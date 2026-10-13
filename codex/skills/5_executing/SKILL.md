@@ -74,6 +74,15 @@ Before doing implementation work:
      persistent PROJ worktree and the runner re-executes there; do not implement
      from the control checkout. Dependencies are isolated, while `.env.local`,
      development data, and hosted-auth limits are deliberately shared.
+   - **Unattended handoff, once, on `P0:done`:** run, in `.worktree.path`, the probe
+     block of `references/unattended-handoff.md`. `SKIP` (runner-managed lane, or past
+     P0) → continue silently. `ASK` → ask the user once (a numbered question
+     where there is no question tool), with its prerequisite lines shown:
+     "Run P5 to PR unattended (`runner/run-phase.sh auto <X> <theme>`), or
+     continue interactively?" A missing prerequisite names what degrades or
+     blocks; the choice stays the user's. Unattended → run the launch block,
+     print what the file lists, and end the turn: no polling, no further work
+     here. Interactive → continue.
    - **On every implementation start or resume**, after verifying the worktree path and before launching workers, run `node ~/.codex/skills/5_executing/scripts/sync-framework.mjs`. Use the installed command, not a potentially stale project copy. A non-zero result blocks implementation: reconcile reported differences against installed sources, test adaptations, and rerun with `--adopt <reviewed-path>` for each resolved file. Never overwrite or blindly adopt project customizations.
    - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If a refresh changes context tooling or role templates, recompile the context bundles and record them via `state.sh`. This new commit invalidates old gate evidence; never refresh during workers or a gate.
    - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/state.sh transition <X> <theme> P5 running`.

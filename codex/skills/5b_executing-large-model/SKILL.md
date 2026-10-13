@@ -48,6 +48,15 @@ from `5_executing` and the same scripts enforce them.
      decisions, then `cd` into the returned `.worktree.path`.
    - `P0:done` or `P5:*` → continue. The runner's P5 lane arrives here; its
      P0 lane already ran setup.
+   - **Unattended handoff, once, on `P0:done`:** run, in `.worktree.path`, the probe
+     block of `5_executing/references/unattended-handoff.md` (installed copy). `SKIP`
+     (runner-managed lane, or past P0) → continue silently. `ASK` → ask the
+     user once (a numbered question where there is no question tool), with
+     its prerequisite lines shown: "Run P5 to PR unattended
+     (`runner/run-phase.sh auto <X> <theme>`), or continue interactively?" A
+     missing prerequisite names what degrades or blocks; the choice stays the
+     user's. Unattended → run the launch block, print what the file lists, and
+     end the turn: no polling, no further work here. Interactive → continue.
    In framework runs preflights belong to setup — never re-run them here — and
    work happens only inside `.worktree.path` from state; a standalone run works
    in the current checkout after its own preflights. On every

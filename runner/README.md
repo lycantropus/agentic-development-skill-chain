@@ -30,7 +30,9 @@ not seal P5 or unlock the next wave. See the
 ## Typical overnight run
 
 ```bash
-# after CP1 was approved via the Step 5 checkpoint subskill (state.json = CP1:approved):
+# Step 5 starts this for you when you answer its one question after P0:done ("unattended"),
+# detached: setsid nohup ... > <log> 2>&1 &   (see 5_executing/references/unattended-handoff.md)
+# by hand, after CP1 was approved via the Step 5 checkpoint subskill (state.json = CP1:approved):
 runner/run-phase.sh auto <proj-x> <theme>            # P0 → P5 → P6 → P7 → P8
 # morning: read the run's one-line summary and the PR body, then review the PR (CP2)
 # optional cross-PROJ overview: node runner/render-report.mjs morning specs
