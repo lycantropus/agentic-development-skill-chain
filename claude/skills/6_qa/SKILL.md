@@ -357,7 +357,6 @@ verification, fix dispatch, opposite re-verification, and
 `ledger.mjs auto-defer` for Medium/Low. Do not fix, do not transition
 state — report findings in the final output and stop.
 
-**Autonomous mode, standalone (`CLAUDE_AUTONOMOUS_LEVEL=balanced`, no state.json):** skip the question. Auto-fix all Critical/High bugs in order of severity, then by discovery time. Log Medium/Low to `## QA Bugs (deferred)` in progress.md — they're for the user to review post-run, not fix. After 3 failed fix attempts on the same bug, halt (hard stop). On `aggressive`, notify the user but keep running. On `conservative`, halt after any Critical/High bug (user must triage).
 
 ## Bug Severity
 

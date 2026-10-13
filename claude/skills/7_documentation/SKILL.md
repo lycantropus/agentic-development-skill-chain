@@ -351,14 +351,6 @@ Runs only if `## AGENTS.md Candidates` (in progress.md, or the QA finder report 
 
 Never edit `AGENTS.md` without explicit approval per entry. The user owns this file; Skill 7 only facilitates.
 
-**Autonomous mode** (`CLAUDE_AUTONOMOUS_LEVEL=balanced` set):
-
-- `balanced`: auto-merge a candidate only if high-confidence: two or more persona sources flagged the same rule, or the source is `Dr. Sarah Chen (Security)` or a DB-schema/RLS finding. Everything else is marked `[REJECTED-BY-POLICY]`.
-- `conservative`: reject all candidates for later user review.
-- `aggressive`: auto-merge everything.
-
-On 40-line overflow, `balanced` and `aggressive` evict oldest merged entries until within cap; `conservative` halts for user pruning. Log every auto-decision to `5_progress/PROJ-<X>-autonomous-log.md`.
-
 ### 6. CLAUDE.md pointer
 
 Runs if `CLAUDE.md` is missing or contains durable rules.
