@@ -30,6 +30,7 @@ OPTIONAL_SKILLS=(
   refactor-dreamer
   sonar-cli
   supabase-local-dev
+  update-chain
   vibecoder
 )
 EXPECTED=("${CORE_SKILLS[@]}" "${OPTIONAL_SKILLS[@]}")
@@ -123,6 +124,8 @@ while IFS= read -r bugfix_file; do
 done < <(find "$ROOT/codex/skills/bugfixing" -type f | sort)
 check_identical "$ROOT/claude/skills/5b_executing-large-model/SKILL.md" \
   "$ROOT/codex/skills/5b_executing-large-model/SKILL.md"
+check_identical "$ROOT/claude/skills/update-chain/SKILL.md" \
+  "$ROOT/codex/skills/update-chain/SKILL.md"
 check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
   "$ROOT/codex/skills/vibecoder/SKILL.md"
 check_identical "$ROOT/claude/skills/1a_clarification/SKILL.md" \

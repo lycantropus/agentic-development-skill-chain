@@ -81,12 +81,13 @@ the installers to obtain new releases. Sync compares with those installed files,
 not a remote branch, and never silently discards project-specific adaptations.
 
 - Existing skill folders with the same names are overwritten.
+- The `update-chain` skill does this from inside a session: it clones the upstream repo, shows which installed skills change, and runs the installer for the current provider.
 - The installed folders are copies, not Git repositories. To update another
   machine, pull this skill-chain repository there and run both installers
   again; do not try to push from `~/.claude/skills/` or `~/.codex/skills/`.
 - Re-running the installers also refreshes the shared P0/P8 worktree helper,
   the plan-consistency validator, and the provider-specific Wave Gate.
-- The 0-to-8 core chain and its `cross-review` mechanism are installed, along with the documented optional skills: `bugfixing`, `refactor-dreamer`, `sonar-cli`, `supabase-local-dev`, and `vibecoder`.
+- The 0-to-8 core chain and its `cross-review` mechanism are installed, along with the documented optional skills: `bugfixing`, `refactor-dreamer`, `sonar-cli`, `supabase-local-dev`, `update-chain`, and `vibecoder`.
 - `CLAUDE.md` is not installed as a skill. It is a repo-level pointer file only.
 
 ## Updating an existing PROJ for the optimized gates

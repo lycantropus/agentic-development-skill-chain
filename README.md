@@ -117,6 +117,7 @@ bugfixing
 refactor-dreamer
 sonar-cli
 supabase-local-dev
+update-chain
 vibecoder
 ```
 
