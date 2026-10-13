@@ -161,6 +161,15 @@ Read the `### SonarCloud` block in `5_progress/PROJ-<X>-progress.md`.
 - Do not run `sonar-scanner` during QA. The scan belongs to Skill 5's Quality Gate; QA consumes its result and verifies any unresolved high-signal findings.
 - Treat MINOR/INFO findings as non-blocking unless manual verification shows real user, security, or maintainability impact.
 
+### 1c. Mutation Input
+
+Read the `### Mutation` block in `5_progress/PROJ-<X>-progress.md`.
+
+- `Status: ran (survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
+- `Status: ran`: no survivors; record it and continue.
+- `Status: skipped (not configured)`: record Mutation as skipped; not a QA blocker.
+- Never run `mutation_cmd` during QA. The run belongs to Skill 5's Quality Gate; QA consumes its result.
+
 ### 2. Browser E2E Testing (Playwright Or Agent Browser)
 
 For every user-facing story implemented, test the changed flow **once in a real browser** using Playwright or the active agent browser/browser automation tools. This is the primary behavioral method — not code review, not reading tests. Reuse authenticated state when auth is only setup; create identities here only when auth itself changed or no cheaper proof exists.
@@ -239,6 +248,8 @@ Before production-readiness is decided, run a focused maintainability pass on th
 
 Ken Takahashi is the primary persona feeding this gate, but the gate itself belongs to QA. Marcus may contribute supporting findings, but Ken owns the minimalism lens. Do not run Ken as a second, separate gate; merge his concrete findings into the Simplicity Gate results.
 
+Step 5's gates already enforce structural complexity, duplication and dependency direction through the project's `complexity_cmd` and `arch_rules_cmd` (check `wave-gate-config.json`). This gate is for what tools cannot decide: code that no PRD or architecture decision requires — scope creep, premature abstraction, speculative options. When a command is configured, do not re-flag what it measures (threshold breaches, mechanical duplicates, forbidden imports); when it is absent, judge those bullets here as before.
+
 Flag a QA bug when the implementation adds complexity that is not required by the PRDs, architecture, or visible product behavior:
 
 - Premature abstractions: generic frameworks, factories, providers, registries, adapters, plugin systems, or configuration layers with one caller or no clear near-term second use.
@@ -262,7 +273,7 @@ Critical/High simplicity findings gate production-readiness the same way functio
 
 ### 7. Document Results
 
-**Framework run (state.json exists): do not edit PRDs or progress.md (read-only finder).** Print the QA summary (per-AC results, Simplicity Gate, Spec vs Standards, Sonar input, AGENTS.md candidates, and the `retrospective` findings from `findings.json` under `## PROJ Retrospective`) as your final output; the runner stores it as `5_progress/qa-finder-<ts>.md`.
+**Framework run (state.json exists): do not edit PRDs or progress.md (read-only finder).** Print the QA summary (per-AC results, Simplicity Gate, Spec vs Standards, Sonar input, Mutation input, AGENTS.md candidates, and the `retrospective` findings from `findings.json` under `## PROJ Retrospective`) as your final output; the runner stores it as `5_progress/qa-finder-<ts>.md`.
 
 **Interactive run:** for each PRD tested, append a `## QA Test Results` section to that PRD file (`specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`) using `references/test-template.md` as the format. Write the same summary sections under `## QA Results` in `5_progress/PROJ-<X>-progress.md`, and append the persona `retrospective` findings verbatim under `## PROJ Retrospective`, each prefixed with the persona name.
 
@@ -291,6 +302,10 @@ Also document the `### Simplicity Gate Results` for the PROJ:
 - Simplification candidates that should become AGENTS.md rules if they are project-wide and repeatable
 
 Also document `### Spec vs Standards` (separate lists, no merged ranking): **Spec** = missing/partial/wrong requirements and scope creep against the PRDs, with the AC quoted; **Standards** = violations of `AGENTS.md`/documented conventions, with the rule cited. Carry over the Quality Gate's axis tags and add QA's own findings.
+
+Also document `### Mutation Quality Input`:
+- `ran`, `ran (survivors carried forward)` with the survivor count, or `skipped (not configured)`
+- Surviving mutants promoted to QA bugs, with BUG-IDs and severity (High on security/auth paths, otherwise Medium)
 
 Also document `### Sonar Quality Input`:
 - `ran` with counts by severity, or `skipped` with the exact reason from Skill 5
@@ -344,6 +359,7 @@ Report to the user:
 - Spec vs Standards: findings and worst issue per axis, reported separately
 - Simplicity gate findings and whether any release-blocking complexity remains
 - Sonar quality input: ran/skipped, blocking findings promoted to QA bugs
+- Mutation quality input: ran/skipped, surviving mutants promoted to QA bugs
 - **QA persona cross-review:** provider, degraded status, round result
 - Screenshots taken during testing
 - **AGENTS.md candidates:** count + one-line summary of each, plus reminder that Skill 7 will ask for approval before merging.
