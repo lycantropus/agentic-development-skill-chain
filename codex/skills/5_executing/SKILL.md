@@ -78,11 +78,14 @@ Before doing implementation work:
      block of `references/unattended-handoff.md`. `SKIP` (runner-managed lane, or past
      P0) → continue silently. `ASK` → ask the user once (a numbered question
      where there is no question tool), with its prerequisite lines shown:
-     "Run P5 to PR unattended (`runner/run-phase.sh auto <X> <theme>`), or
-     continue interactively?" A missing prerequisite names what degrades or
-     blocks; the choice stays the user's. Unattended → run the launch block,
-     print what the file lists, and end the turn: no polling, no further work
-     here. Interactive → continue.
+     "Run P5 to PR unattended (`runner/run-phase.sh auto <X> <theme>`), drive
+     it to the PR in this session (keep it going with `/goal`), or continue
+     interactively?" A missing prerequisite names what degrades or blocks; the
+     choice stays the user's. Unattended → run the launch block, print what the
+     file lists, and end the turn: no polling, no further work here. In this
+     session → follow `references/in-session-driver.md` from the quality gate
+     to the PR and tell the user to set the `/goal` it names. Interactive →
+     continue.
    - **On every implementation start or resume**, after verifying the worktree path and before launching workers, run `node ~/.codex/skills/5_executing/scripts/sync-framework.mjs`. Use the installed command, not a potentially stale project copy. A non-zero result blocks implementation: reconcile reported differences against installed sources, test adaptations, and rerun with `--adopt <reviewed-path>` for each resolved file. Never overwrite or blindly adopt project customizations.
    - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If a refresh changes context tooling or role templates, recompile the context bundles and record them via `state.sh`. This new commit invalidates old gate evidence; never refresh during workers or a gate.
    - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/state.sh transition <X> <theme> P5 running`.
@@ -676,7 +679,8 @@ Skill 5 stops after implementation, wave gates, and the integration-focused PROJ
 `bash scripts/quality-gate-proof.sh <X> <theme>` MUST exit 0 first, then run
 `bash scripts/state.sh transition <X> <theme> P5 done`. The phase runner
 then starts P6 as fresh lanes (read-only QA finder + P6 controller);
-do NOT continue into Skill 6 inside this session.
+do NOT continue into Skill 6 inside this session, unless the user chose the in-session
+driver: then follow `references/in-session-driver.md` (it runs QA as a read-only finder in a subagent and the controller itself).
 
 Before invoking Skill 6 (interactive runs):
 

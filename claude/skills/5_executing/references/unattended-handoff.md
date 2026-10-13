@@ -28,7 +28,7 @@ else
   done
   [ -z "$off" ] && echo "permissions: ok" || echo "permissions: bypass mode disabled -> the claude lane stops at its first prompt"
   [ -x "${SKILLCHAIN_RUNNER:-runner/run-phase.sh}" ] && echo "runner: ok" \
-    || echo "runner: NOT FOUND -> set SKILLCHAIN_RUNNER=<chain checkout>/runner/run-phase.sh, or continue interactively"
+    || echo "runner: NOT FOUND (unattended only) -> set SKILLCHAIN_RUNNER=<chain checkout>/runner/run-phase.sh, or continue interactively"
 fi
 ```
 

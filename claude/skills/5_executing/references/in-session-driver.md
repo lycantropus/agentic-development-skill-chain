@@ -1,0 +1,58 @@
+# In-session driver (P5 done → PR)
+
+For the answer "drive it to the PR in this session". The lead does what the
+runner's phase lanes do, from `.worktree.path`, under the same state, ledger and
+stop rules, and asks nothing until a stop condition. Under `/goal` (for example
+`/goal PROJ-<X> has an open PR and state.json is P8:done`) the session keeps
+taking turns: never end a turn before the exit or a stop. No `/compact` flush
+between phases; every heavy step below runs in a subagent so this context keeps
+only verdicts. `scripts/test-in-session-driver.sh` executes the mechanical blocks.
+
+Entry is state-driven: read `bash scripts/state.sh get <X> <theme> '.phase + ":" + .status'`
+and continue at the matching step, so a fresh session resumes anywhere.
+
+1. **`P5:running` after the Quality Gate proof:** `bash scripts/state.sh transition <X> <theme> P5 done`.
+2. **P6** (`P5:done` → `transition P6 running`; `P6:running` → continue):
+   1. **Finder**, skipped when `.qa.finder_report` is already set. One fresh,
+      read-only subagent: "Load and execute the QA skill qa (6_qa) READ-ONLY for
+      specs/PROJ-<X>-<theme>: find bugs, do not fix anything. Emit each finding
+      as one JSON line on stdout ({"source":"qa","severity":...,"summary":...});
+      you must not write files or run mutating commands." Its persona review
+      (`cross-review.sh --personas`) is the opposite-provider panel: six
+      separate Codex workers, or six Claude workers on the strongest model when
+      Codex is unavailable (say so). Compare `git status --porcelain | sha1sum`
+      before and after; a changed tree is a stop. Then ingest its output
+      (`$OUT`), keeping the report text on disk:
+
+      ```bash ingest
+      grep '^{' "$OUT" | jq -c 'select(type == "object" and .source? and .severity? and .summary?)' \
+        | node scripts/ledger.mjs add <X> <theme> || true
+      REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
+      grep -v '^{' "$OUT" >"$REPORT" || true
+      bash scripts/state.sh set <X> <theme> .qa.finder_report "$REPORT"
+      ```
+   2. **Controller:** follow `references/p6-controller.md` with `<X>` and
+      `<theme>` filled in. Fixers are workers, tiered as in Step 5. A fixer never
+      certifies its own repair: re-verify with
+      `bash scripts/cross-review.sh qa <X> <theme> --personas --persist --round N …`
+      as in `6_qa` (six separate processes on the opposite provider).
+   3. **Seal** only when `node scripts/ledger.mjs stats <X> <theme> | jq .open_blocking`
+      is `0`: `bash scripts/state.sh transition <X> <theme> P6 done`.
+3. **P7:** `transition P7 running`, then `/7_documentation` for the PROJ; it runs
+   the framework curation and gates and seals `P7 done`. A red gate is a stop.
+4. **P8:** `/8_delivery` for the PROJ; it transitions, opens the PR, polls CI and
+   seals `P8 done`. An open PR is the success state.
+5. **Finish:** one line: the PR URL, CI result, and the open Medium/Low debt count.
+
+**Stop conditions** are the runner's: three failed repair attempts on the same
+Critical/High finding, a red gate, a sealed P6 with open Critical/High, a finder
+that modified the tree. Record the cause, park the run, and end the turn:
+
+```bash stop
+bash scripts/state.sh set <X> <theme> .stop "{\"reason\": $(jq -Rn --arg r "$REASON" '$r'), \"at\": \"$(date -Iseconds)\"}"
+bash scripts/state.sh transition <X> <theme> "$(bash scripts/state.sh get <X> <theme> .phase)" blocked
+```
+
+Uncommitted work stays in the worktree. Tell the user to clear the goal
+(`/goal clear`): a parked run cannot meet it. After the fix:
+`bash scripts/state.sh transition <X> <theme> <phase> running`, then re-invoke Step 5.

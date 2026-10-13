@@ -35,7 +35,7 @@ Detect where the user is in the 0-to-8 skill chain and tell them what to do next
 
 Each PROJ has its folder `specs/PROJ-<X>-<theme>/`; each subfolder carries the number of the skill that writes it (architecture and plans share `3-4_plan/`). Progress is one file, `5_progress/PROJ-<X>-progress.md`. Framework runs add machine state `state.json` (only via `scripts/state.sh`) and the findings ledger `findings.json` (only via `scripts/ledger.mjs`).
 
-**Unattended runs** start from one question: once Step 5 has sealed `P0:done`, it asks whether to run P5 to a PR unattended (`runner/run-phase.sh auto <X> <theme>`, started detached; ends with an open PR and a one-line summary, morning report: `node runner/render-report.mjs morning specs`) or continue interactively. It is asked once and skipped inside the runner's own lanes.
+**Unattended runs** start from one question: once Step 5 has sealed `P0:done`, it asks whether to run P5 to a PR unattended (`runner/run-phase.sh auto <X> <theme>`, started detached; ends with an open PR and a one-line summary, morning report: `node runner/render-report.mjs morning specs`) drive it to the PR in this session (`5_executing/references/in-session-driver.md`; keep the session going with `/goal`), or continue interactively. It is asked once and skipped inside the runner's own lanes.
 
 ## Two Tracks
 

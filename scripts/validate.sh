@@ -104,6 +104,8 @@ check_identical() {
   done
 }
 check_identical "$ROOT/claude/skills/5_executing/scripts/wave-gate.sh" "$ROOT/codex/skills/5_executing/scripts/wave-gate.sh"
+check_identical "$ROOT/runner/prompts/p6-controller.md" "$ROOT/claude/skills/5_executing/references/p6-controller.md" "$ROOT/codex/skills/5_executing/references/p6-controller.md"
+check_identical "$ROOT/claude/skills/5_executing/references/in-session-driver.md" "$ROOT/codex/skills/5_executing/references/in-session-driver.md"
 check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/skills/5_executing/scripts/state.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
 check_identical "$ROOT/claude/skills/7_documentation/scripts/curation-caps.sh" \
@@ -176,6 +178,7 @@ harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
 harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
 harness unattended-handoff  bash "$ROOT/scripts/test-unattended-handoff.sh"
+harness in-session-driver   bash "$ROOT/scripts/test-in-session-driver.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
 harness ledger              bash "$ROOT/scripts/test-ledger.sh"
 harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"
