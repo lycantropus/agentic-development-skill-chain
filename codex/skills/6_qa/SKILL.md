@@ -51,7 +51,7 @@ QA finds, documents, and prioritizes bugs. QA NEVER fixes bugs.
 
 **Ownership boundary (framework runs):** this skill is a strictly
 read-only FINDER. In a framework run (state.json exists) the P6 phase
-controller — a separate lane started by the phase runner — owns ledger
+controller — a separate lane started by the phase runner, or the lead of an in-session driver run — owns ledger
 triage, false-positive verification, fix dispatch, and fresh
 provider-opposite re-verification. This skill only tests and writes
 findings; it never dispatches fixes and never seals the P6 phase.
@@ -353,12 +353,11 @@ Then ask: **"Which bugs should be fixed first?"**
 
 **Framework run (state.json exists) — autonomy policy §8:** skip the
 question AND the fixing. This skill ends after documenting findings and
-emitting ledger records; the P6 phase controller (separate lane) owns
+emitting ledger records; the P6 phase controller (separate lane, or the in-session driver's lead) owns
 verification, fix dispatch, opposite re-verification, and
 `ledger.mjs auto-defer` for Medium/Low. Do not fix, do not transition
 state — report findings in the final output and stop.
 
-**Autonomous mode, standalone (`CODEX_AUTONOMOUS_LEVEL=balanced`, no state.json):** skip the question. Auto-fix all Critical/High bugs in order of severity, then by discovery time. Log Medium/Low to `## QA Bugs (deferred)` in progress.md — they're for the user to review post-run, not fix. After 3 failed fix attempts on the same bug, halt (hard stop). On `aggressive`, notify the user but keep running. On `conservative`, halt after any Critical/High bug (user must triage).
 
 ## Bug Severity
 

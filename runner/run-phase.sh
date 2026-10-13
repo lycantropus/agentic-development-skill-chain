@@ -81,23 +81,29 @@ if [ "$WRITER_MODEL" = "$REVIEW_MODEL" ]; then
   exit 64
 fi
 
+skill_file() { # <skill> <relative-path> -> first existing copy: chain checkout layout, then the installed layout (runner shipped to <skills>/5_executing/runner)
+  local c
+  for c in "$RUNNER_DIR/../claude/skills/$1/$2" "$RUNNER_DIR/../codex/skills/$1/$2" "$RUNNER_DIR/../../$1/$2"; do
+    [ -e "$c" ] && { echo "$c"; return 0; }
+  done
+  return 1
+}
+
 # state.sh: prefer the repo copy (P0 setup installs it), fall back to the skill tree
 if [ -x scripts/state.sh ]; then
   STATE_SH="scripts/state.sh"
-elif [ -x "$RUNNER_DIR/../claude/skills/5_executing/scripts/state.sh" ]; then
-  STATE_SH="$RUNNER_DIR/../claude/skills/5_executing/scripts/state.sh"
+elif STATE_SH="$(skill_file 5_executing scripts/state.sh)" && [ -x "$STATE_SH" ]; then
+  :
 else
   echo "run-phase.sh: state.sh not found (scripts/state.sh or skill tree)" >&2; exit 1
 fi
 
 LEDGER=""
 [ -f scripts/ledger.mjs ] && LEDGER="scripts/ledger.mjs"
-[ -z "$LEDGER" ] && [ -f "$RUNNER_DIR/../claude/skills/6_qa/scripts/ledger.mjs" ] && LEDGER="$RUNNER_DIR/../claude/skills/6_qa/scripts/ledger.mjs"
+[ -n "$LEDGER" ] || LEDGER="$(skill_file 6_qa scripts/ledger.mjs || true)"
 
 WORKTREE_HELPER=""
-for candidate in scripts/worktree.sh \
-  "$RUNNER_DIR/../claude/skills/5_executing/scripts/worktree.sh" \
-  "$RUNNER_DIR/../codex/skills/5_executing/scripts/worktree.sh"; do
+for candidate in scripts/worktree.sh "$(skill_file 5_executing scripts/worktree.sh || true)"; do
   if [ -x "$candidate" ]; then WORKTREE_HELPER="$(realpath -m "$candidate")"; break; fi
 done
 WORKTREE_WAS_REMOVED=0
@@ -335,14 +341,14 @@ open_cross_review_blocking() {
 curation_caps_path() { # repo copy first (P0 setup installs it), then skill tree
   if [ -f scripts/curation-caps.sh ]; then
     echo "scripts/curation-caps.sh"
-  elif [ -f "$RUNNER_DIR/../claude/skills/7_documentation/scripts/curation-caps.sh" ]; then
-    echo "$RUNNER_DIR/../claude/skills/7_documentation/scripts/curation-caps.sh"
+  else
+    skill_file 7_documentation scripts/curation-caps.sh || true
   fi
 }
 
 quality_gate_proof_path() {
   local p
-  for p in scripts/quality-gate-proof.sh "$RUNNER_DIR/../claude/skills/5_executing/scripts/quality-gate-proof.sh"; do
+  for p in scripts/quality-gate-proof.sh "$(skill_file 5_executing scripts/quality-gate-proof.sh || true)"; do
     [ -f "$p" ] && { echo "$p"; return 0; }
   done
   return 1
@@ -350,7 +356,7 @@ quality_gate_proof_path() {
 
 ci_poll_path() {
   local p
-  for p in scripts/ci-poll.sh "$RUNNER_DIR/../claude/skills/8_delivery/scripts/ci-poll.sh"; do
+  for p in scripts/ci-poll.sh "$(skill_file 8_delivery scripts/ci-poll.sh || true)"; do
     [ -f "$p" ] && { echo "$p"; return 0; }
   done
   return 1
@@ -435,6 +441,11 @@ setup_providers() {
   fi
 }
 
+tree_snapshot() { # read-only proof for the finder: status + content of everything except the ledger and state the QA scripts legitimately write
+  { git status --porcelain -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'
+    git diff HEAD -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'; } 2>/dev/null | sha1sum
+}
+
 run_p6() {
   # Stage 1/2: read-only QA finder — SEQUENTIAL, before the controller,
   # so every finding is in the ledger before triage starts (review fix #1).
@@ -442,15 +453,15 @@ run_p6() {
   ts="$(date +%Y%m%d-%H%M%S)"
   finder_out="$LANE_DIR/P6-${PEER}-finder-${ts}.out"
   render_prompt peer "Load and execute the QA skill qa (6_qa) READ-ONLY for specs/PROJ-${PROJ}-${THEME}: find bugs, do not fix anything. Emit each finding as one JSON line on stdout ({\"source\":\"qa\",\"severity\":...,\"summary\":...}); the runner ingests them into the ledger — you must not write files or run mutating commands." finder_prompt
-  tree_before="$(git status --porcelain 2>/dev/null | sha1sum)"
+  tree_before="$(tree_snapshot)"
   step "P6 finder lane (sequential, before controller): $PEER — output $finder_out"
   launch_lane "$PEER" peer "$finder_prompt" "$finder_out"
   finder_pid="$LANE_PID"; finder_start="$(date -Iseconds)"
   wait_lanes "$finder_pid"
+  tree_after="$(tree_snapshot)"   # before record_lane: runner bookkeeping is not the finder's write
   record_lane "$PEER" peer "$LANE_MODEL" "$finder_start" "$(date -Iseconds)" "$WRITER_RC" "$finder_out"
   [ "$TIMED_OUT" -eq 1 ] && stop_run "P6 finder timed out after ${TIMEOUT}s" "$finder_out"
   [ "$WRITER_RC" -ne 0 ] && stop_run "P6 finder lane ($PEER) exited $WRITER_RC — no QA verdict, cannot continue" "$finder_out"
-  tree_after="$(git status --porcelain 2>/dev/null | sha1sum)"
   [ "$tree_before" = "$tree_after" ] || stop_run "P6 finder modified the working tree — finder must be read-only" "$finder_out"
   ingest_findings "$finder_out"
   store_finder_report "$finder_out" "$ts"

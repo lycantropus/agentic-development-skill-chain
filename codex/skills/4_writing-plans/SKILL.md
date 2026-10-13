@@ -197,7 +197,7 @@ Say once, then end the turn:
 
 > "Plans complete in `specs/PROJ-<X>-<theme>/3-4_plan/` (wave plans + `wave-gate-config.json`). Run `/compact` (or open a fresh session), then `/5b_executing-large-model` (or `/5_executing` on a weaker model): it runs CP1 and P0 (branch + preflight) through the Step 5 subskills; the setup subskill installs the gate scripts and preflights `jq`, `coderabbit`, and browser tooling in the PROJ worktree. Quality Gate and QA follow the last wave automatically.
 >
-> For an unattended run add **'continue automatic until delivery, goal is PR draft'**: after CP1 and P0, `runner/run-phase.sh auto <X> <theme>` runs P5–P8 ending in an open PR and a one-line run summary. No other approval stop follows CP1."
+> Once P0 is done, Step 5 asks whether to run P5 to a PR unattended or continue interactively."
 
 ## Rules
 

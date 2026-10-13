@@ -2,7 +2,7 @@
 # spike-stage2.sh — Stage 2 verification spike / release gate (CONCEPT.md §10.2).
 #
 # Proves, on disposable fixtures:
-#   context compiler   — determinism, budget breach writes nothing, projection
+#   context compiler   — determinism, a budget breach blocks only that role, projection
 #                        hash parity (claude/codex embed the canonical body),
 #                        verify catches drift and tampering
 #   context injector   — tier matrix (micro-fixer/explore nothing, frontend vs
@@ -90,11 +90,16 @@ node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
 S2="$(cat "$CTX"/bundle-*.md | sha1sum)"
 [ "$S1" = "$S2" ] && ok "deterministic: two compiles are byte-identical" || bad "compiles differ"
 
-BEFORE="$(find "$CTX" -type f -exec sha1sum {} + | sha1sum)"
-CONTEXT_BUNDLE_BUDGET=40 node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
+# A budget breach blocks only the breaching role: no bundle is written for it and
+# blocked-roles.json records the denial (a budget of 40 tokens blocks every role).
+CONTEXT_BUNDLE_BUDGET=40 node scripts/compile-context-bundles.mjs compile 96 stage2 --wave all >/dev/null 2>&1
 RC=$?
-AFTER="$(find "$CTX" -type f -exec sha1sum {} + | sha1sum)"
-[ "$RC" -ne 0 ] && [ "$BEFORE" = "$AFTER" ] && ok "budget breach: exit != 0 and NOTHING written" || bad "budget breach rc=$RC, dir changed: $([ "$BEFORE" != "$AFTER" ] && echo yes || echo no)"
+NBLOCKED="$(jq length "$CTX/blocked-roles.json" 2>/dev/null || echo 0)"
+NBUNDLES="$(find "$CTX" -name 'bundle-*.md' | wc -l | tr -d ' ')"
+[ "$RC" -eq 0 ] && [ "$NBLOCKED" -gt 0 ] && [ "$NBUNDLES" -eq 0 ] \
+  && ok "budget breach: role blocked in blocked-roles.json, no bundle written for it" \
+  || bad "budget breach rc=$RC blocked=$NBLOCKED bundles=$NBUNDLES"
+node scripts/compile-context-bundles.mjs compile 96 stage2 --wave all >/dev/null 2>&1   # restore for the checks below
 
 PARITY_OK=1
 for r in implementer frontend-implementer backend-implementer reviewer; do

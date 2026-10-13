@@ -35,7 +35,7 @@ Detect where the user is in the 0-to-8 skill chain and tell them what to do next
 
 Each PROJ has its folder `specs/PROJ-<X>-<theme>/`; each subfolder carries the number of the skill that writes it (architecture and plans share `3-4_plan/`). Progress is one file, `5_progress/PROJ-<X>-progress.md`. Framework runs add machine state `state.json` (only via `scripts/state.sh`) and the findings ledger `findings.json` (only via `scripts/ledger.mjs`).
 
-**Autonomous full-chain runs** go through the phase runner: after Step 5 seals `CP1:approved`, `runner/run-phase.sh auto <X> <theme>` drives P0 → P5 → P6 → P7 → P8 unattended and ends with an open PR and a one-line summary (morning report: `node runner/render-report.mjs morning specs`). Interactive use stays supported.
+**Unattended runs** start from one question: once Step 5 has sealed `P0:done`, it asks whether to run P5 to a PR unattended (`runner/run-phase.sh auto <X> <theme>`, started detached; ends with an open PR and a one-line summary, morning report: `node runner/render-report.mjs morning specs`) drive it to the PR in this session (`5_executing/references/in-session-driver.md`; keep the session going with `/goal`), or continue interactively. It is asked once and skipped inside the runner's own lanes.
 
 ## Two Tracks
 
@@ -103,8 +103,8 @@ Tell the user the detected state (artifact path) and the next step, in one or tw
 | PRDs, no architecture | **architecture** (3) |
 | Architecture, no wave plans | **writing-plans** (4) |
 | Wave plans, no state.json | **executing-large-model** (5b): Checkpoint 1 (subskill, decision log, `CP1:approved`), P0 setup, then the waves; standalone preflights without the framework. Weaker writer model: **executing** (5) |
-| `CP1:approved`, no P0 | **executing-large-model** (5b) runs P0 and continues; unattended: `runner/run-phase.sh auto <X> <theme>` |
-| `P0:done`, no implementation | **executing-large-model** (5b) interactively, or `runner/run-phase.sh auto <X> <theme>` (dual-lane, ends with an open PR) |
+| `CP1:approved`, no P0 | **executing-large-model** (5b) runs P0, then asks once: unattended (`runner/run-phase.sh auto <X> <theme>`) or interactive |
+| `P0:done`, no implementation | **executing-large-model** (5b): asks once, unattended (`runner/run-phase.sh auto <X> <theme>`, dual-lane, ends with an open PR) or interactive |
 | `*:blocked` | Run parked: read `5_progress/stop-report.md` (what happened, rescue branch, cleanup list); after the fix `bash scripts/state.sh transition <X> <theme> <phase> running`, re-run the phase |
 | Some waves passed | Next wave `<N>` with the variant the run started in (5b or 5; progress.md records it) |
 | All waves passed, no QA | **qa** (6) |

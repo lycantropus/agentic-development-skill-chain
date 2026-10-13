@@ -18,4 +18,9 @@ for skill in "$ROOT"/claude/skills/*; do
   cp -R "$skill" "$DEST/$name"
 done
 
+# The phase runner ships next to its skill, so unattended runs work in any project.
+rm -rf "${DEST:?}/5_executing/runner"
+cp -R "$ROOT/runner" "$DEST/5_executing/runner"
+rm -f "$DEST"/5_executing/runner/spike-*.sh
+
 echo "Installed Claude skills to $DEST"

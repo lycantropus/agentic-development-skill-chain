@@ -66,8 +66,9 @@ developer via Linear at Step 2, no codebase required. See
 
 ## The Agent Workflow Framework
 
-After Step 5 seals CP1 through the checkpoint subskill, the host-neutral phase runner drives the
-execution phases unattended:
+Once Step 5 has sealed P0, it asks once whether to run P5 to a PR unattended, drive it in this
+session under `/goal`, or continue interactively. Unattended starts the host-neutral phase
+runner, detached, which drives the execution phases:
 
 ```bash
 runner/run-phase.sh auto <proj-x> <theme>     # P0 → P5 → P6 → P7 → P8

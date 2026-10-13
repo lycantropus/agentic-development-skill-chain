@@ -92,8 +92,10 @@ After decomposition:
 
 ## Framework Runs (Agent Workflow, Stage 1 + Stage 2)
 
-After Step 5 seals Checkpoint 1 through the checkpoint subskill, the host-neutral phase runner
-(`runner/run-phase.sh auto <X> <theme>`) drives P0 → P5 → P6 → P7 → P8
+Once Step 5 has sealed P0 (`P0:done`), it asks once whether to run P5 to a PR unattended, drive it
+to the PR in the current session (the lead plays the runner's role; `/goal` keeps the session
+turning), or continue interactively. On unattended it starts the host-neutral phase runner detached
+(`runner/run-phase.sh auto <X> <theme>`), which drives P5 → P6 → P7 → P8
 unattended — dual Claude + Codex lanes with a single writer-orchestrator per phase,
 `state.json`/`findings.json` as the only handoff, and a stop policy: a failed
 writer, timeout, unsealed phase, or red gate parks the run — rescue branch

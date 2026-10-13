@@ -47,7 +47,20 @@ from `5_executing` and the same scripts enforce them.
      path. `P0:blocked` back → stop and report its reason. Relay any defaulted
      decisions, then `cd` into the returned `.worktree.path`.
    - `P0:done` or `P5:*` → continue. The runner's P5 lane arrives here; its
-     P0 lane already ran setup.
+     P0 lane already ran setup. `P6:*`–`P8:*` → resume the in-session driver
+     (`5_executing/references/in-session-driver.md`) at that phase.
+   - **Unattended handoff, once, on `P0:done`:** run, in `.worktree.path`, the probe
+     block of `5_executing/references/unattended-handoff.md` (installed copy). `SKIP`
+     (runner-managed lane, or past P0) → continue silently. `ASK` → ask the
+     user once (a numbered question where there is no question tool), with
+     its prerequisite lines shown: "Run P5 to PR unattended
+     (`runner/run-phase.sh auto <X> <theme>`), drive it to the PR in this
+     session (keep it going with `/goal`), or continue interactively?" A
+     missing prerequisite names what degrades or blocks; the choice stays the
+     user's. Unattended → run the launch block, print what the file lists, and
+     end the turn: no polling, no further work here. In this session → follow
+     `5_executing/references/in-session-driver.md` from the quality gate to the
+     PR and tell the user to set the `/goal` it names. Interactive → continue.
    In framework runs preflights belong to setup — never re-run them here — and
    work happens only inside `.worktree.path` from state; a standalone run works
    in the current checkout after its own preflights. On every
@@ -120,7 +133,8 @@ from `5_executing` and the same scripts enforce them.
    `## Quality Gate — PROJ-X` section, then `bash scripts/quality-gate-proof.sh <X> <theme>`
    must exit 0.
 9. **Handoff.** Framework run: `bash scripts/state.sh transition <X> <theme> P5 done`
-   and stop; the runner starts P6 as fresh lanes. Interactive run: invoke
+   and stop; the runner starts P6 as fresh lanes. In-session driver run: go on
+   with `5_executing/references/in-session-driver.md`. Interactive run: invoke
    `/6_qa`. Skill 5 never performs QA itself and never skips Skill 6.
 10. **Learnings.** When a worker or the lead hits a wall and gets past it, the
     workaround goes into the feature folder's `agent.md` immediately, using
