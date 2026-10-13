@@ -28,27 +28,36 @@ for p in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running"; do $S
 # 1. The driver's phase sequence is legal as written (P5 done -> ... -> P8 done).
 for p in "P5 done" "P6 running"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done
 
-# 2. Finder ingest fails closed. Malformed lines are dropped one by one (a bad line
-#    BEFORE a valid High finding must not hide it); empty output or a failing ledger
-#    must not record a finder report; the report holds the prose only.
+# 2. Finder ingest fails closed: no complete report, ANY malformed finding line (also
+#    malformed-only output), or a failing ledger must not record a finder report.
 recorded() { jq -r '.qa.finder_report // empty' specs/PROJ-1-demo/state.json; }
-: >"$CASE/empty.out"
-if OUT="$CASE/empty.out" bash "$CASE/ingest.sh" >/dev/null 2>&1; then die 'empty finder output must fail the ingest'; fi
-[ -z "$(recorded)" ] || die 'empty finder output must not record a report'
-cat >"$CASE/finder.out" <<'EOF2'
+ingest_fails() { # <label> <file>
+  if OUT="$2" bash "$CASE/ingest.sh" >/dev/null 2>&1; then die "$1 must fail the ingest"; fi
+  [ -z "$(recorded)" ] || die "$1 must not record a report"
+}
+: >"$CASE/empty.out";                 ingest_fails 'empty finder output' "$CASE/empty.out"
+printf 'partial notes only\n' >"$CASE/partial.out"; ingest_fails 'a report without a verdict' "$CASE/partial.out"
+printf '## QA Results\nProduction-ready recommendation: NO\n{not json\n' >"$CASE/malformed-only.out"
+ingest_fails 'malformed-only finding lines' "$CASE/malformed-only.out"
+cat >"$CASE/malformed-first.out" <<'EOF2'
 {not json
 ## QA Results
+Production-ready recommendation: NO
+{"source":"qa","severity":"high","summary":"login drops session"}
+EOF2
+ingest_fails 'a malformed line before a valid High' "$CASE/malformed-first.out"
+cat >"$CASE/finder.out" <<'EOF2'
+## QA Results
 All ACs tested.
+Production-ready recommendation: NO
 {"source":"qa","severity":"high","category":"bug","summary":"login drops session","file":"src/a.ts","line":3}
-{"source":"qa","summary":"no severity, must be dropped"}
 {"source":"qa","severity":"low","summary":"typo in empty state","file":"src/b.ts","line":9}
 EOF2
 cp scripts/ledger.mjs "$CASE/ledger.real"; printf 'process.exit(1)\n' >scripts/ledger.mjs
-if OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1; then die 'a failing ledger must fail the ingest'; fi
-[ -z "$(recorded)" ] || die 'a failing ledger must not record a report'
+ingest_fails 'a failing ledger' "$CASE/finder.out"
 cp "$CASE/ledger.real" scripts/ledger.mjs
-OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1 || die 'ingest block failed'
-[ "$(jq '.findings | length' specs/PROJ-1-demo/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 valid findings (malformed line first)'
+OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1 || die 'ingest block failed on a well-formed report'
+[ "$(jq '.findings | length' specs/PROJ-1-demo/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 findings'
 rep="$(recorded)"
 [ -f "$rep" ] || die "recorded finder report missing: $rep"
 grep -q '^## QA Results' "$rep" && ! grep -q '^{' "$rep" || die 'report must hold the prose only'

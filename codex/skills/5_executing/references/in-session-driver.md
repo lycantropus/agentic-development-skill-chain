@@ -21,23 +21,33 @@ and continue at the matching step, so a fresh session resumes anywhere.
       you must not write files or run mutating commands." Its persona review
       (`cross-review.sh --personas`) is the opposite-provider panel: six
       separate Codex workers, or six Claude workers on the strongest model when
-      Codex is unavailable (say so). A finder that errors, returns nothing
-      (`$OUT` empty), or changes the tree is a stop. Snapshot the tree before and
-      after with `{ git status --porcelain; git diff HEAD; } | sha1sum`. There is
-      no wall-clock bound in-session; only the detached runner has `--timeout`.
-      Ingest fails closed: the report is recorded only after the ledger accepted
-      the findings. Malformed lines are dropped one by one, as the runner does.
+      Codex is unavailable (say so). A finder that errors, returns no complete
+      report (no `Production-ready recommendation:` line), emits a malformed
+      finding line, or changes the tree is a stop: re-run it once, a second
+      failure parks the run. Snapshot the tree before and after with
+      `{ git status --porcelain; git diff HEAD -- . ':(exclude)specs'; } | sha1sum`
+      (edits to existing untracked or ignored files are not covered; `specs/`
+      is excluded because the QA scripts legitimately write the ledger and
+      state). There is no wall-clock bound in-session; only the detached runner
+      has `--timeout`. Ingest fails closed: the report is recorded only after
+      the ledger accepted every finding line.
 
       ```bash ingest
-      if [ ! -s "$OUT" ]; then echo "finder returned no output"; false; else
+      if [ ! -s "$OUT" ] || ! grep -q 'Production-ready recommendation' "$OUT"; then
+        echo "finder returned no complete QA report"; false
+      else
+        ALL="$(grep -c '^{' "$OUT" || true)"
         VALID="$(grep '^{' "$OUT" | while IFS= read -r l; do
           jq -c 'select(type == "object" and .source? and .severity? and .summary?)' <<<"$l" 2>/dev/null
         done)"
-        { [ -z "$VALID" ] || printf '%s\n' "$VALID" | node scripts/ledger.mjs add <X> <theme>; } && {
-          REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
-          grep -v '^{' "$OUT" >"$REPORT" || true
-          bash scripts/state.sh set <X> <theme> .qa.finder_report "$REPORT"
-        }
+        GOOD="$(printf '%s' "$VALID" | grep -c . || true)"
+        if [ "$GOOD" != "$ALL" ]; then echo "malformed finding line(s): $GOOD of $ALL valid; re-run the finder"; false; else
+          { [ -z "$VALID" ] || printf '%s\n' "$VALID" | node scripts/ledger.mjs add <X> <theme>; } && {
+            REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
+            grep -v '^{' "$OUT" >"$REPORT" || true
+            bash scripts/state.sh set <X> <theme> .qa.finder_report "$REPORT"
+          }
+        fi
       fi
       ```
    2. **Controller:** follow `references/p6-controller.md` with `<X>` and
