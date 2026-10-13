@@ -69,6 +69,7 @@ Task tool:
     - Never claim a test passes without running it and reading the output
     - A test that depends on external state (provider rate budget, suite order, or time) must establish that state itself or explicitly assert it. “Nothing happened” needs a positive control: prove the valid session/input/path would work, and do not let a polling matcher pass before observing the intended transition.
     - Minimal implementation — YAGNI, do not build beyond what the tasks ask
+    - [Only when the PROJ config has `complexity_cmd`:] Do not polish structure beyond the story; the wave gate checks complexity and dependency rules and returns failures to you.
     - If stuck after 3 attempts, escalate to main agent instead of guessing
     - Do NOT verify acceptance criteria — that is the main agent's job
     - UI: Use existing components from `@/components/ui/` — never create one-off styled elements

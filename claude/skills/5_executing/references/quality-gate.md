@@ -21,9 +21,23 @@ assembled-PROJ coverage, not another run of every wave AC.
 
 ---
 
+## Gate 0b: Mutation Hardening (optional, `mutation_cmd`)
+
+Runs only when `wave-gate-config.json` has a top-level `mutation_cmd`; otherwise record `Status: skipped (not configured)`. It runs **before coverage and Sonar**: hardening adds tests, so coverage and Sonar then see them, and any commit invalidates earlier evidence.
+
+```bash
+node scripts/quality-evidence.mjs <X> <theme> run mutation
+```
+
+The command receives `BASE_SHA` (the P0 base tag) and `CHANGED_FILES` (`git diff --name-only --diff-filter=d BASE_SHA..HEAD`, newline-separated) in its environment, and must scope itself to them. Thresholds (mutation score) live in the tool's own config. Exit contract: 0 = the tool's threshold is met (survivors it tolerates are the project's accepted policy); exactly 1 with mutants analysed = survivors; any other non-zero exit (timeout 124, crash) is a failed run, never survivor evidence. Wrap tools whose exit codes differ. The command must print how many mutants it tested (`Mutants: 42`, `42 mutants`): zero or unparseable is a silent no-op and fails, exactly like an empty test selection. The tool's temp and report directories must be gitignored.
+
+Survivors go to **one tests-only fix round** per round: dispatch a worker whose ownership is test files only, with the tool output verbatim, then commit and rerun. A survivor that needs a production change is not fixed here; the lead logs it as a finding for QA. Maximum three rounds. If survivors remain after round 3, do **not** escalate or block: record them in `5_progress/PROJ-<X>-progress.md` as carried-forward (file, mutant, what the last test added) and set `Status: ran (survivors carried forward)`. Late is safe because this round cannot change production code; QA assigns severity (Skill 6 §1c).
+
+---
+
 ## Gate 1: Code Review Expert
 
-Review cross-wave integration across the feature diff: contracts between waves, shared state, authorization boundaries, and unresolved earlier findings. Consult wave review evidence first; do not repeat its generic checklist or QA's persona review. The reviewer is the `skillchain-reviewer` agent; put the integration focus and the diff scope in its prompt (they fill the bundle's `review-criteria` and `diff-scope`). Do not replay wave ACs here.
+Review cross-wave integration across the feature diff: contracts between waves, shared state, authorization boundaries, and unresolved earlier findings. Consult wave review evidence first; do not repeat its generic checklist or QA's persona review. The reviewer is the `skillchain-reviewer` agent; put the integration focus and the diff scope in its prompt (they fill the bundle's `review-criteria` and `diff-scope`). Do not replay wave ACs here. When the config has `arch_rules_cmd`, dependency direction is machine-checked by the wave gates: judge only boundary and contract fit, and do not re-flag import layering.
 
 ### Steps
 
@@ -123,13 +137,13 @@ Use the existing lead to coordinate these commands; no additional scheduler is n
 
 1. Source `scripts/env-local.sh`. Freeze a committed revision; allow no code edits while verification runs. Run the integration reviewer alongside build and coverage where resources permit. Keep shared DB/browser commands sequential and under their existing lock/auth controls.
 2. Inspect `sonar_cmd` before starting. If its wrapper generates coverage, split it into a `coverage_cmd` and scanner-only `sonar_cmd`; keep the wrapper's ordinary combined entry point for other callers. Declare `coverage_artifacts` (for example `coverage/lcov.info`). Do not also declare the same coverage command as a quality-phase test. Coverage test failures block; never treat a successful upload of partial coverage as passing tests.
-3. Run `node scripts/quality-evidence.mjs <X> <theme> run coverage` when configured. Only unchanged, successful coverage with intact artifacts is reusable. Then run Sonar; never run a scanner against coverage still being written. If no separate coverage command exists, execute the configured Sonar wrapper as-is without claiming coverage reuse.
+3. When `mutation_cmd` is configured, run Gate 0b first (`... run mutation`), so coverage and Sonar see the hardening tests. Then run `node scripts/quality-evidence.mjs <X> <theme> run coverage` when configured. Only unchanged, successful coverage with intact artifacts is reusable. Then run Sonar; never run a scanner against coverage still being written. If no separate coverage command exists, execute the configured Sonar wrapper as-is without claiming coverage reuse.
 4. Run each declared quality command with `node scripts/quality-evidence.mjs <X> <theme> run 'test:<label>'`, and lint with `... run lint` (`lint_cmd`, default `npm run lint`). These commands run live, require successful exits, and tests require positive selection. Auth-consuming quality entries execute their preflight and command under `worktree.sh with-shared-lock`. Retain CI/nightly workflow-wiring checks.
-5. Collect reviewer, build, tests, lint and Sonar reports before editing. Fix workers span waves, so first recompile the bundles unscoped (`node scripts/compile-context-bundles.mjs compile <X> <theme> --wave all`) and record the lock via `state.sh`. If that blocks a role, compile `--wave <N>` of the story that owns the touched files instead and batch the round's fixes per wave. Batch confirmed findings into one recovery round; dispatch disjoint fixes concurrently, overlapping files serially. After integration/commit, run quality tests, lint, build and coverage once on that revision, re-review the fix diff, then submit one fresh Sonar scan. If no code changed, do not repeat successful commands merely because another stream reported later. Keep per-issue attempt history: non-Sonar blockers escalate after three fixes; Sonar retains its three-round carry-forward policy. An unrelated later review fix does not reset Sonar's budget; refresh analysis on the final revision without starting more Sonar fix rounds.
+5. Collect reviewer, build, tests, lint and Sonar reports before editing. Fix workers span waves, so first recompile the bundles unscoped (`node scripts/compile-context-bundles.mjs compile <X> <theme> --wave all`) and record the lock via `state.sh`. If that blocks a role, compile `--wave <N>` of the story that owns the touched files instead and batch the round's fixes per wave. Batch confirmed findings into one recovery round; dispatch disjoint fixes concurrently, overlapping files serially. After integration/commit, run quality tests, lint, build and coverage once on that revision, re-review the fix diff, rerun mutation once for evidence on the final revision (no new fix rounds; it may only refresh the carried-forward list), then submit one fresh Sonar scan. If no code changed, do not repeat successful commands merely because another stream reported later. Keep per-issue attempt history: non-Sonar blockers escalate after three fixes; Sonar retains its three-round carry-forward policy. An unrelated later review fix does not reset Sonar's budget; refresh analysis on the final revision without starting more Sonar fix rounds.
 6. Save the completed review report in `5_progress/` and bind it with `node scripts/quality-evidence.mjs <X> <theme> review <report-path>` only after confirmed P0/P1 issues are resolved. For an allowed Sonar skip use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`.
 7. Update the human-readable statuses below, then run `bash scripts/quality-gate-proof.sh <X> <theme>`. It now requires command evidence as well as statuses: current inputs, exact configured command, exit result, unchanged log, positive test selection and output artifact hashes. Scanner submission also requires a fresh task receipt; the Sonar stream still fetches the completed task's server results and records its disposition before marking `Status: ran`.
 
-Evidence is generated in `5_progress/quality-*.json` and logs. Each record retains the verified commit. Evidence-only commits do not invalidate the code proof; code/configuration changes do. Build and coverage reuse is opt-in through artifact lists, not a general cache for external services. Never hand-edit a proof record. Commands are bounded by their configured `<kind>_seconds` timeout (quality tests use `ac_seconds`, fallback 600 seconds).
+Evidence is generated in `5_progress/quality-*.json` and logs. Each record retains the verified commit. Evidence-only commits do not invalidate the code proof; code/configuration changes do. Build and coverage reuse is opt-in through artifact lists, not a general cache for external services. Never hand-edit a proof record. Commands are bounded by their configured `<kind>_seconds` timeout (quality tests use `ac_seconds`, fallback 600 seconds; set `timeouts.mutation_seconds` explicitly, mutation runs are slow). Sequence: mutation → coverage → Sonar; build and the reviewer stay parallel.
 
 ---
 
@@ -139,13 +153,14 @@ The quality gate passes when ALL of these are true:
 
 - [ ] Every declared `quality` phase command passed once; CI/nightly commands are wired to their named workflows
 - [ ] Zero P0/P1 code review findings remain
+- [ ] If `mutation_cmd` is configured: mutation evidence is current, and every surviving mutant after round 3 is documented as carried-forward (carried-forward survivors do not block this gate)
 - [ ] Full PROJ build passes (`build_cmd` from `wave-gate-config.json`)
 - [ ] If Sonar ran: zero BLOCKER/CRITICAL/MAJOR sonar issues, or every remaining one is documented as carried-forward after 3 fix rounds (a carried-forward Sonar issue does not block this gate)
 - [ ] If Sonar was skipped: explicit skip reason is logged
 - [ ] Declared integration/quality-phase tests still passing
 - [ ] No new lint errors (`npm run lint`)
 
-For every gate item except Sonar's fix loop: if it cannot pass after 3 fix iterations on the same issue, escalate to user. Sonar's own 3-round loop (Gate 3, step 6) never escalates or blocks — it documents and moves on.
+For every gate item except the Sonar and mutation fix loops: if it cannot pass after 3 fix iterations on the same issue, escalate to user. Sonar's own 3-round loop (Gate 3, step 6) and the mutation loop (Gate 0b) never escalate or block — they document and move on.
 
 ---
 
@@ -166,6 +181,9 @@ Standards: 2 findings (worst: P2 data clump)
 | P1 High | 2 | 2 | 0 |
 | P2 Medium | 1 | 0 | 1 |
 | P3 Low | 3 | 0 | 3 |
+
+### Mutation
+Status: ran | ran (survivors carried forward) | skipped (not configured)
 
 ### Build
 Status: passed
@@ -193,6 +211,9 @@ Status: ran | skipped (sonar CLI unavailable) | skipped (project not configured)
 ### Deferred (user decision)
 - P2: `src/features/foo/qux.ts:88` — Data clump, 3 params passed together
 - Minor: `src/features/foo/utils.ts:15` — Prefer replaceAll over replace with regex
+
+### Carried Forward (Mutation, 3 tests-only rounds exhausted)
+- `src/features/foo/price.ts:31` — mutant `>` → `>=` survives; the boundary needs a production-visible contract, not a test
 
 ### Carried Forward (Sonar, 3 fix rounds exhausted)
 - Major: `src/features/foo/legacy-parser.ts:120` — Cognitive complexity 24 (limit 15); round 3 refactor reduced it to 18, still over limit — needs a structural split, not a local fix

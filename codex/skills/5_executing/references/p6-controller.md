@@ -27,13 +27,25 @@ Ownership boundary — never blur it:
    fixer receives ONLY the finding text, the code anchor (symbol or
    regex, never a line number — parallel fixers shift lines), the
    relevant `agent.md` excerpt, and the verification command — no
-   context pack, no QA identity, ≤ 2000 tokens in total. One cluster
+   context pack, no QA identity, ≤ 2000 tokens in total. Every fixer
+   brief also says: add a regression test for this bug in the project's
+   existing test location (unit, integration or browser as fits), run it
+   against the unfixed code first and see it fail for the bug's reason,
+   then fix and see it pass; report the test file and exact command, or
+   `not scriptable: <reason>`. One cluster
    (one file) per fixer; bugs in the same file run sequentially, and a
    bug spanning files goes to its primary file's cluster. Only after the fix is verified:
    `node scripts/ledger.mjs set-status <X> <theme> <id> fixed <commit-sha>`.
-4. **Fresh opposite re-verification:** after each fix batch, a NEW
-   read-only QA check from the provider (or in degraded mode: model)
-   opposite the fixer reruns only the affected checks. The fixer never
+4. **Re-verification, scripts first:** rerun each fixer's reported
+   regression test yourself; red or missing (without an accepted
+   `not scriptable` reason) = failed attempt, no opposite check needed.
+   If no existing `regression_commands` entry would pick the test up,
+   note it in your final output. **Fresh opposite re-verification:**
+   after each fix batch, a NEW read-only QA check from the provider (or
+   in degraded mode: model) opposite the fixer reruns only the affected
+   checks that a test does not already prove — findings whose fixer
+   reported `not scriptable`, plus the batch as a whole where the test
+   covers only part of the finding. The fixer never
    certifies its own repair. If re-verification finds the problem again,
    report it as a fresh open finding via `ledger.mjs add <X> <theme>` — the ledger
    REOPENS a `fixed` finding on an open re-report; never leave a failed

@@ -86,7 +86,7 @@ After decomposition:
 | 4 | writing-plans | Split independently verifiable stories into dependency-ordered waves; use expand–contract for wide migrations |
 | 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through the subskills below, then the waves with the same state.sh, wave tag, wave-gate, Outer Ralph recovery, Quality Gate proof and Skill 6 handoff as `5_executing`; TDD choreography and persona reviews replaced by intent and invariants, workers tiered by `Complexity`, the strongest model leads |
 | 5 | executing | Full-procedure alternative for weaker writer models. Hosts the subskills: run Checkpoint 1 and P0 in subagents — `subskills/checkpoint.md` (structured reconcile loop: decision log, cascaded plan updates, seal `CP1:approved`; the user dialogue stays with the orchestrator; the same loop serves CP2 via delivery and bootstrap via intake) and `subskills/setup.md` (persistent PROJ worktree + branch/BASE_SHA, tool/auth preflight, reproducible dependency install, framework helpers synchronized from installed skills with an adaptation-protecting hash manifest) — then delegate code/test/fix edits to workers, run TDD plus one wave-scoped Ralph pass and hard wave gates, then an integration-focused PROJ gate and direct Skill 6 handoff |
-| 6 | qa | Run E2E QA, security, the required opposite-provider six-persona review (the only persona panel), and simplicity review; strictly read-only finder in framework runs |
+| 6 | qa | Run E2E QA, security, the required opposite-provider six-persona review (the only persona panel), simplicity review (what the Step 5 static and mutation gates cannot decide), and mutation-survivor input; strictly read-only finder in framework runs |
 | 7 | documentation | Curate feature and technical docs, then merge approved AGENTS.md candidates |
 | 8 | delivery | Conflict probe against main, PR body rendered from state.json + findings.json and declared external prerequisites in wave-gate-config.json, bounded CI fix loop, Checkpoint 2 comment reconcile |
 
@@ -145,6 +145,12 @@ auth-budget metadata, and deterministic frontend route expectations. Planning,
 Checkpoint 1, and P0 run the same consistency validator. A green wave gate
 reuses exact same-HEAD evidence produced by its `--ac-only` pass, then certifies
 current ACs plus declared regressions—not every earlier AC command.
+Projects may add `complexity_cmd` and `arch_rules_cmd` to the gate config: the wave gate runs
+them last in the AC pass (ACs green first), so structure is judged by tools that fail and the
+failure goes back to fresh workers through the existing recovery stages, not by a cleaner agent.
+`mutation_cmd` is the PROJ-end counterpart for test quality: mutation testing scoped to the feature
+diff runs once in the Quality Gate before coverage and Sonar, survivors get a tests-only fix round, and
+unresolved survivors are carried forward to QA instead of blocking.
 Legacy string AC entries are rejected by the current wave gate. Upgrade them to
 structured AC metadata in Writing Plans and reapprove before execution; the
 runtime does not infer AC identity from an old array position.

@@ -124,5 +124,31 @@ if qa_codex >"$CASE/out" 2>&1; then echo "qa without --personas must fail closed
 grep -q 'Claude is required' "$CASE/out"
 if PATH="$CASE/noclaude:$CASE/bin:$PATH" PROMPT_CAPTURE="$CASE/prompt" bash "$SCRIPT" docs 1 test --artifacts artifact.md --author-provider codex >"$CASE/out" 2>&1; then echo "docs review must fail closed" >&2; exit 1; fi
 
+# Persona focus: tool-measured concerns leave the prompts only when the project configured the tool.
+mkdir -p "$CASE/cap" specs/PROJ-1-test/3-4_plan
+cat >"$CASE/cap/codex" <<'EOF3'
+#!/usr/bin/env bash
+if [[ "${1:-} ${2:-}" == "login status" ]]; then exit 0; fi
+cat >"$PERSONA_CAPTURE/$$-$RANDOM.txt"
+printf '%s\n' '{"severity":"low","category":"review-clean","summary":"clean"}'
+EOF3
+chmod +x "$CASE/cap/codex"
+persona_prompts() { # config-json -> captured persona prompts in $CASE/personas
+  rm -rf "$CASE/personas"; mkdir -p "$CASE/personas"
+  printf '%s\n' "$1" >specs/PROJ-1-test/3-4_plan/wave-gate-config.json
+  PATH="$CASE/noclaude:$CASE/cap:$PATH" PERSONA_CAPTURE="$CASE/personas" bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider codex --personas >"$CASE/out" 2>&1 || { cat "$CASE/out" >&2; exit 1; }
+}
+persona_has() { grep -l "You are $1" "$CASE"/personas/*.txt | xargs grep -c "$2" | paste -sd+ | grep -qv '^0$'; }
+persona_prompts '{}'
+persona_has 'Marcus Weber' 'coupling' || { echo "default Weber focus lost" >&2; exit 1; }
+! grep -rq 'machine-checked' "$CASE/personas" || { echo "unconfigured project got machine-checked text" >&2; exit 1; }
+persona_prompts '{"arch_rules_cmd":"npm run arch","complexity_cmd":"npm run cx"}'
+persona_has 'Marcus Weber' 'arch_rules_cmd' || { echo "Weber not told about arch_rules_cmd" >&2; exit 1; }
+persona_has 'Elena Rodriguez' 'arch_rules_cmd' || { echo "Rodriguez not told about arch_rules_cmd" >&2; exit 1; }
+persona_has 'Ken Takahashi' 'complexity_cmd' || { echo "Takahashi not told about complexity_cmd" >&2; exit 1; }
+! persona_has 'Marcus Weber' 'coupling' || { echo "Weber kept the coupling focus despite arch_rules_cmd" >&2; exit 1; }
+persona_has 'Elena Rodriguez' 'retrospective' || { echo "retrospective instruction lost" >&2; exit 1; }
+rm -f specs/PROJ-1-test/3-4_plan/wave-gate-config.json
+
 echo 'cross-review diff-scope, manual-round and degraded-model tests passed'
 

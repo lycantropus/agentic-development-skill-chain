@@ -39,6 +39,12 @@ function selected(log) {
   const counts = [...log.matchAll(/(?:Tests\s+[^\n]*?([0-9]+)\s+passed|# tests\s+([0-9]+)|Running\s+([0-9]+)\s+tests?|(?:^|\n)\s*([0-9]+)\s+passed)/g)].map(m => Number(m.slice(1).find(v => v !== undefined)));
   return Math.max(0, ...counts);
 }
+function mutants(log) {
+  // Positive control for mutation runs: the wrapper must print how many mutants it tested ("42 mutants", "Mutants: 42").
+  log = log.replace(/\x1b\[[0-9;]*m/g, '');
+  return Math.max(0, ...[...log.matchAll(/([0-9]+)\s+(?:mutants?|mutations?)\b|\b(?:mutants?|mutations?)\s*[:=]\s*([0-9]+)/gi)].map(m => Number(m[1] ?? m[2])));
+}
+function mutationBase() { return git('rev-parse', '--verify', `proj-PROJ-${proj}-base^{commit}`); }
 function write(key, record) {
   const target = evidencePath(key), temp = `${target}.${randomUUID()}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(record, null, 2) + '\n'); fs.renameSync(temp, target);
@@ -49,11 +55,15 @@ function commandFor(key, config) {
 }
 function valid(key, config, fingerprint) {
   const record = JSON.parse(fs.readFileSync(evidencePath(key), 'utf8'));
-  if (record.inputs !== fingerprint || record.rc !== 0 || !record.head) throw new Error(`${key}: stale or failed evidence`);
+  // Mutation contract: exit 0 = the tool's own threshold is met, exit 1 with mutants analysed = survivors (the progress status decides
+  // whether they block); any other non-zero exit (timeout 124/137, crash) is a failed run, never survivor evidence.
+  if (record.inputs !== fingerprint || !record.head || (record.rc !== 0 && !(key === 'mutation' && record.rc === 1 && record.mutants > 0))) throw new Error(`${key}: stale or failed evidence`);
   if (key !== 'review' && key !== 'sonar-skip' && record.command !== commandFor(key, config)) throw new Error(`${key}: command changed`);
   if (!record.log || snapshotFile(record.log) !== record.log_hash) throw new Error(`${key}: log missing or changed`);
   if (JSON.stringify(artifacts(record.artifacts.map(([name]) => name))) !== JSON.stringify(record.artifacts)) throw new Error(`${key}: artifacts missing or changed`);
   if ((key === 'coverage' || key.startsWith('test:')) && !(record.selected > 0)) throw new Error(`${key}: no tests selected`);
+  if (key === 'mutation' && !(record.mutants > 0)) throw new Error('mutation: no mutants analysed');
+  if (key === 'mutation' && record.base_sha !== mutationBase()) throw new Error('mutation: base tag moved since the run');
   return record;
 }
 function canSkip(reason) {
@@ -68,7 +78,7 @@ function main() {
   const fingerprint = inputs();
   if (action === 'snapshot') { console.log(fingerprint); return; }
   if (action === 'check') {
-    for (const key of ['build', 'lint', 'review', ...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)]) valid(key, config, fingerprint);
+    for (const key of ['build', 'lint', 'review', ...(config.mutation_cmd ? ['mutation'] : []), ...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)]) valid(key, config, fingerprint);
     if (fs.existsSync(evidencePath('sonar-skip'))) {
       const skip = valid('sonar-skip', config, fingerprint);
       if (!canSkip(skip.reason)) throw new Error('Sonar skip no longer valid');
@@ -117,12 +127,19 @@ function main() {
       if (!config.auth_budget?.preflight_cmd || !fs.existsSync('scripts/worktree.sh')) throw new Error('auth quality command requires preflight and shared lock helper');
       invocation = ['bash', 'scripts/worktree.sh', 'with-shared-lock', '--', 'bash', '-c', 'bash -c "$1" && bash -c "$2"', '_', config.auth_budget.preflight_cmd, command];
     }
-    const result = spawnSync('timeout', ['--kill-after=5s', String(seconds), ...invocation], { stdio: ['ignore', fd, fd] });
+    // Mutation gets the changed files as env: BASE_SHA (the P0 base tag) and CHANGED_FILES (newline-separated, deleted files excluded).
+    // Passed to the child only, so the input fingerprint (which hashes process.env) is unaffected.
+    let env = process.env;
+    if (key === 'mutation') {
+      const baseSha = mutationBase();
+      env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES: git('diff', '--name-only', '--diff-filter=d', `${baseSha}..HEAD`) };
+    }
+    const result = spawnSync('timeout', ['--kill-after=5s', String(seconds), ...invocation], { stdio: ['ignore', fd, fd], env });
     fs.closeSync(fd); rc = result.status ?? 1;
   }
   const output = fs.readFileSync(log, 'utf8');
-  const count = selected(output);
-  if ((key === 'coverage' || key.startsWith('test:')) && !count) rc ||= 1;
+  const count = key === 'mutation' ? mutants(output) : selected(output);
+  if ((key === 'coverage' || key.startsWith('test:') || key === 'mutation') && !count) rc ||= 1;
   if (inputs() !== fingerprint || git('rev-parse', 'HEAD') !== head) rc ||= 1;
   let files = [];
   if (rc === 0) {
@@ -132,8 +149,8 @@ function main() {
       files = artifacts([task]);
     } else files = artifacts(artifactNames);
   }
-  write(key, { head, inputs: fingerprint, command, rc, selected: count, log, log_hash: snapshotFile(log), artifacts: files });
-  if (rc) throw new Error(`${key} failed (${rc}); log: ${log}`);
+  write(key, { head, inputs: fingerprint, command, rc, ...(key === 'mutation' ? { mutants: count, base_sha: mutationBase() } : { selected: count }), log, log_hash: snapshotFile(log), artifacts: files });
+  if (rc) throw new Error(`${key} failed (${rc})${key === 'mutation' && count && rc === 1 ? ' — surviving mutants, see log' : ''}; log: ${log}`);
   if (key === 'sonar') fs.rmSync(evidencePath('sonar-skip'), { force: true });
   console.log(`✓ ${key}: ${log}`);
 }

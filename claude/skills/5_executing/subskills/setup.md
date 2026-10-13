@@ -267,6 +267,17 @@ in `5_progress/PROJ-<X>-progress.md`. Never use a production mutation, destructi
 migration, or syntax-only failure. If no safe control exists, STOP; an untested
 verifier is not a P0 success.
 
+### 5b. Static-check candidates (suggest only)
+
+Read `docs/ARCHITECTURE.md` § Stack and, per optional key in
+`wave-gate-config.json` (`complexity_cmd`, `arch_rules_cmd`, `mutation_cmd`),
+**suggest** one candidate command for that stack when the config lacks the key
+(complexity/duplication rules, dependency-direction rules, mutation testing).
+Install nothing and edit no config: the thresholds live in the project's own tool
+config, and the decision is the user's. Record the suggestions and the default
+taken (key left absent = silently skipped) under the defaulted decisions in
+`5_progress/PROJ-<X>-progress.md`, and relay them in the return.
+
 ### 6. Context system (compile bundles, ground file, injectors)
 
 **6a. Compile the context bundles.**

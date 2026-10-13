@@ -518,6 +518,48 @@ EOF
   [[ -f "$READY_FILE" && -s "$DEV_PID_FILE" ]] || fail "$LABEL: gate did not start configured dev server"
   pid=$(cat "$DEV_PID_FILE"); ! kill -0 "$pid" 2>/dev/null || fail "$LABEL: gate did not stop its dev server"
   unset DEV_PID_FILE READY_FILE CURL_ALWAYS_READY
+
+  case_dir static-checks-unconfigured
+  write_config "$(default_config)"; commit_case; run_gate >/dev/null
+  grep -q 'Complexity: skipped (not configured)' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: unconfigured complexity not noted"
+  grep -q 'Architecture rules: skipped (not configured)' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: unconfigured arch rules not noted"
+
+  case_dir static-checks-pass
+  config=$(default_config | jq '.complexity_cmd="echo base=$WAVE_BASE_SHA; echo Analysed 7 files" | .arch_rules_cmd="echo 3 modules cruised"')
+  write_config "$config"; commit_case; ac_only_gate >"$GATE_OUT" 2>&1 || fail "$LABEL: passing static checks failed ac-only"
+  grep -q "base=$(git -C "$CASE" rev-parse wave-1-start-PROJ-1)" "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1-complexity-attempt-1.log" || fail "$LABEL: WAVE_BASE_SHA not passed to the tool"
+  run_gate >"$GATE_OUT" 2>&1 || fail "$LABEL: passing static checks failed the full gate"
+  grep -q 'Complexity: `echo base=$WAVE_BASE_SHA; echo Analysed 7 files` (7 files)' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: complexity line missing from PASSED block"
+  grep -q 'Architecture rules: `echo 3 modules cruised` (3 files)' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: arch rules line missing from PASSED block"
+  [[ -f "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1-complexity-attempt-2.log" ]] || fail "$LABEL: attempt logs were overwritten"
+
+  case_dir static-check-noop
+  write_config "$(default_config | jq '.complexity_cmd="echo Analysed 0 files"')"; commit_case
+  expect_rc 1 ac_only_gate
+  grep -q 'silent no-op' "$GATE_OUT" || fail "$LABEL: zero-file complexity run accepted"
+  write_config "$(default_config | jq '.arch_rules_cmd="true"')"; commit_case
+  expect_fail run_gate
+  grep -q 'silent no-op' "$GATE_OUT" || fail "$LABEL: arch rules without a count accepted"
+
+  case_dir static-check-failure
+  write_config "$(default_config | jq '.complexity_cmd="echo \"src/a.ts: cognitive complexity 17 > 10\"; exit 3" | .arch_rules_cmd="echo Analysed 4 files"')"; commit_case
+  expect_rc 1 ac_only_gate
+  grep -q 'src/a.ts: cognitive complexity 17 > 10' "$GATE_OUT" || fail "$LABEL: tool output not printed verbatim"
+  jq -e '.ralph_status=="failed"' "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1.json" >/dev/null || fail "$LABEL: ralph status not failed"
+  [[ -f "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1-arch-rules-attempt-1.log" ]] || fail "$LABEL: second check skipped after first failed"
+  expect_fail run_gate
+  ! grep -q 'Gate — PASSED' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: wave certified despite static failure"
+
+  case_dir static-check-timeout
+  write_config "$(default_config | jq '.timeouts.complexity_seconds=1 | .complexity_cmd="echo partial-output; sleep 3; echo Analysed 1 files"')"; commit_case
+  expect_rc 1 ac_only_gate
+  grep -q 'complexity timed out after 1s' "$GATE_OUT" || fail "$LABEL: complexity timeout not enforced"
+  grep -q 'partial-output' "$GATE_OUT" || fail "$LABEL: partial output lost on timeout"
+
+  case_dir static-check-after-red-ac
+  write_config "$(default_config | jq '.waves["1"].ac_commands[0].command="exit 1" | .complexity_cmd="echo Analysed 1 files"')"; commit_case
+  expect_rc 1 ac_only_gate
+  [[ ! -e "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1-complexity-attempt-1.log" ]] || fail "$LABEL: static check ran on red ACs"
 }
 
 # Both platform suites use platform-prefixed paths under $TMP, so they run concurrently.
