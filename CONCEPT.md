@@ -1106,8 +1106,8 @@ progress.md/state.json. Auth is checked too (`gh auth status`,
 ### Sonar — One Stage, PROJ end only
 - **`sonar_cmd`**: required project-defined local change analysis + secrets
   scan, run ONCE per PROJ at the PROJ-end Quality Gate — no wave gate runs
-  it (a wave gate certifies ACs, regressions, build, CodeRabbit, and smoke
-  only). It runs from the persistent PROJ worktree and may call
+  it (a wave gate certifies ACs, regressions, optional static checks, build,
+  CodeRabbit, and smoke only). It runs from the persistent PROJ worktree and may call
   `sonar-scanner`, an npm script, or a wrapper. Missing or non-zero execution
   blocks; there is no hard-coded `command -v sonar` skip. Because it runs
   once against the whole assembled PROJ diff, it covers every wave's
@@ -1417,6 +1417,7 @@ agent-browser smoke tests.
 | Context pack manifest | schema following the claude-skills frontmatter taxonomy, defined when building the injector (Stage 2) |
 | Cross-model review | symmetric provider-opposite review via our thin `cross-review`: Claude-authored → Codex, Codex-authored → authenticated isolated Claude with validated structured output, joint → both independently; required for Requirements/P6/P7 and automatic on saved concept/architecture/plan outputs; conservative default input cap, explicit diff omissions and Claude 10 MB stdin failure; any permitted model-opposite fallback is flagged, and same-model review never satisfies the gate; findings → ledger, blocking per §8 |
 | Focused bug repair | `bugfixing` stays outside the feature chain: reproduce first (real browser for UI), trace code cause + test escape, prove a regression test red before the fix, dispatch a micro-fixer, and stop after at most three Ralph repair attempts; CodeRabbit/Sonar are proportional existing gates, not new dependencies |
+| Structure quality | Gate-driven cleaning, no "cleaner" agent: optional `complexity_cmd` / `arch_rules_cmd` run last in the wave gate's AC pass (ACs green, before build + CodeRabbit), and the existing four Outer Ralph recovery stages feed the verbatim output to fresh workers; the rerun re-proves the ACs. Commands are project-supplied (stack-agnostic), thresholds live in the tool's own config, each needs a positive control (analysed-file count > 0), and absence is a silent skip. Failures are gate failures, not ledger findings. Per-story checks in sequential waves and trimming `GUIDELINES.md` wait for run data (`Variant Notes`) |
 | P6 QA/fix ownership | Skill 6 is a strictly read-only finder. The P6 phase controller deduplicates and verifies findings, dispatches tier-0 fix lanes, and requires fresh provider-opposite QA re-verification; three failed Critical/High repair attempts trigger the stop policy |
 
 New questions arise during the detailed planning of each stage and are

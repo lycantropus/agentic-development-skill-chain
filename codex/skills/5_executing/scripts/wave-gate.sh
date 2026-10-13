@@ -107,9 +107,11 @@ BUILD_TIMEOUT=$(jq -er '.timeouts.build_seconds' "$CFG") || fail "timeouts.build
 CODERABBIT_TIMEOUT=$(jq -er '.timeouts.coderabbit_seconds' "$CFG") || fail "timeouts.coderabbit_seconds missing"
 BROWSER_TIMEOUT=$(jq -er '.timeouts.browser_seconds' "$CFG") || fail "timeouts.browser_seconds missing"
 RALPH_STALL_SECONDS=$(jq -r '.timeouts.ralph_stall_seconds // .timeouts.ac_seconds' "$CFG")
+COMPLEXITY_TIMEOUT=$(jq -r '.timeouts.complexity_seconds // .timeouts.ac_seconds' "$CFG")
+ARCH_RULES_TIMEOUT=$(jq -r '.timeouts.arch_rules_seconds // .timeouts.ac_seconds' "$CFG")
 RATE_LIMIT_BACKOFF_SECONDS=$(jq -r "${WAVE_KEY}.rate_limit_backoff_seconds // .rate_limit_backoff_seconds // 330" "$CFG")
 AUTH_PACING_SECONDS=$(jq -r "${WAVE_KEY}.auth_pacing_seconds // 0" "$CFG")
-for pair in "ac:$AC_TIMEOUT" "build:$BUILD_TIMEOUT" "coderabbit:$CODERABBIT_TIMEOUT" "browser:$BROWSER_TIMEOUT" "stall:$RALPH_STALL_SECONDS" "backoff:$RATE_LIMIT_BACKOFF_SECONDS" "pacing:$AUTH_PACING_SECONDS"; do
+for pair in "ac:$AC_TIMEOUT" "build:$BUILD_TIMEOUT" "coderabbit:$CODERABBIT_TIMEOUT" "browser:$BROWSER_TIMEOUT" "stall:$RALPH_STALL_SECONDS" "backoff:$RATE_LIMIT_BACKOFF_SECONDS" "pacing:$AUTH_PACING_SECONDS" "complexity:$COMPLEXITY_TIMEOUT" "arch-rules:$ARCH_RULES_TIMEOUT"; do
   value="${pair#*:}"
   [[ "$value" =~ ^[0-9]+$ ]] || fail "invalid timeout/pacing ${pair}"
 done
@@ -171,6 +173,45 @@ selected_count() {
   match=$(grep -Eo '(^|[^0-9])[0-9]+[[:space:]]+passed([[:space:]]|$)' "$log" 2>/dev/null | head -1 || true)
   [[ -n "$match" ]] && { grep -Eo '[0-9]+' <<<"$match" | head -1; return; }
   echo 0
+}
+
+# Positive control for static checks: the command must print how many files it analysed
+# ("Analysed 12 files", "12 files checked", "42 modules cruised"); 0 or unparseable is a silent no-op.
+analysed_count() {
+  local log="$1" match
+  match=$(grep -Eio '(analy[sz]ed|checked|cruised|scanned|linted)[[:space:]]+[0-9]+[[:space:]]+(files?|modules?)|[0-9]+[[:space:]]+(files?|modules?)[[:space:]]+(analy[sz]ed|checked|cruised|scanned|linted)' "$log" 2>/dev/null | head -1 || true)
+  [[ -n "$match" ]] && { grep -Eo '[0-9]+' <<<"$match" | head -1; return; }
+  echo 0
+}
+
+# Resolves the wave base once; static checks and CodeRabbit scope from the same SHA.
+resolve_wave_base() {
+  [[ -z "${WAVE_BASE:-}" ]] || return 0
+  WAVE_BASE="${WAVE_BASE_SHA:-}"
+  if [[ -n "$WAVE_BASE" ]]; then git rev-parse --verify "${WAVE_BASE}^{commit}" >/dev/null 2>&1 || fail "invalid WAVE_BASE_SHA"; else WAVE_BASE=$(git rev-parse --verify "wave-${WAVE}-start-PROJ-${PROJ}^{commit}" 2>/dev/null || true); fi
+  [[ -n "$WAVE_BASE" ]] || fail "missing wave base SHA/tag"
+}
+
+# Runs one optional static check (complexity / arch-rules), sets STATIC_COUNT, returns 1 on a
+# gate failure after printing the tool output verbatim for recovery workers. Every attempt keeps its own log.
+run_static_check() {
+  local kind="$1" label="$2" command="$3" timeout_secs="$4" attempt=1 log rc
+  while [[ -e "${BASE}/5_progress/ralph-wave-${WAVE}-${kind}-attempt-${attempt}.log" ]]; do attempt=$((attempt+1)); done
+  log="${BASE}/5_progress/ralph-wave-${WAVE}-${kind}-attempt-${attempt}.log"
+  resolve_wave_base
+  heartbeat; set +e
+  WAVE_BASE_SHA="$WAVE_BASE" timeout --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
+  set -e; heartbeat
+  assert_verified_head; assert_clean_worktree
+  STATIC_COUNT=$(analysed_count "$log")
+  if [[ "$rc" -eq 124 ]]; then echo "   ✗ ${label} timed out after ${timeout_secs}s (log: $log)" >&2; return 1; fi
+  if [[ "$rc" -ne 0 ]]; then
+    echo "   ✗ ${label} failed rc=${rc} (log: $log) — tool output follows" >&2; cat "$log" >&2; return 1
+  fi
+  if [[ "$STATIC_COUNT" -le 0 ]]; then
+    echo "   ✗ ${label} analysed 0 files or printed no analysed-file count — treated as a silent no-op (log: $log)" >&2; cat "$log" >&2; return 1
+  fi
+  echo "   ✓ ${label} (${STATIC_COUNT} files)"
 }
 
 provider_rate_limited() {
@@ -433,6 +474,25 @@ for ((index=0; index<AC_COUNT; index++)); do
   assert_clean_worktree
 done
 
+# Static checks run last in the AC pass, once the ACs are green: a fix commit then reruns the
+# ACs on the new HEAD, which proves behaviour was preserved. They run before build + CodeRabbit.
+COMPLEXITY_CMD=$(jq -r '.complexity_cmd // empty' "$CFG")
+ARCH_RULES_CMD=$(jq -r '.arch_rules_cmd // empty' "$CFG")
+COMPLEXITY_LINE="skipped (not configured)"; ARCH_RULES_LINE="skipped (not configured)"
+if [[ "$AC_ONLY_FAILED" == false && "$EXTERNAL_BLOCKED" == false && ( -n "$COMPLEXITY_CMD" || -n "$ARCH_RULES_CMD" ) ]]; then
+  step "1b/6 Static checks: complexity + architecture rules"
+  STATIC_FAILED=false
+  if [[ -n "$COMPLEXITY_CMD" ]]; then
+    if run_static_check complexity "complexity" "$COMPLEXITY_CMD" "$COMPLEXITY_TIMEOUT"; then COMPLEXITY_LINE="\`${COMPLEXITY_CMD}\` (${STATIC_COUNT} files)"; else STATIC_FAILED=true; fi
+  else echo "   (complexity_cmd not configured — skipped)"; fi
+  if [[ -n "$ARCH_RULES_CMD" ]]; then
+    if run_static_check arch-rules "architecture rules" "$ARCH_RULES_CMD" "$ARCH_RULES_TIMEOUT"; then ARCH_RULES_LINE="\`${ARCH_RULES_CMD}\` (${STATIC_COUNT} files)"; else STATIC_FAILED=true; fi
+  else echo "   (arch_rules_cmd not configured — skipped)"; fi
+  if [[ "$STATIC_FAILED" == true ]]; then
+    if [[ "$AC_ONLY" == true ]]; then AC_ONLY_FAILED=true; else fail "static check failed (output above; fix and rerun the gate)"; fi
+  fi
+fi
+
 if [[ "$AC_ONLY" == true || "$EXTERNAL_BLOCKED" == true ]]; then
   rm -f "$RALPH_PID"; OWNS_RALPH=false
   status=complete; rc=0
@@ -552,9 +612,7 @@ else echo "   (component registry unavailable/not applicable — skipped)"; fi
 step "5–6/6 Build and CodeRabbit wave review (parallel; last so environmental smoke failures cost no review)"
 BUILD_CMD=$(jq -r '.build_cmd // empty' "$CFG"); [[ -n "$BUILD_CMD" ]] || fail "build_cmd missing"
 command -v coderabbit >/dev/null || fail "coderabbit not installed"
-WAVE_BASE="${WAVE_BASE_SHA:-}"
-if [[ -n "$WAVE_BASE" ]]; then git rev-parse --verify "${WAVE_BASE}^{commit}" >/dev/null 2>&1 || fail "invalid WAVE_BASE_SHA"; else WAVE_BASE=$(git rev-parse --verify "wave-${WAVE}-start-PROJ-${PROJ}^{commit}" 2>/dev/null || true); fi
-[[ -n "$WAVE_BASE" ]] || fail "missing wave base SHA/tag"
+resolve_wave_base
 FILES_CHANGED=$(git diff --name-only "${WAVE_BASE}..HEAD" | wc -l | tr -d ' '); [[ "$FILES_CHANGED" -le 150 ]] || fail "CodeRabbit scope ${FILES_CHANGED} exceeds 150 files"
 attempt=1
 while [[ -e "${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}.jsonl" || -e "${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}-normalized.jsonl" ]]; do attempt=$((attempt+1)); done
@@ -617,6 +675,8 @@ cat >>"$PROGRESS" <<EOF
 - [x] Stories: ${STORIES:-n/a (no stories table in the wave plan)}
 - [x] Current ACs: ${AC_COUNT} commands green at ${VERIFIED_HEAD}
 - [x] Declared broad regressions: ${REG_COUNT} commands green
+- [x] Complexity: ${COMPLEXITY_LINE}
+- [x] Architecture rules: ${ARCH_RULES_LINE}
 - [x] Build: \`${BUILD_CMD}\`
 - [x] CodeRabbit: attempt ${attempt} ingested; cumulative open blocking findings after ledger status: 0
 - [x] Component registry: checked

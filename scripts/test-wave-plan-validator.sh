@@ -31,12 +31,17 @@ expect_failure() {
   fi
 }
 
-for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42'; do
+for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7'; do
   prepare_case plan-valid.md config-valid.json
   jq "$expression" "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
   mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
   if run_validator >"$CASE/output" 2>&1; then echo "invalid quality config accepted: $expression" >&2; exit 1; fi
 done
+
+prepare_case plan-valid.md config-valid.json
+jq '.complexity_cmd="npm run complexity" | .arch_rules_cmd="npm run arch"' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
+mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
+run_validator >/dev/null
 
 prepare_case plan-valid.md config-valid.json
 jq '.waves["1"].ac_commands[0].external_dependency={reason:"review of seed revision abc",decided_by:"owner",decided_at:"2026-09-08T10:00:00Z",check_command:"node check-signoff.mjs"} | .waves["1"].regression_commands[0].selection_check_cmd="node scenarios.mjs --list"' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"

@@ -208,6 +208,7 @@ The script is the hard boundary and validates:
 - Every structured `ac_commands` entry for the wave exits 0 and selects tests.
 - A cached AC pass matches its command, test files, auth context, configuration hash, positive selected count, and committed `verified_head`.
 - Every declared `regression_commands` entry passes before build; selection-aware suites cannot pass empty. Only entries with `reuse_passed: true` can reuse deterministic, non-auth local results on unchanged HEAD/configuration; external or auth-dependent tests run live.
+- Optional `complexity_cmd` and `arch_rules_cmd` static checks run last in the AC pass, after the ACs are green and before build and CodeRabbit, so CodeRabbit reviews cleaned code. Each must exit 0 and print an analysed-file count above zero (a zero or missing count is a silent no-op). The tool's output goes to the recovery workers verbatim, the four Outer Ralph recovery stages apply, and the rerun re-proves the ACs on the new `HEAD`. Absent keys are skipped and noted in the PASSED block. Thresholds live in the project's own tool config.
 - The configured `build_cmd` exits 0.
 - CodeRabbit archives unique raw and normalized evidence for every attempt,
   ingests validated finding records, and leaves no cumulative open blocking ledger findings.

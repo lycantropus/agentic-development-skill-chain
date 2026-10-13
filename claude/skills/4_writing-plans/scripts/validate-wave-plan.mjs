@@ -311,7 +311,7 @@ for (const [wave, plan] of plans) {
   }
 }
 
-for (const key of ["coverage_cmd", "lint_cmd"]) {
+for (const key of ["coverage_cmd", "lint_cmd", "complexity_cmd", "arch_rules_cmd"]) {
   if (config[key] !== undefined && !isText(config[key])) fail(`${key} must be a non-empty string`);
 }
 for (const key of ["build_artifacts", "coverage_artifacts"]) {

@@ -89,6 +89,13 @@ Both run automatically. Nothing moves forward until they're satisfied —
 or a human has explicitly decided a remaining issue is acceptable to
 carry forward.
 
+Structure is measured the same way. Instructions to "keep it clean" get
+diluted in a long working session, and fast agents leave mess that compounds
+from wave to wave. So a project can plug in tools that measure complexity and
+dependency direction after every wave; when they fail, the exact output goes
+back to fresh workers. Clean is defined by a check that fails, not by a
+sentence that was once in a prompt.
+
 ### The paperwork is generated, not freehand
 
 Things like the description of a proposed change, or the morning

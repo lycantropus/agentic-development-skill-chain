@@ -145,6 +145,9 @@ auth-budget metadata, and deterministic frontend route expectations. Planning,
 Checkpoint 1, and P0 run the same consistency validator. A green wave gate
 reuses exact same-HEAD evidence produced by its `--ac-only` pass, then certifies
 current ACs plus declared regressions—not every earlier AC command.
+Projects may add `complexity_cmd` and `arch_rules_cmd` to the gate config: the wave gate runs
+them last in the AC pass (ACs green first), so structure is judged by tools that fail and the
+failure goes back to fresh workers through the existing recovery stages, not by a cleaner agent.
 Legacy string AC entries are rejected by the current wave gate. Upgrade them to
 structured AC metadata in Writing Plans and reapprove before execution; the
 runtime does not infer AC identity from an old array position.

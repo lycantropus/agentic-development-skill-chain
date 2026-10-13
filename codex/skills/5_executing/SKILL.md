@@ -131,8 +131,9 @@ The script validates:
 2. **Declared targeted regressions** — every `regression_commands` entry covers shared behavior affected by this wave and runs after the current ACs and before smoke; selection-aware entries must prove that they selected tests. Broad hosted-auth/browser suites belong in `phase_commands`, not every wave.
 3. **Smoke Test** — the configured dev server is reused or started by the gate. Anonymous routes must match URL and characteristic content; redirects are failures. Protected routes require auth state or authenticated E2E coverage.
 4. **Component registry** — `gen-component-registry.mjs --check` passes where applicable.
-5. **Build** — `build_cmd` from config exits 0; runs in parallel with CodeRabbit as the last phase.
-6. **CodeRabbit** — every attempt archives raw and normalized evidence, validates the finding count, ingests it, and then requires zero cumulative open blocking findings in the ledger.
+5. **Static checks (optional)** — top-level `complexity_cmd` and `arch_rules_cmd`, run last in the AC pass (`--ac-only` and the full gate) once the ACs are green, with `WAVE_BASE_SHA` in the environment. Each must exit 0 and print an analysed-file count above zero (`Analysed N files`, `N files checked`, `N modules cruised`); a zero or missing count is a silent no-op and fails. Absent keys are skipped and noted in the PASSED block. Failure output is printed verbatim; every attempt keeps its own log.
+6. **Build** — `build_cmd` from config exits 0; runs in parallel with CodeRabbit as the last phase.
+7. **CodeRabbit** — every attempt archives raw and normalized evidence, validates the finding count, ingests it, and then requires zero cumulative open blocking findings in the ledger.
 
 The wave gate does not run Sonar. The top-level `sonar_cmd` runs once, at the PROJ-end Quality Gate (Step 9) after all waves pass — not per wave.
 
@@ -499,6 +500,7 @@ if failures still remain: use the existing blocked-run evidence path
 - Failure output is passed **verbatim** to correction and diagnostic workers — not summarized or interpreted.
 - Reuse requires the same committed `HEAD` and complete gate-config fingerprint. Identical AC commands with matching `test_files` and `auth_consuming` share successful execution across AC IDs, with separate evidence for every ID. Identical failed/empty/timed-out commands also share their result within one AC-only invocation, but failures are retried on the next invocation; infrastructure and auth exhaustion still stop immediately. Every correction commit invalidates reuse; no cross-HEAD impact inference is supported. Remove cached Ralph evidence after dependency, runtime, or environment changes.
 - Recovery has exactly four stages: normal fix round 1, normal fix round 2 with fresh workers, fresh diagnosis, then a different diagnosis-driven implementer. Do not add retries or silently weaken an AC.
+- A static-check failure (`complexity_cmd`, `arch_rules_cmd`) exits the pass non-zero like a red AC and follows the same four stages with the tool output verbatim; the rerun re-proves the ACs on the new `HEAD`, so behaviour preservation is evidenced. These are gate failures, not ledger findings.
 - If diagnosis finds an invalid or contradictory AC, record the evidence and use the existing blocked/escalation path.
 - Exit 76 with `blocked_external` is a missing declared prerequisite, not a
   code defect and not a green AC. Keep the test and plan scope; no repair rounds,
