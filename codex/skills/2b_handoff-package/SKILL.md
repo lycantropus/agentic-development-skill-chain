@@ -34,7 +34,7 @@ This is the terminal step of the product discovery track. It can also produce a 
 
 Read these inputs (the same PROJ locations on both delivery tracks):
 
-1. Reconciled concept: `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md` (with `Concept Sync Log` / `Handoff Readiness`)
+1. Reconciled concept: `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md` — sections `Problem And Goal`, `Primary Users And Scenarios`, `Scope`, `Key Behaviors And Flows`, `Data, Permissions, And Constraints`, `Decomposition Context`, `Concept Sync Log`, `Handoff Readiness`
 2. PRDs: `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md`
 3. Review changelog (if present): `specs/PROJ-<X>-<theme>/2_PRDs/review-changelog.md`
 4. Review decision records (if present): `specs/PROJ-<X>-<theme>/2_PRDs/*-review-decisions.md`
@@ -43,7 +43,7 @@ Read these inputs (the same PROJ locations on both delivery tracks):
 7. Optional design language: `specs/PROJ-<X>-<theme>/1c_design/design-language.md`
 8. Optional Visual Companion decision: `specs/PROJ-<X>-<theme>/1b_visual-companion/layout-decision.md`
 9. Optional brownfield as-is reference: `specs/PROJ-<X>-<theme>/0_context/existing-state.md` and `0_context/references/`
-10. Previous handoff runs, if any: `specs/PROJ-<X>-<theme>/2b_handoff/YYYY-MM-DD-handoff*/`
+10. Previous handoff run, if any: only its `handoff-manifest.md` (for the delta), not the run folder: `specs/PROJ-<X>-<theme>/2b_handoff/YYYY-MM-DD-handoff*/handoff-manifest.md`
 
 Do not read or package `1_concept/PROJ-<X>-direction-log.md` or anything under `_dropped/`; the package carries only the selected direction.
 
@@ -93,7 +93,7 @@ In the packaged sitemap and handoff, replace required localhost/repository links
 
 This is the first file in the reading order. It is a curated delta for repeat recipients, not a raw git diff and not the whole history.
 
-If a previous run exists, compare the current source artifacts against that run's `handoff-manifest.md` and packaged files. Prefer git history when the workspace is a git repository; otherwise compare file presence, modified times, and manifest contents. Summarize only material handoff changes:
+If a previous run exists, compare the current source artifacts against that run's `handoff-manifest.md` (it lists the included artifacts; do not open the run folder). Prefer git history when the workspace is a git repository; otherwise compare file presence, modified times, and manifest contents. Summarize only material handoff changes:
 
 ```markdown
 # What Changed Since Last Handoff
@@ -287,24 +287,4 @@ docs(PROJ-<X>): Assemble standalone handoff package for <theme>
 
 Git is optional on the discovery track. If the workspace is not a git repository, skip the commit; the dated run folder under `2b_handoff/` (and its ZIP) is the durable, distributable artifact.
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

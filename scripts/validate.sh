@@ -173,6 +173,8 @@ HARNESS_NAMES=(); HARNESS_PIDS=()
 harness() { local name="$1"; shift; "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
+harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
+harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
 harness ledger              bash "$ROOT/scripts/test-ledger.sh"
 harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"

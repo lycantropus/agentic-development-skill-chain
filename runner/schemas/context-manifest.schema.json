@@ -24,11 +24,12 @@
     },
     "inject": {
       "type": "array",
-      "description": "Ordered source ids compiled into the canonical bundle. Empty array = no bundle is compiled and the injector emits nothing (tier 0, explore).",
+      "description": "Ordered source ids compiled into the canonical bundle. Empty array = no bundle is compiled and the injector emits nothing (tier 0, explore). `architecture-delta` is the legacy alias of `proj-architecture`.",
       "items": {
         "enum": [
           "product",
           "architecture-overview",
+          "proj-architecture",
           "architecture-delta",
           "guidelines",
           "ground-file",

@@ -64,6 +64,8 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
 - **P6 is sequential:** the read-only QA finder runs FIRST and its
   findings are ingested before the P6 controller starts; the runner
   refuses `P6:done` while the ledger has open Critical/High findings.
+  The finder's text output is stored by the runner as
+  `5_progress/qa-finder-<ts>.md` (path in `state.json` `.qa.finder_report`).
 - **Models are pinned:** the claude writer runs `CLAUDE_WRITER_MODEL`
   (default `opus`), review lanes run `CLAUDE_REVIEW_MODEL` (default: the
   strongest model in `CLAUDE_MODEL_RANK`, `fable opus sonnet`, that is not
@@ -100,7 +102,8 @@ Env knobs: `CLAUDE_WRITER_MODEL`, `CLAUDE_REVIEW_MODEL`, `CLAUDE_MODEL_RANK`, `P
 (seconds a peer may outlive the writer, default 300), `SKILLCHAIN_POLL_SECONDS`
 (lane poll interval, default 5; the test harnesses set 0.1),
 `PONYTAIL_ENFORCE` (0 = loud escape hatch for the P0 ponytail gate),
-`CONTEXT_BUNDLE_BUDGET` (token budget override for the compiler).
+`CONTEXT_BUNDLE_BUDGET` (token budget override for the compiler; recorded as
+`budget_override` in `bundles.lock.json` and thus in state.json).
 `SKILLCHAIN_WORKTREE_ROOT` overrides the default sibling-worktree base;
 `SKILLCHAIN_DEV_PORT` records the PROJ dev port when setup needs a non-default.
 

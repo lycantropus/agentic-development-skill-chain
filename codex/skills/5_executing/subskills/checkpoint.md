@@ -16,7 +16,7 @@ Three call sites, one loop:
 
 | Call site (orchestrator) | Reviewed | Seal |
 |---|---|---|
-| **CP1** (Step 5 lead — main) | architecture-delta + wave plans + gate config + api-contracts | `state.json` → `CP1:approved` — the ONLY thing that unlocks P0 |
+| **CP1** (Step 5 lead — main) | architecture + wave plans + gate config + api-contracts | `state.json` → `CP1:approved` — the ONLY thing that unlocks P0 |
 | **Bootstrap** (via 0b_intake) | intake first drafts (all eight baseline files) | curated baseline commit — no state.json |
 | **CP2** (via delivery, 8) | PR review comments | classified comments: fix now / debt / reject |
 
@@ -80,7 +80,7 @@ itself.
 
 ## Input
 
-1. `specs/PROJ-<X>-<theme>/architecture-delta.md` (or `3-4_plan/PROJ-<X>-architecture.md`)
+1. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (legacy PROJs may still carry an `architecture-delta.md`)
 2. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (all waves) + `wave-gate-config.json`
 3. `specs/PROJ-<X>-<theme>/api-contracts.md` (if present)
 4. Open pre-mortem risks / plan self-review findings (if present)
@@ -116,8 +116,8 @@ first):
    ```
    Nonzero (a finding needed a human decision and nobody resolved it in the
    ledger) → no fast path, continue at Step 1.
-4. Run the machine consistency validator (exact command in Step 4 below). Any
-   error → no fast path, continue at Step 1.
+4. Run the machine consistency validator and the bundle check (exact commands
+   in Step 4 below). Any error → no fast path, continue at Step 1.
 
 If all four hold: skip the interactive walk-through (Steps 1-2) and the
 cascade (Step 4 — nothing changed, so there is nothing to cascade). Append one
@@ -137,8 +137,9 @@ when something is actually wrong.
 
 Build a summary the human can decide on in minutes:
 
-- **Decision summary:** the NEW decisions of this PROJ (the delta),
-  one line each — not the full architecture text.
+- **Decision summary:** every `Decision N` with its Affects and Summary
+  line — exactly what implementers will receive — not the full architecture
+  text.
 - **Wave overview:** waves with story sets, dependency rationale, and
   execution mode per wave.
 - **Open risks:** unresolved pre-mortem findings and weak spots the
@@ -171,8 +172,8 @@ with lasting value into `docs/ARCHITECTURE.md`/ADRs.
 <HARD-GATE>
 One decision ("drop US-7, cut Wave 2 differently") touches several
 artifacts. For every `change`/`reject` decision, update EVERY affected
-file — architecture-delta, wave plans, `wave-gate-config.json`,
-api-contracts — and record the touched files in the entry's
+file — the architecture (decision body AND its Summary line), wave plans,
+`wave-gate-config.json`, api-contracts — and record the touched files in the entry's
 **Cascade** field. Then re-run the plan self-review (the consistency
 check from writing-plans, 4): story/dependency/contract consistency
 across all waves. A checkpoint that edits a wave plan but not the gate
@@ -184,7 +185,12 @@ when the round adopted every point unchanged:
 ```bash
 node ~/.codex/skills/5_executing/scripts/validate-wave-plan.mjs \
   specs/PROJ-<X>-<theme>/3-4_plan
+node ~/.codex/skills/5_executing/scripts/compile-context-bundles.mjs check <X> <theme>
 ```
+
+The `check` compiles every role's bundle per wave in memory and fails when a
+role would be blocked at P0, a decision or key flow is malformed, or one
+reaches no wave.
 
 This is a hard pre-approval gate. It checks unique AC IDs, their task/command
 mapping, bidirectional task/test-file agreement, broad regressions, auth-budget
@@ -226,29 +232,7 @@ approval pipeline — not silently applied.
 
 ## Bootstrap Variant (via 0b_intake)
 
-Validation of the intake first drafts with the same point-by-point
-pattern. Generated docs are HYPOTHESES, not truth — the loop exists to
-turn them into a baseline the developer actually stands behind.
-
-- **Input:** the provenance-marked drafts in `specs/intake/` (all eight
-  baseline files: PRODUCT, ARCHITECTURE, GUIDELINES, DESIGN-SYSTEM,
-  components, security-baseline, test-conventions, root AGENTS.md).
-- **Review queue:** every `[gap: ...]`, every `[assumed]`, every
-  inconsistency the scan flagged — plus anything the developer wants to
-  challenge in the `[extracted: ...]` statements.
-- **Loop:** identical to CP1 — present point by point, each point ends
-  in exactly one of adopt / change (how) / reject (why) / defer,
-  recorded BEFORE the next point.
-- **Decision log:** `specs/intake/decisions.md`, ids `D-BOOTSTRAP-<NN>`,
-  same `templates/decisions.md.tmpl` frame (checkpoint name:
-  `Bootstrap`).
-- **Cascade:** every decision is applied to the affected draft(s) —
-  a GUIDELINES ruling may also touch ARCHITECTURE or add a Known Debt
-  note.
-- **Seal:** a git COMMIT of the curated baseline (done by the intake
-  skill after `intake-seal-check.sh` passes) — explicitly NO
-  `state.sh init` and NO phase transition. The bootstrap is pre-PROJ:
-  each PROJ's state.json is created later by concept (1).
+Specialised loop for the intake drafts: `0b_intake/references/bootstrap-reconcile.md`.
 
 ## Completion Checklist
 
@@ -268,24 +252,4 @@ turn them into a baseline the developer actually stands behind.
 docs(PROJ-<X>): CP1 approved — decision log + cascaded plan updates
 ```
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this subskill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

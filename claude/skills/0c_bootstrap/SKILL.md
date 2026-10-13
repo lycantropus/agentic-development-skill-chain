@@ -116,12 +116,22 @@ versions from `package.json`/the lockfile — never from memory:
 
 Commands: `pnpm dev` · `pnpm build` · `pnpm test` · `pnpm lint`
 
-<!-- Everything below is filled by 3_architecture (per PROJ) and P7 curation. -->
+## System shape
+<!-- parts, boundaries and external integrations, and how they talk -->
+
+## Data ownership
+<!-- which part owns which entity -->
+
+## Invariants
+<!-- auth, security and consistency rules every change must keep -->
 ```
 
 This file is part of the curated baseline, is injected into every context
 bundle, and is **capped at 200 lines** (`curation-caps.sh`). The Stack table
-is the part that must never be duplicated elsewhere.
+is the part that must never be duplicated elsewhere. The four sections
+describe the system as it is NOW — only P7 curation fills and edits them,
+by rewriting the affected section; never with per-PROJ sections. PROJ
+architectures (`3_architecture`) reference them and never edit `docs/`.
 
 If `docs/ARCHITECTURE.md` already exists (a repo that went through
 `0b_intake`), do not rewrite it — insert or correct the `## Stack` section

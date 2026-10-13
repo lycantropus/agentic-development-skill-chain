@@ -44,7 +44,7 @@ For UI features, concept may record product vocabulary, required high-level stat
 
 Create a task for each item and complete them in order:
 
-1. **Explore project context** - before asking, read `README.md`, `docs/`, `specs/INDEX.md`, existing PROJs and their decisions, `AGENTS.md`, routes, screens, components, APIs, schemas, theme files and component registry, deployment and platform constraints (runtime, storage, env vars, cron, serverless limits), and recent commits. Summarize briefly. On the discovery track for an existing product without a local codebase, run [Brownfield Context Intake](#brownfield-context-intake-discovery-track) instead or in addition.
+1. **Explore project context** - spawn one Explore agent (read-only) with the question list below and keep only its ≤300-token answer in this context: current routes/screens, components and registry (`docs/components.md`), API/schema entry points, deployment constraints (runtime, storage, env vars, cron, serverless limits), PROJs that touch the same area (`specs/PROJ-*/1_concept/*-concept.md` titles + Scope sections only), recent commits touching the area. The concept session itself reads only `docs/PRODUCT.md`, the roadmap entry, and the stakeholder brief if one exists. Never read `docs/TECHNICAL.md`, `docs/PROJECT.md` or `docs/architecture/*` whole. On the discovery track, write the answer to `0_context/existing-state.md` for later skills; for an existing product without a local codebase, run [Brownfield Context Intake](#brownfield-context-intake-discovery-track) instead or in addition.
 2. **Clarify the problem** - see [Clarification](#clarification).
 3. **Open the solution space** - see [Opening](#opening). First iteration only; nothing below may narrow the space before this step.
 4. **Run the decomposition gate** - see [Project Decomposition Gate](#project-decomposition-gate). If `specs/product-roadmap.md` exists, the cut and the PROJ number are already decided there: take the entry's user outcome, `Depends on`, and boundaries as given, and set its `Status` to `concept`. Only decompose further if this single entry turns out to be more than one PROJ — then split it in the roadmap too, with a changelog line.
@@ -101,12 +101,12 @@ Write to `specs/PROJ-<X>-<theme>/0_context/existing-state.md` (references in `0_
 
 Before exploring solutions, establish the problem owner (and deputy if relevant), job to be done, current pain, outcome/adoption/guardrail success factors with known baselines and targets, non-goals, and constraints. Keep success factors in business terms; measurement implementation belongs later. Do not choose scope, solution direction, UI, or technology in this pass.
 
-Use a stakeholder brief from `clarification` (1a, `specs/_clarification/<slug>-stakeholder_brief.md`) or another user-provided clarification artifact as the source when it covers these points. Record its path or link in the concept and skip questions it answers. If no artifact exists, gather the missing facts conversationally and preserve them in the concept's `Clarification` section. Do not require a separate brief file or gate record.
+Use a stakeholder brief from `clarification` (1a, `specs/_clarification/<slug>-stakeholder_brief.md`) or another user-provided clarification artifact as the source when it covers these points. Record its path or link in the concept and skip questions it answers. If no artifact exists, gather the missing facts conversationally and preserve them in `Problem And Goal`, `Success Criteria`, `Out Of Scope` and `Data, Permissions, And Constraints`. Do not require a separate brief file or gate record.
 
 A stakeholder brief from `clarification` was confirmed by the stakeholder, usually without the PM who now runs concept being able to re-ask them:
 
 - Take confirmed facts as given; do not ask the PM to re-confirm them.
-- For each open question, first ask whether it has been answered since. A still-open question marked `Blocks concept? yes` is a stakeholder follow-up: report it with its owner and do not select a direction until it is resolved. Non-blocking ones carry into `Open clarification questions`.
+- For each open question, first ask whether it has been answered since. A still-open question marked `Blocks concept? yes` is a stakeholder follow-up: report it with its owner and do not select a direction until it is resolved. Non-blocking ones carry into `Risks And Trade-Offs`.
 - If the PM's direction would contradict the stakeholder brief (for example, widen a non-goal), flag it as needing the problem owner instead of overriding it silently.
 - Never edit the stakeholder brief. If it no longer holds, ask for a new revision via `clarification`.
 - When one stakeholder brief is decomposed into several PROJs, every sibling concept cites the same stakeholder brief.
@@ -228,14 +228,7 @@ Approved concept
 - As-is reference (discovery track): `0_context/existing-state.md` if captured
 - Relevant constraints:
 - Prior related specs:
-
-## Clarification
-- Source: <supplied artifact path/link | captured in this concept>
-- Problem Owner / deputy: <if known>
-- Job to be done: <when, who, goal, benefit>
-- Success factors: <outcome, adoption, guardrail; known baselines and targets>
-- Non-goals and constraints: <from clarification>
-- Open clarification questions: <none | list>
+- Clarification brief: <path | captured in this concept>; problem owner / deputy: <if known>
 
 ## Problem And Goal
 
@@ -270,11 +263,8 @@ Approved concept
 - Existing behavior to preserve:
 - Downstream attention needed:
 
-## Downstream Handoff Notes
-- For visual-companion: <primary user job and context; information shape (list/detail, form-heavy, review/approval, timeline, dashboard, wizard-like, other); likely UI tensions without choosing a container; mobile importance, deep links, destructive actions, context preservation; UI anti-goals>
-- Mockup-relevant product inputs: <vocabulary, high-level states, content examples, behavior to preserve>
-- For requirements-engineer: <major behaviors; product-level edge cases and failure expectations; constraints PRDs must preserve>
-- For architecture/planning: <constraints with technical implications; data ownership, permission, and external dependency hints; operational risks, durability, latency; existing behavior to preserve; explicit non-goals against overbuilding>
+## Handoff Readiness
+- Delivery track: full chain (in-repo build) | discovery (Linear handoff)
 
 ## Direction Log
 Dropped options and superseded decisions: `PROJ-<X>-direction-log.md`. Not input for later stages.
@@ -290,7 +280,7 @@ Dropped options and superseded decisions: `PROJ-<X>-direction-log.md`. Not input
 - Backend/API feature: requirements-engineer
 ```
 
-Keep it product-level and decision-rich; no PRDs, architecture, or implementation plan. Commit with `feat(PROJ-<X>): add concept for <theme>`. Git is optional on the discovery track: without a repository, skip the commit (or suggest an optional `git init` for a history of concept and mockup iterations); the file itself is the durable artifact.
+Keep it product-level and decision-rich; no PRDs, architecture, or implementation plan. At approval set `Delivery track` to `full chain (in-repo build)` by default, or `discovery (Linear handoff)` when the user says the PRD goes to an external developer. Cap: 150 lines. Commit with `feat(PROJ-<X>): add concept for <theme>`. Git is optional on the discovery track: without a repository, skip the commit (or suggest an optional `git init` for a history of concept and mockup iterations); the file itself is the durable artifact.
 
 ## Direction Log
 
@@ -319,13 +309,19 @@ Before the user reviews it, check the written concept and fix issues inline; ask
 3. **Scope:** focused enough for one PROJ, or decomposed with map, siblings, dependencies, and excluded sibling scope documented.
 4. **Ambiguity:** requirements cannot be read in materially different ways; key terms are defined and disputed scenarios settled.
 5. **Coverage:** success criteria, out of scope, and users/scenarios are explicit; every dropped option is in the direction log and none lingers in the concept; confirmed assumptions are recorded; unresolved assumptions are not hidden.
-6. **Contract:** every template section, including the downstream handoff notes for the chosen path, is filled.
-7. **Boundary:** nothing from the [Boundary](#boundary) "does not own" list leaked in; implementation success reads as product constraints, risks, or handoff notes, not technical design.
+6. **Contract:** every template section, including `Handoff Readiness`, is filled, and the file is within the 150-line cap.
+7. **Boundary:** nothing from the [Boundary](#boundary) "does not own" list leaked in; implementation success reads as product constraints or risks, not technical design.
 
 ## Automatic Cross-Review
 
-Immediately after saving the concept, invoke `cross-review` in the same turn,
-before user review or transition. Do not ask whether to run it or wait for
+Immediately after saving the concept, check the cap and invoke `cross-review` in the same turn,
+before user review or transition:
+
+```bash
+[ "$(wc -l < specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md)" -le 150 ] || echo "concept over 150 lines — cut before cross-review"
+```
+
+While over the cap, cut (never by removing scope, success criteria or constraints) and do not proceed to cross-review. Do not ask whether to run it or wait for
 approval. Supply everything that establishes as-is truth for the concept:
 
 ```bash

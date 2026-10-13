@@ -82,7 +82,7 @@ bash scripts/state.sh set 96 stage2 .base_sha "\"$BASE_SHA\"" >/dev/null
 # =============================================================================
 step "context compiler"
 # =============================================================================
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1 \
+node scripts/compile-context-bundles.mjs compile 96 stage2 --wave all >/dev/null 2>&1 \
   && ok "compile succeeds on the baseline fixture" || bad "compile failed"
 CTX=specs/PROJ-96-stage2/context
 S1="$(cat "$CTX"/bundle-*.md | sha1sum)"
@@ -281,7 +281,7 @@ PATH="$STUB:$PATH" QA_STUB_LOG="$QA_FALLBACK_LOG" bash scripts/cross-review.sh q
 RC=$?
 QA_FALLBACK="$(jq -r '.cross_review[-1] | .reviewer_provider + ":" + (.degraded_fallback | tostring)' specs/PROJ-96-stage2/state.json 2>/dev/null)"
 [ "$RC" -eq 3 ] && [ "$QA_FALLBACK" = "claude:true" ] && [ "$(wc -l < "$QA_FALLBACK_LOG" | tr -d ' ')" -eq 6 ] \
-  && grep -q 'Codex unavailable; continuing six QA personas with Claude (degraded)' "$QA_FALLBACK_OUT" \
+  && grep -q 'opposite provider unavailable; continuing six QA personas with claude' "$QA_FALLBACK_OUT" \
   && ok "missing Codex -> six Claude personas, recorded degraded fallback and visible warning" \
   || bad "Codex fallback wrong rc=$RC record=$QA_FALLBACK workers=$(wc -l < "$QA_FALLBACK_LOG" | tr -d ' ')"
 # Restore the successful adapter stub for the remaining protocol controls.

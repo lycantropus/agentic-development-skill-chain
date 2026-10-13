@@ -171,6 +171,13 @@
         }
       }
     },
+    "qa": {
+      "type": "object",
+      "description": "QA (P6) records written by the runner.",
+      "properties": {
+        "finder_report": { "type": "string", "description": "Path of the stored QA finder report, specs/PROJ-<X>-<theme>/5_progress/qa-finder-<ts>.md" }
+      }
+    },
     "cross_review": {
       "type": "array",
       "description": "One record per cross-review round (appended by cross-review.sh via state.sh). Every degraded_fallback=true round is flagged in the morning report and PR body.",

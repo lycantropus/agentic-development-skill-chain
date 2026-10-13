@@ -39,7 +39,7 @@ the discovery track skips 0c because there is no codebase.
 
 The chain serves two delivery tracks: the full in-repo build (Steps 1–7) and a **product discovery** track that stops at Step 2 and hands a PRD to a developer via Linear. See [PM / Product Discovery Chain](pm-chain.md).
 
-Architecture (3) continues into writing-plans (4) and writing-plans into Step 5 (`executing-large-model`, 5b) — which opens with Checkpoint 1 — without intermediate approval stops when their cross-reviews are clean; Checkpoint 1 is the single human approval of the planning package and cascades changes back into both. Either skill still stops on remaining Critical/High findings, open product decisions, or an explicit request to review one artifact alone. If planning exposes a PRD or architecture defect, it returns to the owning skill and its required cross-review before continuing to executing.
+Architecture (3) continues into writing-plans (4) without a stop when its cross-review is clean; writing-plans ends its turn so the user can flush the session (`/compact` or a fresh one) before Step 5 (`executing-large-model`, 5b) — which opens with Checkpoint 1 — a context flush, not an approval stop; Checkpoint 1 is the single human approval of the planning package and cascades changes back into both. Either skill still stops on remaining Critical/High findings, open product decisions, or an explicit request to review one artifact alone. If planning exposes a PRD or architecture defect, it returns to the owning skill and its required cross-review before continuing to executing.
 
 `cross-review`, `bugfixing`, `refactor-dreamer`, `sonar-cli`, `update-chain` and `vibecoder` intentionally sit outside this flow. Step 5 has two skills with identical gates and state contracts: `5b_executing-large-model` is the default, with procedure reduced to invariants; `5_executing` is the full-procedure alternative for weaker writer models and hosts the shared subskills and scripts. `cross-review` is a mechanism, not a step — it is invoked by producing skills and never routed to directly, which is why it carries no chain number. Concept, architecture, and plan reviews start automatically as soon as their outputs are saved, before user approval or handoff. Requirements, P6 QA, and P7 documentation also require it. Use `bugfixing` for a reported defect that needs reproduction, a narrow repair, regression-test proof, and test-escape analysis without starting a feature PROJ. Launch `refactor-dreamer` separately for a long-form architecture drift/refactor discovery run, then feed its `chain-input.md` into the appropriate chain step. Use `sonar-cli` separately for SonarScanner/SonarQube CLI setup, analysis runs, and issue triage. Use `vibecoder` for a freeform exploratory coding session on a scratch branch: it keeps a live journal while you experiment, then distills it into a `chain-input.md` that feeds `1_concept` as raw input.
 
@@ -86,7 +86,7 @@ After decomposition:
 | 4 | writing-plans | Split independently verifiable stories into dependency-ordered waves; use expand–contract for wide migrations |
 | 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through the subskills below, then the waves with the same state.sh, wave tag, wave-gate, Outer Ralph recovery, Quality Gate proof and Skill 6 handoff as `5_executing`; TDD choreography and persona reviews replaced by intent and invariants, workers tiered by `Complexity`, the strongest model leads |
 | 5 | executing | Full-procedure alternative for weaker writer models. Hosts the subskills: run Checkpoint 1 and P0 in subagents — `subskills/checkpoint.md` (structured reconcile loop: decision log, cascaded plan updates, seal `CP1:approved`; the user dialogue stays with the orchestrator; the same loop serves CP2 via delivery and bootstrap via intake) and `subskills/setup.md` (persistent PROJ worktree + branch/BASE_SHA, tool/auth preflight, reproducible dependency install, framework helpers synchronized from installed skills with an adaptation-protecting hash manifest) — then delegate code/test/fix edits to workers, run TDD plus one wave-scoped Ralph pass and hard wave gates, then an integration-focused PROJ gate and direct Skill 6 handoff |
-| 6 | qa | Run E2E QA, security, required six-persona opposite-provider evidence review, and simplicity review; strictly read-only finder in framework runs |
+| 6 | qa | Run E2E QA, security, the required opposite-provider six-persona review (the only persona panel), and simplicity review; strictly read-only finder in framework runs |
 | 7 | documentation | Curate feature and technical docs, then merge approved AGENTS.md candidates |
 | 8 | delivery | Conflict probe against main, PR body rendered from state.json + findings.json and declared external prerequisites in wave-gate-config.json, bounded CI fix loop, Checkpoint 2 comment reconcile |
 
@@ -174,16 +174,28 @@ Stage 2 adds the bootstrap and the full context system:
   hash. Claude subagents get their bundle via the SubagentStart hook
   (`context-injector.mjs`), codex lanes read `bundle-<role>.codex.md`;
   micro-fixer and explore spawns get nothing by design.
+  The PROJ architecture reaches implementers as a compiled view of the one
+  `PROJ-<X>-architecture.md`: each decision's and key flow's Summary line
+  (plus an override note when it `Changes baseline`), filtered to the PRDs of
+  the running wave; bundles are recompiled at every wave start, and a
+  recompile without `--wave` keeps the lock's scope. `compile-context-bundles.mjs
+  check` runs in writing-plans and at CP1, so a role that would be blocked
+  surfaces before approval; a budget override is recorded in the lock.
   The story itself is not in the bundle: each implementer's spawn prompt
   embeds its section of the wave plan verbatim (`story-slice.mjs`), and the
-  lead reads only the Wave shape plus the current wave's plan.
+  lead reads only the wave shape (each plan's `User Stories in this Wave` and
+  `Execution` sections) plus the current wave's plan.
 - **Ponytail parity:** the minimalism ladder comes from the Ponytail
   plugin on both providers — same version and mode, gated in the P0
   preflight. P0 leaves its matcher unset so generic implementation
   fallbacks receive the same ladder.
 - **P7 curation + gates:** `documentation` (7) curates docs/ and
-  `src/**/agent.md`, then must pass FORM (`curation-caps.sh`: PRODUCT
-  ≤30 non-blank lines, ARCHITECTURE ≤200 lines, agent.md ≤100 lines) and
+  `src/**/agent.md` — `docs/ARCHITECTURE.md` stays a current-state
+  description (Stack · System shape · Data ownership · Invariants), edited in
+  place from the PROJ's `Changes baseline` lines, never a per-PROJ
+  chronicle — then must pass FORM (`curation-caps.sh`: PRODUCT
+  ≤30 non-blank lines, ARCHITECTURE ≤200 lines, agent.md ≤100 lines,
+  GUIDELINES ≤120, security-baseline and test-conventions ≤60) and
   TRUTH (`cross-review`: the provider opposite the curation author
   reviews the docs delta against the PROJ diff; Critical/High block the
   phase, up to 3 automatic rounds while findings remain; manual rounds have no limit). The runner re-verifies both gates after the seal.
@@ -192,13 +204,13 @@ Stage 2 adds the bootstrap and the full context system:
   `claude -p` with validated structured output; degraded fallback =
   model-opposite, always flagged). Active call sites:
   required PRD review in Step 2, automatic concept/architecture/plan reviews,
-  required P6 QA evidence review, and the P7 docs truth gate. Review prompts
+  required P6 QA opposite-provider six-persona review, and the P7 docs truth gate. Review prompts
   have a 900,000-byte default embedded-material cap; large diffs use explicit
   pathspecs and name every omitted changed path.
   The Claude adapter reports Claude Code's hard 10 MB stdin ceiling rather
   than truncating review material. The QA gate launches one isolated worker per
-  persona: Codex-authored QA fails closed without Claude, while Claude-authored
-  QA may fall back loudly to six Claude workers when Codex is unavailable.
+  persona: when the opposite provider is unavailable, QA falls back loudly to six
+  same-vendor workers (Claude: strongest model; Codex: default), flagged degraded.
 - **Integration-focused PROJ gate:** once every wave passes, the PROJ
   quality gate reviews only the assembled cross-wave diff from `BASE_SHA`
   (contracts, shared state, authorization boundaries, unresolved wave

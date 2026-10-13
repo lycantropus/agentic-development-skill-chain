@@ -12,7 +12,7 @@ that plan and implement from it (writing-plans, implementers).
 ## Rules
 
 - **English only** in every written file, whatever language the user chats in.
-- **No code** in the architecture and delta: no SQL, no TypeScript, no API
+- **No code** in the architecture: no SQL, no TypeScript, no API
   snippets. WHAT and WHY, not HOW. Only `migration-design.md` may carry DDL.
 - **Scope = architecturally significant only.** A decision belongs here when it
   affects multiple PRDs or waves, or is significant on its own: irreversible (a
@@ -22,9 +22,14 @@ that plan and implement from it (writing-plans, implementers).
   implementer. When in doubt, leave it out.
 - **Stack is inherited.** `docs/ARCHITECTURE.md` § Stack (from `bootstrap` 0c or
   `intake` 0b) is the single source of truth: build on it, don't restate or
-  re-open it. A new stack layer (queue, cache, second DB) or closing an `open` row
-  is one Cross-Cutting Tech Decision plus a `Stack change:` line in the delta.
-  Never edit `docs/` here — P7 (`documentation`) promotes built changes.
+  re-open it. Never edit `docs/` here — P7 (`documentation`) promotes built changes.
+- **Baseline changes are explicit.** A decision that changes anything
+  `docs/ARCHITECTURE.md` states — a new stack layer, closing an `open` Stack row,
+  a moved boundary, new data ownership, a relaxed or new invariant — carries
+  `**Changes baseline:** docs/ARCHITECTURE.md § <section>` and its Summary says
+  what it supersedes. A contradiction without that line is a defect. The line
+  tells implementers which injected baseline rule this PROJ overrides and is
+  P7's to-do list for the curation.
 - **Decomposed PROJs:** sibling PROJs are external dependencies or consumers.
   Document only the contract (ownership, dependency direction, shared entities,
   rollout assumptions), never their internals.
@@ -53,7 +58,10 @@ Ask the user directly only about open cross-cutting questions, e.g.
 accounts and roles, cross-device sync, third-party integrations, migration
 rollback policy, or a UI handoff that conflicts with § Stack.
 
-## Output 1: `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`
+## Output: `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`
+
+One file. It is the single architecture source for CP1, the implementer
+bundles, QA and P7 — there is no separate delta or summary file.
 
 ```markdown
 # PROJ-<X> Architecture — <theme>
@@ -72,14 +80,21 @@ rollback policy, or a UI handoff that conflicts with § Stack.
 indexes. Add an erDiagram (names + cardinality only) at 3+ related entities.]
 
 ## Key Flows
-[0-3 sequenceDiagrams for flows that cross system boundaries or are significant
-per Rules — auth, real-time, async work, external integrations, multi-system
-writes. Each with "Affects: PRD-…". Omit the section if none.]
+### Flow N: <title>
+**Affects:** PRD-2 | all
+**Summary:** <one sentence: the ordering or guarantee implementers must keep — the only line they see>
+[sequenceDiagram. 0-3 flows that cross system boundaries or are significant per
+Rules — auth, real-time, async work, external integrations, multi-system writes.
+Omit the section if none.]
 
 ## Cross-Cutting Tech Decisions
-[Numbered `### Decision N: <title>`, numbers stable through reconciliation
-(writing-plans cites them). 3-6 sentences each: decision, its one real reason, affected PRDs. Cite
-requirements by ID ("per PRD-2 US-2 AC-9"), don't quote them.]
+### Decision N: <title>
+**Affects:** PRD-1, PRD-3 | all
+**Changes baseline:** docs/ARCHITECTURE.md § <section>   ← only when it changes the baseline
+**Summary:** <one sentence: WHAT + short WHY — the only line implementers see>
+[3-6 sentences: the decision and its one real reason. Cite requirements by ID
+("per PRD-2 US-2 AC-9"), don't quote them. Numbers stay stable through
+reconciliation — wave plans cite them.]
 
 ## UI Implementation Constraints
 [Only with a UI handoff: project mode (greenfield/brownfield/hybrid), component
@@ -95,8 +110,13 @@ If the handoff conflicts with § Stack, § Stack wins — raise it as an open qu
 [New packages only, with affected PRDs]
 ```
 
-Example decision: "Real-time updates via Supabase subscriptions, not polling —
-users need instant feedback. Affects: PRD-2, PRD-3."
+Example decision:
+
+```markdown
+### Decision 2: Live status via subscriptions
+**Affects:** PRD-2, PRD-3
+**Summary:** Status updates arrive through Supabase subscriptions, not polling (users need instant feedback).
+```
 
 Example flow:
 
@@ -122,34 +142,24 @@ put that detail in `3-4_plan/PROJ-<X>-migration-design.md`, organized by decisio
 The architecture names the decision and WHY in plain language and points there
 ("detailed in `PROJ-<X>-migration-design.md` § Decision 3").
 
-## Output 2: `specs/PROJ-<X>-<theme>/architecture-delta.md` (always)
+## Implementer view (generated — never hand-written)
 
-Implementer context bundles (compiled by the P0 setup subskill) prefer this file and block the
-role outright if the bundle exceeds its ~6.5k-token budget. Write it every time.
+`compile-context-bundles.mjs` builds what workers see from this file: Overview,
+Data Model, Cross-PROJ Dependencies, Dependencies and (frontend roles only) UI
+Implementation Constraints verbatim; PRDs Covered, System Boundaries and every
+diagram dropped; each decision and key flow reduced to
+`Decision N: <title> (Affects) — Summary` (`Flow N: …` alike) plus an override
+note when it `Changes baseline`, filtered to the PRDs of the running wave. So:
 
-```markdown
-# PROJ-<X> Architecture Delta
-
-Condensed decision summary for implementer context bundles. Full rationale and
-detail: `3-4_plan/PROJ-<X>-architecture.md`.
-
-## Scope
-[2-4 sentences]
-
-## Stack changes
-- [Only if any: `Stack change: <layer> — <choice> (<why>)`]
-
-## Data model decisions
-- [One line per decision: WHAT + short parenthetical WHY]
-
-## [Other decision groupings as needed]
-- [Same format]
-```
-
-Compression drops wording, never decisions: every Cross-Cutting Tech Decision,
-binding UI constraint, and cross-PROJ contract keeps at least one line; migration
-decisions keep their pointer. Every line traces to the full document. No diagrams.
-Stay well under 1500 tokens. No wave section — `writing-plans` appends it.
+- Every decision and flow is a `### Decision N: <title>` / `### Flow N: <title>`
+  heading with both `**Affects:**` (at least one `PRD-n`, or `all`) and
+  `**Summary:**`. The compiler fails on a malformed heading, a missing or doubled
+  field, and (`check`) an item whose PRDs are in no wave — never drops it silently.
+- Whatever an implementer must obey goes into a Summary; the body and the
+  diagram stay for the human and the reviewers. A migration decision's Summary
+  keeps its `migration-design.md` pointer.
+- The non-decision sections are injected verbatim into every bundle — keep them
+  to the format above. `writing-plans` runs the budget check once waves exist.
 
 ## Cross-Review (automatic, same turn)
 
@@ -158,7 +168,6 @@ Right after saving, without asking:
 ```bash
 bash scripts/cross-review.sh architecture <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md \
-    specs/PROJ-<X>-<theme>/architecture-delta.md \
     specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-migration-design.md \
   --ground-truth specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md \
     specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md docs/ARCHITECTURE.md docs/GUIDELINES.md \
@@ -171,8 +180,8 @@ bash scripts/cross-review.sh architecture <X> <theme> \
 - Drop paths that don't exist (the script fails on missing files); never drop a
   PRD. If the context cap rejects the call, tell the user which inputs you left out.
 - `--persist` is mandatory: CP1's fast path reads the persisted round and ledger.
-- Reconcile and re-review through round 3 while any findings remain; keep the
-  delta aligned. Further rounds only on user request.
+- Reconcile and re-review through round 3 while any findings remain; a changed
+  decision gets a matching Summary. Further rounds only on user request.
 
 ## Continue into writing-plans
 
@@ -184,28 +193,8 @@ asked to review the architecture alone first.
 
 Update `specs/INDEX.md` status to "In Progress" if it exists. Say once:
 
-> "Architecture is ready at `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`, with a condensed `architecture-delta.md` for implementer context bundles. Cross-review: <clean | N findings reconciled>. Continuing into **writing-plans**; you approve architecture and plans together at Checkpoint 1."
+> "Architecture is ready at `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`. Cross-review: <clean | N findings reconciled>. Continuing into **writing-plans**; you approve architecture and plans together at Checkpoint 1."
 
 Commit: `docs(PROJ-<X>): Add architecture for <theme>`
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

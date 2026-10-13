@@ -43,7 +43,7 @@ scaffold stood up, agent files written); an existing codebase goes through
 | 4 | `writing-plans` | Wave-based implementation plans; flows straight into 5, whose CP1 is the single planning approval |
 | 5 | `executing` | Full-procedure Step 5 for weaker writer models (runner: `SKILLCHAIN_P5_SKILL`); hosts CP1 and P0 as subskills run in subagents — `checkpoint` (CP1/CP2/bootstrap reconcile loops with a decision log, seals `CP1:approved`) and `setup` (persistent isolated worktree, branch, preflight, framework scripts, dependencies, context bundles) — then worker-owned code/test/fix edits, TDD, one wave-scoped Ralph pass, hard wave gates, an integration-focused PROJ gate, then direct handoff to mandatory Skill 6 |
 | 5b | `executing-large-model` | **Default Step 5**: CP1 + P0 through the subskills above, then the waves with the same gates, state, and QA handoff as `executing`, procedure replaced by intent and invariants |
-| 6 | `qa` | End-to-end QA plus required six-persona opposite-provider evidence review; read-only finder in framework runs, findings into the ledger |
+| 6 | `qa` | End-to-end QA plus the required opposite-provider six-persona review; read-only finder in framework runs, findings into the ledger |
 | 7 | `documentation` | Human docs + curation of the long-lived `docs/` baseline behind form and truth gates |
 | 8 | `delivery` | Conflict probe, PR with rendered body, CI fix loop, CP2 comment reconcile |
 
@@ -106,9 +106,9 @@ rounds have no limit (`--round 4`, `--round 5`, and so on). Remaining
 Critical/High findings block handoff; Medium/Low findings are reported or
 deferred after the automatic rounds.
 P6 uses six isolated discipline reviewers rather than one reviewer playing a
-panel. A Codex-authored QA run fails closed when Claude is unavailable;
-Claude-authored QA may fall back loudly to six Claude reviewers when Codex is
-unavailable.
+panel. When the opposite provider is unavailable, QA falls back loudly to six reviewers
+on the same vendor (Claude: its strongest model; Codex: its default), flagged
+degraded.
 
 ## Optional Skills
 

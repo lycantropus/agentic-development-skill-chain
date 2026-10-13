@@ -27,10 +27,11 @@ You are a QA Engineer and Red-Team Pen-Tester. Your mindset is adversarial — y
 ## Input
 
 Read the following for the PROJ under test:
-- All PRDs in `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` — user stories, acceptance criteria, edge cases
-- Architecture in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` — tech design context
-- Progress in `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md` — implementation status, Ralph results
-- Wave plans in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md` — what was built
+- All PRDs in `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` — user stories, acceptance criteria, edge cases (these are the tests)
+- `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md` — what shipped: the `### Wave N Gate — PASSED` blocks list the stories; Ralph evidence; Quality Gate results
+- `specs/PROJ-<X>-<theme>/3-4_plan/wave-gate-config.json` — `phase_commands`, routes, auth budget
+- Architecture `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`: **on demand only**, for a finding that needs a design decision to classify
+- Wave plans: **not read**. Their story list is in the PASSED blocks.
 
 QA runs across all PRDs of the PROJ. Each PRD's acceptance criteria become tests.
 
@@ -82,11 +83,10 @@ This skill was imported from a Claude workflow. In Codex, follow these overrides
 
 ## Context Economy
 
-QA generates heavy token load: Playwright/agent-browser transcripts, persona reviews, red-team outputs. Keep the orchestrator's context small.
+QA generates heavy token load: Playwright/agent-browser transcripts and security probe output. Keep the orchestrator's context small.
 
 - Prefer focused searches and concise summaries.
-- When delegation is allowed, assign independent test streams or review personas to subagents.
-- For the six-persona panel, delegation is the default: spawn one independent subagent per persona unless the active environment explicitly lacks subagent support.
+- When delegation is allowed, assign independent test streams to subagents.
 - Keep BUG-IDs, severities, reproduction steps, and decisions in the main context; leave raw logs in files or subagent context.
 
 Fixing is outside QA's role unless the user explicitly asks this session to fix Critical/High findings after the QA report.
@@ -103,17 +103,23 @@ QA has six release gates:
 - Sonar quality input: consume Skill 5 Sonar results when present; never make QA rerun Sonar from scratch.
 - Severity merge: all confirmed Critical/High bugs block release, regardless of which stream found them.
 
-The six-persona panel is a diff-level review source, not a separate QA workflow. Persona findings become normal QA bugs after deduplication and severity assignment. Persona retrospectives are advisory; persona bug findings are not advisory once accepted into the bug list.
+The opposite-provider persona review is a diff-level review source, not a separate QA workflow. Its findings are normal QA bugs once deduplicated and severity-assigned. Retrospectives are advisory; bug findings are not.
 
 ### Required Persona Cross-Review (Codex QA)
 
-When this QA skill runs in Codex, it is not complete until six independent opposite-provider persona workers have reviewed the QA evidence. After documenting QA results and before making a release recommendation, run:
+QA's persona review is the opposite-provider panel below; there is no in-session panel. When this QA skill runs in Codex, it is not complete until six independent opposite-provider persona workers have reviewed the QA evidence. After documenting QA results and before making a release recommendation, run:
 
 ```bash
 BASE="specs/PROJ-<X>-<theme>"
 BASE_SHA="$(bash scripts/state.sh get <X> <theme> .base_sha)"
+# The QA report is the QA summary sections only — never the whole progress.md.
+QA_REPORT="$(mktemp)"
+# Framework run: write the summary you will print as your final output into "$QA_REPORT"
+# (the runner stores that output as 5_progress/qa-finder-<ts>.md only after you finish).
+# Interactive run: export the QA Results section of progress.md:
+# awk '/^## /{p=($0=="## QA Results")} p' "$BASE/5_progress/PROJ-<X>-progress.md" >"$QA_REPORT"
 bash scripts/cross-review.sh qa <X> <theme> \
-  --artifacts "$BASE/5_progress/PROJ-<X>-progress.md" \
+  --artifacts "$QA_REPORT" \
   --ground-truth "$BASE/3-4_plan/PROJ-<X>-architecture.md" "$BASE"/2_PRDs/PROJ-<X>-PRD-*.md \
   --author-provider codex --persist --personas \
   --diff-base "$BASE_SHA" \
@@ -122,7 +128,7 @@ bash scripts/cross-review.sh qa <X> <theme> \
   --round 1
 ```
 
-The workers are Chen (security), Weber (architecture), Sharma (performance), Mueller (reliability), Rodriguez (cross-wave architecture), and Takahashi (minimalism). Claude is the opposite provider here. If it is unavailable, the script fails because no same-provider substitution is permitted for a Codex-authored run. Critical/High findings enter `findings.json` through `ledger.mjs` and block the release decision. Fix/review orchestration stays with the P6 controller: follow `cross-review`'s automatic loop through round 3 while findings of any severity remain, stopping early when clean. QA reports findings; the controller delegates fixes and refreshes evidence before re-review. After round 3, escalate remaining Critical/High findings and report or defer Medium/Low.
+The workers are Chen (security), Weber (architecture), Sharma (performance), Mueller (reliability), Rodriguez (cross-wave architecture), and Takahashi (minimalism). Claude is the opposite provider here. If it is missing or unauthenticated, the script prints a visible degraded-mode notice, records `degraded_fallback: true`, and runs the same six personas as six separate Codex workers; tell the user that independent-provider review was unavailable. Critical/High findings enter `findings.json` through `ledger.mjs` and block the release decision. Rodriguez and Takahashi also emit one `low` finding with category `retrospective` (their retrospective); it is not a defect and does not keep the loop running. Fix/review orchestration stays with the P6 controller: follow `cross-review`'s automatic loop through round 3 while defect findings of any severity remain, stopping early when clean. QA reports findings; the controller delegates fixes and refreshes evidence before re-review. After round 3, escalate remaining Critical/High findings and report or defer Medium/Low.
 
 ### 0. Start Dev Server
 
@@ -136,12 +142,12 @@ Run this in the background. Wait until it reports a local URL (typically `http:/
 
 ### 1. Read PRDs + Progress
 
-- Read every PRD in `specs/PROJ-<X>-<theme>/2_PRDs/` and `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md`
+- Read the PRDs, progress.md and `wave-gate-config.json` listed under Input; nothing else up front
 - ACs are already verified by skill 5's wave-scoped Outer Ralph pass — do not re-test them in code
 - Focus on: browser E2E validation, edge cases, adversarial scenarios, security, regression
 - Also inspect implementation shape for unnecessary complexity. QA must surface complexity that makes the feature harder to fix, test, or extend.
 - QA covers the entire PROJ — all PRDs together
-- Read `phase_commands` in `wave-gate-config.json`. Do not replay `ci` or
+- Use `phase_commands` from `wave-gate-config.json`. Do not replay `ci` or
   `nightly` hosted-auth/browser suites locally. Verify their workflow wiring;
   P8 delivery owns the actual PR CI result. Missing wiring is a release gap,
   not permission to drain the shared provider from QA.
@@ -203,7 +209,7 @@ Scale checks to the feature — not every feature needs all of these:
 
 ### 5. UI Consistency Check
 
-**Component Registry hard check (ui-auditor):**
+**Component Registry hard check:**
 - Run `node scripts/gen-component-registry.mjs --check` (nested app root: `<app> --check --out docs/components.md`). Non-zero exit → file a Critical bug: either a component lacks its doc block or `docs/components.md` was not regenerated (registry desynced is a process failure). Do not fix it — report it.
 - For every new component, search the registry for semantically similar existing components (Button/PrimaryButton, Card/Panel, Badge/Chip/Tag). Flag any that should have been reused instead.
 - Visit `/dev/components` showcase route via Playwright or the active agent browser: does every registered component render, in **both** light and dark mode? Does every `## Patterns` entry of `docs/DESIGN-SYSTEM.md` have its `#pattern-<name>` section? Any new component not registered?
@@ -254,118 +260,24 @@ For every simplicity bug, include:
 
 Critical/High simplicity findings gate production-readiness the same way functional and security bugs do. QA should not mark a PROJ ready while unnecessary complexity is carrying meaningful implementation risk.
 
-### 6.5 Persona Code Review Panel
-
-Spawn **six persona reviewers** on the PROJ's code diff since BASE_SHA. Each persona is a 20-year veteran of a specific discipline. They do **code review**, not browser testing — complementing the Playwright/agent-browser steps above. Findings feed into the bug list AND the `## AGENTS.md Candidates` block (step 7.5). Elena and Ken also write PROJ-level retrospectives.
-
-Note: Ken Takahashi does **not** run per wave. CodeRabbit is the only per-wave review. Ken runs here once against the **assembled PROJ** so the minimalism review can judge cross-wave shape, duplicate abstractions, and code that only looks necessary when each wave is viewed in isolation.
-
-#### The six personas (each: 20 years of experience)
-
-1. **Dr. Sarah Chen — Security Lead (20y)**
-   *Focus:* Static/diff threat modeling that complements the runtime Security Audit: OWASP Top 10, auth/session, cryptographic misuse, injection (SQLi/XSS/command/template), secrets in code or logs, CSRF, privilege escalation, insecure deserialization, RLS gaps. Do not duplicate browser probing unless the diff suggests a specific runtime check to add.
-
-2. **Marcus Weber — Principal Engineer (20y)**
-   *Focus:* Architecture shape, coupling, naming, error-handling gaps, testability, duplicated domain logic, and premature optimization vs. real performance risk. Marcus may flag unnecessary abstraction when it affects architecture or testability, but component re-invention belongs primarily to UI Consistency and minimalism findings belong primarily to Ken.
-
-3. **Priya Sharma — Performance Engineer (20y)**
-   *Focus:* Latency hotpaths, N+1 queries, unbounded work (loops, recursion, memory), bundle size, render-blocking, cache keys, pagination correctness, cold-start cost.
-
-4. **Thomas Mueller — SRE / Reliability Engineer (20y)**
-   *Focus:* Failure modes (network, disk, partial writes), retries/backoff, idempotency, timeouts, observability (logs/metrics/traces), graceful degradation, rollback/backfill safety, race conditions, resource leaks.
-
-5. **Elena Rodriguez — Principal Architect, PROJ Retrospective (20y)**
-   *Focus:* **Cross-wave, PROJ-level patterns** that per-wave reviews can't catch. Did the waves add up to a coherent feature, or did they silt up into tech debt? Which abstractions emerged that should have been planned? Which features grew faster than the PRD promised (scope creep)? Are we building on a foundation that will hold the next PROJ, or painted ourselves into a corner? Elena does not redesign the architecture during QA; she reports coherence risks and next-PROJ lessons.
-   *Deliverable:* two parts — (a) findings like the others (Critical/High/Medium/Low), and (b) a **PROJ Retrospective** narrative: "Given what we learned building PROJ-X, what should change for PROJ-X+1?" Appends to `5_progress/PROJ-<X>-progress.md` under a new `## PROJ Retrospective` section (not a AGENTS.md candidate — too long-form for one line).
-
-6. **Ken Takahashi — Minimalism Engineer (20y)**
-   *Focus:* Primary reviewer for the Simplicity Gate: PROJ-level YAGNI, premature abstraction, layers with one caller, duplicate utilities/components, feature flags/options that the PRD did not require, dead paths, and code that could be deleted because the assembled feature found a simpler shape. Ken must turn meaningful over-complexity into concrete QA bugs with simplification sketches, not only retrospective advice.
-   *Deliverable:* two parts — (a) findings like the others (Critical/High/Medium/Low), and (b) a **Minimalism Retrospective** narrative: "What should we delete, inline, merge, or avoid in PROJ-X+1?" Append this under `## PROJ Retrospective` with source `Ken Takahashi (Minimalism)`.
-
-Use **exactly these names and disciplines** — they are stable across runs so the user recognizes recurring reviewers. The 20-year framing matters: each persona should call out risks that would embarrass a senior engineer, not nitpicks a junior might raise.
-
-#### Invocation: Codex-native
-
-Default path: if Codex subagent delegation is available and allowed in the active session, spawn six independent review subagents in parallel, one per persona. Do this before running any persona review locally.
-
-Hard rules:
-- Spawn exactly six persona review subagents: Chen, Weber, Sharma, Mueller, Rodriguez, Takahashi.
-- Give each subagent only one persona. Do not ask one subagent to cover multiple personas.
-- Run the six subagents in parallel when the tool supports it. Do not serialize them unless parallel spawning is unavailable.
-- Keep the main agent as orchestrator: it launches, waits, deduplicates, assigns BUG-IDs, and writes summaries.
-- Do not paste raw diffs or long logs into the main context if a subagent can inspect them directly.
-- Only use the local sequential fallback when subagent delegation is unavailable or prohibited by the active Codex instructions.
-
-Prompt each subagent with:
-- Persona identity ("You are Dr. Sarah Chen, 20y Security Lead, ex-OWASP …")
-- Discipline focus (same bullet list as above)
-- Scope: `git diff BASE_SHA..HEAD` (whole PROJ)
-- Expected output format:
-  - Chen/Weber/Sharma/Mueller: Critical/High/Medium/Low findings with file:line + optional `AGENTS.md` one-liners
-  - Elena: findings **plus** a separate PROJ Retrospective narrative (5-15 bullets)
-  - Ken: findings **plus** a separate Minimalism Retrospective narrative (5-15 bullets)
-
-Required subagent tasks:
-- **Dr. Sarah Chen:** static/diff security review. Output security findings and suggested runtime checks only when needed.
-- **Marcus Weber:** principal engineering review. Output architecture, coupling, error-handling, testability, and duplicated domain logic findings.
-- **Priya Sharma:** performance review. Output latency, N+1, unbounded work, bundle, cache, pagination, and cold-start findings.
-- **Thomas Mueller:** reliability review. Output failure-mode, retry, idempotency, timeout, observability, race, and resource-leak findings.
-- **Elena Rodriguez:** cross-wave architecture coherence review plus PROJ Retrospective.
-- **Ken Takahashi:** Simplicity Gate review plus Minimalism Retrospective, with simplification sketches for every concrete finding.
-
-If delegation is not allowed, run the six reviews sequentially in the main session using focused diffs and searches. Keep each persona report concise and merge findings immediately into the QA result.
-
-#### Merging findings
-
-After all six persona reviews complete:
-
-1. **Deduplicate:** If two personas flag the same root cause, merge them (keep the higher severity, list both personas in `source:`).
-2. **Assign stable IDs:** Every finding gets an ID `BUG-PROJ<X>-QA-<NNN>` where `<NNN>` is zero-padded sequential within this QA run (001, 002, …). Every AGENTS.md candidate gets `AGENTS-PROJ<X>-QA-<NNN>`. IDs are the reference handle for fixer-spawns and for status tracking — line numbers drift when multiple fixers run, IDs don't.
-3. **Bugs:** Append each finding to the QA bug list. Format per entry:
-   ```markdown
-   ### BUG-PROJ1-QA-007 — [High] XSS in comment render
-   - **File:** `src/features/comments/CommentCard.tsx`
-   - **Anchor:** `export function CommentCard` (symbol/regex — not a line number)
-   - **Source:** Dr. Sarah Chen (Security) + Marcus Weber (Principal)
-   - **Status:** open
-   - **Fix attempts:** 0
-   - **Description:** …
-   - **Repro:** …
-   - **Fix sketch:** …
-   ```
-4. **AGENTS.md candidates:** Append to `## AGENTS.md Candidates` in `5_progress/PROJ-<X>-progress.md`:
-   ```markdown
-   - [PROPOSED] AGENTS-PROJ1-QA-003: <one-liner rule> — source: Priya Sharma (Performance)
-   ```
-   Skill 7 flips `[PROPOSED]` → `[MERGED]` or `[REJECTED]` by ID, preserving the line. No deletions — the log is append-only.
-5. **PROJ Retrospective (Elena + Ken):** Append Elena's and Ken's narratives verbatim to `5_progress/PROJ-<X>-progress.md` under `## PROJ Retrospective` (no IDs — long-form). Prefix each subsection with the persona name.
-
-**Why anchors, not line numbers:** parallel fixers on the same file shift line numbers. An anchor (`export function validateSession` or regex) stays stable because fixers re-lookup before editing.
-
-**Fix handoff format — parallel when safe:**
-
-1. **Cluster bugs by `file` field.** Bugs touching the same file go into one cluster (sequential within, because parallel edits on the same file race regardless of anchors).
-2. **Run clusters in parallel only when safe and allowed.** If Codex delegation is allowed, spawn one worker task named `micro-fixer` per disjoint file cluster. Otherwise hand the clusters back to implementation or fix locally only after the user explicitly asks for fixes.
-3. **Each worker prompt or local fix task contains only:**
-   - The BUG-IDs + anchors for its cluster
-   - The relevant feature's `agent.md` excerpt
-   - For simplicity bugs: the required reduction target (delete, inline, merge, reuse, collapse state, remove option) and the rule that the fix should reduce code/indirection before adding new code
-   - A verify-before-claiming-done reminder: run the check, read the actual output, only then report status
-   - ≤ 2000 tokens total
-4. **Disjoint-file invariant:** if clustering leaves bugs that span multiple files, assign to the primary file's cluster and document the cross-file touch in the prompt. Never split a single bug across subagents.
-5. **Lead-owned control plane:** the lead alone updates `progress.md`, stages, and commits while parallel fixers run.
-
-The main agent collects reports from all fixers, verifies that simplicity fixes actually remove or collapse unnecessary code, updates each BUG-ID's `status` (to `fixed` or `open` + `fix_attempts += 1`), and re-runs the affected tests. Only after all clusters return does the main agent decide on re-spawns for still-failing bugs.
-
-Example: 12 bugs in a QA run across 7 files → 7 parallel fixer-spawns (one per file). Wall-clock time drops from 12 × T to ~max(T_per_file).
-
-Persona retrospectives are **advisory**. Persona bug findings are normal QA findings once accepted into the merged bug list; Critical/High persona bugs gate release through the same severity rules as browser, security, UI, regression, and simplicity findings.
-
 ### 7. Document Results
 
-For each PRD tested: append a `## QA Test Results` section to that PRD file (`specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`) using `references/test-template.md` as the format.
+**Framework run (state.json exists): do not edit PRDs or progress.md (read-only finder).** Print the QA summary (per-AC results, Simplicity Gate, Spec vs Standards, Sonar input, AGENTS.md candidates, and the `retrospective` findings from `findings.json` under `## PROJ Retrospective`) as your final output; the runner stores it as `5_progress/qa-finder-<ts>.md`.
 
-Also update `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md` with a top-level QA summary across all PRDs.
+**Interactive run:** for each PRD tested, append a `## QA Test Results` section to that PRD file (`specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`) using `references/test-template.md` as the format. Write the same summary sections under `## QA Results` in `5_progress/PROJ-<X>-progress.md`, and append the persona `retrospective` findings verbatim under `## PROJ Retrospective`, each prefixed with the persona name.
+
+Bug entries (progress.md or finder report) use stable IDs `BUG-PROJ<X>-QA-<NNN>` (zero-padded, sequential in this run) and an anchor — a symbol or regex, never a line number, because parallel fixers shift lines:
+
+```markdown
+### BUG-PROJ1-QA-007 — [High] XSS in comment render
+- **File:** `src/features/comments/CommentCard.tsx`
+- **Anchor:** `export function CommentCard`
+- **Source:** Dr. Sarah Chen (Security) + Marcus Weber (Principal)
+- **Status:** open
+- **Description / Repro / Fix sketch:** …
+```
+
+Two personas flagging the same root cause are one bug: keep the higher severity, list both sources.
 
 Include for each tested AC:
 - What was done in the browser (steps)
@@ -406,7 +318,7 @@ While testing, collect project-wide rules that future agents should know. These 
 Typical sources during QA:
 - A bug that recurs across features (e.g. unsafe cookie flags)
 - A convention QA discovered the implementation violated repeatedly (e.g. missing RLS on new tables)
-- A platform quirk that tripped red-team-tester or ui-auditor (e.g. `bcrypt` salt-rounds threshold)
+- A platform quirk that tripped the security audit or UI consistency check (e.g. `bcrypt` salt-rounds threshold)
 
 **Append candidates to the `## AGENTS.md Candidates` section** of `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md`. If the section does not exist yet, create it. Do NOT write to `AGENTS.md` directly — Skill 7 does the merge after user approval.
 
@@ -414,11 +326,13 @@ Format:
 
 ```markdown
 ## AGENTS.md Candidates
-- [PROPOSED] <one-liner rule>                        — source: QA BUG-3
-- [PROPOSED] <another convention>                    — source: QA regression check
+- [PROPOSED] AGENTS-PROJ1-QA-003: <one-liner rule>   — source: QA BUG-PROJ1-QA-007
+- [PROPOSED] AGENTS-PROJ1-QA-004: <another convention> — source: Priya Sharma (Performance)
 ```
 
-Skill 5 quality-gate agents (code-reviewer-gate, optional sonar-cli stream, red-team-tester, ui-auditor) may already have added entries to this section — QA adds on top, not overwriting. Omit the section entirely if no candidates emerged.
+Skill 7 flips `[PROPOSED]` → `[MERGED]` or `[REJECTED]` by ID, preserving the line; the log is append-only. In a framework run the candidates go into the finder report instead.
+
+Skill 5's Quality Gate (reviewer, optional sonar-cli stream) may already have added entries to this section — QA adds on top, not overwriting. Omit the section entirely if no candidates emerged.
 
 ### 8. Present Summary
 
@@ -430,9 +344,8 @@ Report to the user:
 - Spec vs Standards: findings and worst issue per axis, reported separately
 - Simplicity gate findings and whether any release-blocking complexity remains
 - Sonar quality input: ran/skipped, blocking findings promoted to QA bugs
-- **QA persona cross-review:** provider, six persona results, degraded status, round result, and promoted findings.
+- **QA persona cross-review:** provider, degraded status, round result
 - Screenshots taken during testing
-- **Persona review summary:** for each of the six reviewers (Chen/Weber/Sharma/Mueller/Rodriguez/Takahashi): N findings by severity. For Rodriguez and Takahashi additionally confirm that `## PROJ Retrospective` was appended to progress.md.
 - **AGENTS.md candidates:** count + one-line summary of each, plus reminder that Skill 7 will ask for approval before merging.
 - Production-ready recommendation: YES or NO
 
@@ -484,24 +397,4 @@ Handoff message to the user (right before invoking Skill 7):
 test(PROJ-<X>): Add QA test results for <theme>
 ```
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

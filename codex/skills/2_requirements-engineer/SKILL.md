@@ -38,12 +38,12 @@ Document dependencies between PRDs, including cross-PROJ dependencies, inside ea
 
 ## Delivery Track
 
-Detect how this PROJ will be delivered before writing PRDs. The concept's `Handoff Readiness` section (written by `concept-sync`) sets `Delivery track`; if it is absent, infer from context and confirm with the user.
+Detect how this PROJ will be delivered before writing PRDs. The concept's `Handoff Readiness` section (written by `concept`, confirmed by `concept-sync`) sets `Delivery track`. A legacy concept without it: ask the user once and write the answer into the concept.
 
-- **Full chain (in-repo build):** Steps 3–7 follow in this repo. Write PRDs normally, including the `UI Implementation Notes` section with component reuse and file-path hints.
+- **Full chain (in-repo build):** Steps 3–7 follow in this repo. Write PRDs normally, including the short `UI Implementation Notes` section (screen references and a pointer to the handoff).
 - **Discovery / Linear handoff:** There is no codebase here. You are producing a developer handoff that goes to Linear (https://linear.app). The developer who picks it up owns architecture and implementation. In this mode:
   - Write the same PRDs (user stories, acceptance criteria, edge cases) — these are the contract.
-  - Do **not** invent in-repo file paths or component locations. Replace `UI Implementation Notes` component-path hints with mockup references and design intent only.
+  - Do **not** invent in-repo file paths or component locations. `UI Implementation Notes` carries mockup references only.
   - Do **not** recommend `architecture` (3); the chain stops at Step 2 for this PROJ.
 
 ## Decomposed PROJ Handling
@@ -60,9 +60,9 @@ Requirements run one PROJ at a time. If the concept contains `Decomposition Cont
 
 Read these inputs:
 
-1. Concept: `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md`
-2. UI mockups: follow the screen/source references in `1d_prototypes/implementation-handoff.md`; for legacy HTML handoffs without that section, read the screen HTML files in `1d_prototypes/`.
-3. Sitemap: `specs/PROJ-<X>-<theme>/1d_prototypes/sitemap.html`
+1. `docs/PRODUCT.md` (30 lines) — purpose and audience
+2. Concept: `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md` — all sections except `Direction Log`, `Assumptions Confirmed`, `Risks And Trade-Offs`, `Testing Focus`
+3. UI mockups: follow the screen/source references in `1d_prototypes/implementation-handoff.md`; for legacy HTML handoffs without that section, read the screen HTML files in `1d_prototypes/`.
 4. UI implementation handoff: `specs/PROJ-<X>-<theme>/1d_prototypes/implementation-handoff.md`
 5. Optional Visual Companion decision: `specs/PROJ-<X>-<theme>/1b_visual-companion/layout-decision.md`
 6. Optional design language: `specs/PROJ-<X>-<theme>/1c_design/design-language.md`
@@ -84,7 +84,7 @@ Use the next available `PRD-Y` number inside the PROJ, starting at 1 and avoidin
 
 ### 2. Understand The Feature
 
-For UI features, resolve screens through the implementation handoff, then read mockups and sitemap:
+For UI features, resolve screens through the implementation handoff (its `Screen References` and `Flow Descriptions` carry the sitemap facts), then read the mockups:
 
 - Which screens exist?
 - Which user flows are clickable or linked?
@@ -97,7 +97,7 @@ For UI features, resolve screens through the implementation handoff, then read m
 
 Ask the user focused questions only when needed:
 
-- Who are the primary users?
+- Who are the primary users? (answer from `docs/PRODUCT.md` and the concept; ask only if both are silent)
 - What is MVP scope vs. nice-to-have?
 - What constraints exist?
 
@@ -162,12 +162,8 @@ Template:
 - Performance, security, compatibility, or operational constraints.
 
 ## UI Implementation Notes
-- Project mode:
-- Reuse:
-- New component candidates:
-- Design tokens:
-- Interaction contract:
-- Implementation tolerance:
+- Screen reference(s): <screen/source from `implementation-handoff.md`>
+- Reuse, candidates and tokens: `1d_prototypes/implementation-handoff.md` § Reuse, New Component Candidates, Design Tokens And Styling, Interaction Contract
 ```
 
 Each user story owns its own acceptance criteria. Do not create one global acceptance-criteria section. Derive ACs directly from the story's Given/When/Then/And clauses and make them testable.
@@ -183,7 +179,7 @@ and consistency findings unreliable.
 
 Build the ground-truth list from files that exist. Always include the concept.
 For UI work, add the compact UI contracts (`implementation-handoff.md`,
-`sitemap.html`, layout decision, and design language) rather than every mockup
+layout decision, and design language) rather than every mockup
 source file unless a disputed detail requires it:
 
 ```bash
@@ -191,7 +187,6 @@ BASE="specs/PROJ-<X>-<theme>"
 GROUND_TRUTH=("$BASE/1_concept/PROJ-<X>-concept.md")
 for candidate in \
   "$BASE/1d_prototypes/implementation-handoff.md" \
-  "$BASE/1d_prototypes/sitemap.html" \
   "$BASE/1b_visual-companion/layout-decision.md" \
   "$BASE/1c_design/design-language.md"; do
   [ ! -f "$candidate" ] || GROUND_TRUTH+=("$candidate")
@@ -226,7 +221,7 @@ product-owner approval.
 
 - [ ] Existing PRDs checked for duplicates and next PRD number
 - [ ] Necessary user questions answered
-- [ ] UI mockups and sitemap read for UI features
+- [ ] UI mockups read for UI features
 - [ ] `implementation-handoff.md` read for UI features
 - [ ] At least 3-5 user stories defined where feature size warrants it
 - [ ] Every user story has its own acceptance criteria
@@ -245,24 +240,4 @@ feat(PROJ-<X>-PRD-<Y>): Add PRD for <feature-name>
 
 Git is optional on the discovery track. If the workspace is not a git repository, skip the commit; the PRD files are the durable artifacts.
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

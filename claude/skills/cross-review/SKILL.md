@@ -18,7 +18,7 @@ reviews are mandatory gates; do not ask the user whether to start them.
 |---|---|---|
 | `concept` | `1_concept/PROJ-<X>-concept.md` | product coherence, buildability, boundaries, grounding |
 | `requirements` | the complete `2_PRDs/PROJ-<X>-PRD-*.md` set | concept and UI traceability, story/AC testability, edge behavior, cross-PRD consistency, architecture leakage |
-| `architecture` | `3-4_plan/PROJ-<X>-architecture.md` | decisions, feasibility, traceability, risk |
+| `architecture` | `3-4_plan/PROJ-<X>-architecture.md` | decisions, feasibility, traceability, risk, Summary fidelity |
 | `plan` | wave plans and gate config | executability, coverage, sequencing, scope |
 | `qa` | QA summary/evidence plus implementation diff | evidence integrity, adversarial coverage, finding quality, release decision; `--personas` runs six isolated discipline reviewers |
 | `docs` | curated documentation | factual truth, staleness, cap-gaming, durable-rule quality |
@@ -77,12 +77,13 @@ or `claude` makes an unavailable/opposite fallback fail rather than silently
 replacing the required reviewer. For Claude-authored QA, use `qa --personas`:
 it launches six separate Codex reviews in parallel. If Codex is unavailable,
 the script prints a degraded-mode warning, records `degraded_fallback: true`,
-and runs the same six personas on the strongest Claude model that is not the
-author model (`CLAUDE_MODEL_RANK`, default `fable opus sonnet`; override with
+and runs the same six personas on the strongest Claude model, even when that is
+the author model (`CLAUDE_MODEL_RANK`, default `fable opus sonnet`; override with
 `CLAUDE_REVIEW_MODEL`); the QA caller must tell the user
 that independent-provider review was unavailable. Codex-authored QA launches
-six separate Claude reviews and fails closed when `claude auth status` is not
-green; it never substitutes Codex for its own work. Keep `--require-provider`
+six separate Claude reviews; when `claude auth status` is not green it runs six
+separate Codex reviews instead, flagged degraded. Other Codex-authored modes
+still fail closed without Claude. Keep `--require-provider`
 for handoffs where a fallback must instead stop the gate.
 
 ```bash
@@ -128,7 +129,8 @@ its own history.
 
 - Claude-authored artifacts go to Codex; Codex-authored artifacts go to Claude.
   `--joint` runs both independently. If Codex is unavailable, the strongest
-  Claude model that is not the author model is chosen automatically (rank
+  Claude model that is not the author model is chosen automatically (QA personas
+  take the strongest model even when it is the author model; rank
   `fable opus sonnet`, alias or full id compared by substring); that is marked
   as a degraded persistent review. Any route that selects Claude verifies CLI
   availability and authentication before launching the review.

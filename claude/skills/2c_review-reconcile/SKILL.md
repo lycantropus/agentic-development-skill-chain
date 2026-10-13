@@ -45,8 +45,8 @@ Read these inputs:
 
 1. The review itself — pasted text or a file the user provides (gaps, questions, suggested updates).
 2. Target PRDs: `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md`.
-3. The canonical scope/decisions source if one exists (e.g. the concept's decisions register or an explicitly supplied source document) — **read it first** so no decision contradicts a canonical rule.
-4. Concept: `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md` (if it exists).
+3. The canonical scope/decisions source if one exists (e.g. an explicitly supplied source document) — **read it first** so no decision contradicts a canonical rule.
+4. Concept: `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md` (if it exists), `Scope` and `Key Behaviors And Flows` sections.
 5. Mockups: screen/source references in `1d_prototypes/implementation-handoff.md` + `iteration-log.md`. Legacy handoffs without screen references use the existing screen HTML files.
 
 If the review references decision IDs, rules, or sections, resolve them in the source documents before interpreting the gap — an answer that violates a canonical rule is wrong even if it closes the gap.
@@ -154,24 +154,4 @@ docs(PROJ-<X>): Reconcile <review> feedback into PRDs and mockups for <theme>
 
 Git is optional on the discovery track. If the workspace is not a git repository, skip the commit; the decision record, updated PRDs, and changelog are the durable artifacts.
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

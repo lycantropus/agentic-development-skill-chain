@@ -41,7 +41,8 @@ All stories from all PRDs go into one graph; cross-PRD edges are allowed. A wave
 
 - **Vertical stories.** Each story must yield one independently verifiable outcome through every layer it needs. Schema/API/UI are tasks within a story, not separate stories. Backend-only and enabling stories qualify when their contract is testable. A story with no standalone verifiable outcome goes back to `requirements-engineer` (plus its PRD cross-review, then re-check affected architecture). Never silently change PRD text.
 - **Wide migrations** without a useful vertical slice: `expand → migrate (bounded batches, explicit blocking edges) → contract`. Missing stories/ACs for those stages go back to `requirements-engineer`; never invent plan-only stories. Every wave must still pass its AC and regression gates — if intermediate waves can't stay green, return to `architecture` (and its cross-review); never waive the gate.
-- **Wave shape.** Implementers never see other waves' plans (`compile-context-bundles.mjs` never-inject list), so append one `## Wave shape` section to `specs/PROJ-<X>-<theme>/architecture-delta.md`: one line per wave — scope, complexity/model, execution mode, dependencies. No task detail. Create the file with just this section if missing.
+- **The plans are the wave shape.** Step 5's lead reads each plan's `## User Stories in this Wave` table and `## Execution` block through `story-slice.mjs`; never copy the shape into another file.
+- **`**PRDs involved:**` is machine-read.** The bundle compiler injects only the architecture decisions whose `Affects` names one of these PRDs, so list every PRD that owns a story in the wave.
 - Put the dependency analysis into the Wave 1 plan as a reference.
 
 ### 3. Write one plan per wave
@@ -134,6 +135,7 @@ Field rules:
 - **Execution mode:** `parallel` only with no dependency **and** no shared runtime hazard; `sequential` when stories contend on a dev server/port, hosted DB or other mutable service, browser profile, cache, or shared harness. Runtime constraints name the owner; file contact stays in the cross-US note. `Execution`, not `Can start when`, decides concurrent dispatch.
 - **DB/browser isolation:** state the real fixture namespace and lock layer, not just the tool. Prefer run/scenario/retry-scoped projects and row IDs over one shared mutable fixture where RLS, global state, and teardown allow. Remote browser fixtures are committed and cleaned up, never hidden in an outer rollback. Plan a small isolation proof before parallelizing an existing shared harness. Independent lifecycles may use `worktree.sh with-shared-lock --shared`; migrations/resets and overlapping fixtures stay exclusive on the same lock file. Budget lock wait separately from test time; measure browser startup before proposing session reuse. See executing's `references/worker-lifecycle.md`.
 - **Split:** `contract` = full-stack story split into backend + frontend workers against the wave's section in `api-contracts.md`; `fan-out` = same-shaped units over disjoint files, parallelized after the first unit exists.
+- **`api-contracts.md`** (this skill writes it, at `specs/PROJ-<X>-<theme>/api-contracts.md`): required for every `contract` split and for parallel stories that share an interface. One `## Wave <N>: <interface>` section per wave — request/response shape, who implements and who consumes, error cases; no code. The bundle compiler injects only the sections whose heading names the running wave, so a contract outside such a heading reaches no worker.
 - **Post-Wave Notes** stay empty — Skill 7 fills them after QA.
 - **Commits:** `feat(PROJ-<X>-PRD-<Y>): implement [task name]`, Y = the task's story's PRD.
 
@@ -148,7 +150,14 @@ Run the validator first — it checks plan/config structure, AC↔task↔command
 ```bash
 node ~/.claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs \
   specs/PROJ-<X>-<theme>/3-4_plan
+node ~/.claude/skills/5_executing/scripts/compile-context-bundles.mjs check <X> <theme>
 ```
+
+The `check` compiles every role's bundle per wave in memory (writes nothing) and
+exits 1 when one would be blocked at P0 — fix it now while the architecture is
+open: tighten the Summary lines or the verbatim sections, or move a PRD to
+another wave. It also fails on a malformed decision or key flow, or one whose PRDs are in no wave; return
+that to `architecture`.
 
 Then check with fresh eyes what it can't:
 
@@ -157,7 +166,7 @@ Then check with fresh eyes what it can't:
 3. **Story size:** one story = one worker (its tasks may share files, so they never run in parallel). A story ~2× its siblings or >~6 tasks → own wave, or a valid `Split` (`contract` needs `api-contracts.md`; `fan-out` needs named disjoint file sets). Still too big → `requirements-engineer` splits the PRD story (with cross-review), then replan.
 4. File paths match the project; each wave can run after its predecessors; same-wave stories touching the same file/module are flagged.
 5. Every UI task has `Reuse:`/`Create new:` against a freshly generated registry, with semantic neighbours named (Badge/Chip/Tag, Card/Panel, Drawer/Sheet). Every frontend/full-stack story has UI Implementation Notes and every UI task its handoff constraints.
-6. Every plan has `Execution` and every story the empty Post-Wave Notes block; `architecture-delta.md` has `## Wave shape` covering every wave.
+6. Every plan has `Execution`, a complete `**PRDs involved:**` line, and every story the empty Post-Wave Notes block.
 7. **Platform authority:** each deployment/platform value (region, runtime, API feature, env setting) names the platform query, CLI, or deployment response that validates it. A mutating command (e.g. `config:push`) is not verification unless it reads back and compares.
 
 Fix plan-only issues inline and re-validate; return PRD or architecture defects to their owning skill and its cross-review before regenerating.
@@ -170,6 +179,7 @@ Right after the validator passes, in the same turn and without asking, review th
 bash scripts/cross-review.sh plan <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md \
     specs/PROJ-<X>-<theme>/3-4_plan/wave-gate-config.json \
+    specs/PROJ-<X>-<theme>/api-contracts.md \
   --ground-truth specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md \
     specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md docs/GUIDELINES.md \
   --author-provider <current-writer> --persist --round 1
@@ -181,13 +191,13 @@ bash scripts/cross-review.sh plan <X> <theme> \
 
 ### 7. Hand off to Step 5
 
-Present waves, stories per wave, execution mode, and the cross-review result. Don't ask for approval — Checkpoint 1 approves architecture and plans together (auto-approves when both cross-reviews are clean). Invoke **executing-large-model** (5b, the default Step 5) in the same session; it runs CP1 and P0 through its checkpoint and setup subskills before any implementation. Stop instead only if Critical/High findings remain after round 3, a product decision is open, a PRD/architecture handback is unresolved, or the user wants to review the plans first.
+Present waves, stories per wave, execution mode, and the cross-review result. Don't ask for approval — Checkpoint 1 approves architecture and plans together (auto-approves when both cross-reviews are clean). Then **end the turn**: this session carries every PRD, the architecture and all plans, and a model cannot compact its own context. The user runs `/compact` (or opens a fresh session) and invokes **executing-large-model** (5b, the default Step 5), which runs CP1 and P0 through its checkpoint and setup subskills before any implementation. This is a context flush, not an approval stop. Report a blocker instead only if Critical/High findings remain after round 3, a product decision is open, a PRD/architecture handback is unresolved, or the user wants to review the plans first.
 
-Say once before invoking executing-large-model:
+Say once, then end the turn:
 
-> "Plans complete in `specs/PROJ-<X>-<theme>/3-4_plan/` (wave plans + `wave-gate-config.json`). For an unattended run say **'continue automatic until delivery, goal is PR draft'**: executing-large-model (5b) runs CP1 and P0 (branch + preflight) through the Step 5 subskills, then `runner/run-phase.sh auto <X> <theme>` for P5–P8 ending in an open PR and a one-line run summary. No other approval stop follows CP1.
+> "Plans complete in `specs/PROJ-<X>-<theme>/3-4_plan/` (wave plans + `wave-gate-config.json`). Run `/compact` (or open a fresh session), then `/5b_executing-large-model` (or `/5_executing` on a weaker model): it runs CP1 and P0 (branch + preflight) through the Step 5 subskills; the setup subskill installs the gate scripts and preflights `jq`, `coderabbit`, and browser tooling in the PROJ worktree. Quality Gate and QA follow the last wave automatically.
 >
-> Manual path: run `/5b_executing-large-model` (or `/5_executing` on a weaker model) — the setup subskill installs the gate scripts and preflights `jq`, `coderabbit`, and browser tooling in the PROJ worktree. Quality Gate and QA follow the last wave automatically."
+> For an unattended run add **'continue automatic until delivery, goal is PR draft'**: after CP1 and P0, `runner/run-phase.sh auto <X> <theme>` runs P5–P8 ending in an open PR and a one-line run summary. No other approval stop follows CP1."
 
 ## Rules
 
@@ -202,12 +212,4 @@ Say once before invoking executing-large-model:
 
 `docs(PROJ-<X>): Add wave-<N> implementation plan` — one per wave file, or all together.
 
-## Legacy Folder Layout
-
-Old → current: `2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` · `5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` · `8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` · `7_progress/` → `5_progress/`
-
-If only the legacy folder exists, read from it and keep writing there — never create a second folder. Say once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the current names, or continue with the existing layout?"
-
-Renaming = `git mv` per folder plus updating old paths in the PROJ's own documents; never a precondition.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

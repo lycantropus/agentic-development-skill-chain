@@ -101,7 +101,7 @@ Ask one question at a time for anything unresolved. Only continue after the user
 
 ### 5. Signal Handoff Readiness
 
-Once the concept matches the mockups and the user approves, write a short readiness marker so downstream skills know the concept is reconciled:
+Once the concept matches the mockups and the user approves, update the `## Handoff Readiness` section that `concept` wrote at approval (create it only on a legacy concept that lacks it):
 
 ```markdown
 ## Handoff Readiness
@@ -110,12 +110,10 @@ Once the concept matches the mockups and the user approves, write a short readin
 - Delivery track: discovery (Linear handoff) | full chain (in-repo build)
 ```
 
-Place this section in the concept. Set `Delivery track` based on how this PROJ will be delivered:
+`Delivery track` is already set; change it only if the delivery plan changed:
 
 - **discovery (Linear handoff):** No in-repo implementation here — `requirements-engineer` produces a developer handoff for Linear and the chain stops at Step 2.
 - **full chain (in-repo build):** Steps 3–7 will follow in this repo.
-
-If unsure, ask the user.
 
 ### 6. Handoff
 
@@ -134,7 +132,7 @@ The reconciled concept, the current mockups, and the implementation handoff are 
 - [ ] Dropped scope moved to Future Scope, not deleted
 - [ ] Superseded decisions and dropped candidates in the direction log, none left in the concept
 - [ ] `Concept Sync Log` trailer added/updated
-- [ ] `Handoff Readiness` section added with delivery track set
+- [ ] `Handoff Readiness` updated (reconciled marker, open questions, delivery track confirmed)
 - [ ] User reviewed the change summary and approved
 - [ ] Correct `requirements-engineer` mode recommended
 
@@ -146,24 +144,4 @@ docs(PROJ-<X>): Sync concept with mockup iterations for <theme>
 
 Git is optional on the discovery track. If the workspace is not a git repository, skip the commit; the reconciled concept file is the durable artifact.
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

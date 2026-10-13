@@ -83,8 +83,11 @@ fi
 
 codex_available() { command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; }
 claude_available() { command -v claude >/dev/null 2>&1 && claude auth status >/dev/null 2>&1; }
-pick_review_model() { # strongest Claude model that is not the author's (alias or full id), best first
-  local m; for m in ${CLAUDE_MODEL_RANK:-fable opus sonnet}; do case "${1:-}" in *"$m"*) ;; *) echo "$m"; return 0 ;; esac; done
+pick_review_model() { # strongest Claude model that is not the author's (alias or full id), best first; QA personas take the strongest even when it is the author model
+  local m; for m in ${CLAUDE_MODEL_RANK:-fable opus sonnet}; do
+    [ "$QA_PERSONAS" -eq 1 ] && { echo "$m"; return 0; }
+    case "${1:-}" in *"$m"*) ;; *) echo "$m"; return 0 ;; esac
+  done
   echo "cross-review.sh: no Claude model left after excluding author model '${1:-}'" >&2; return 1
 }
 REVIEW_MODEL="${CLAUDE_REVIEW_MODEL:-$(pick_review_model "$AUTHOR_MODEL")}"; REVIEWERS=(); DEGRADED_FALLBACK=false
@@ -96,6 +99,7 @@ if [ "$JOINT" -eq 1 ]; then
   if codex_available; then REVIEWERS=("claude:${REVIEW_MODEL}" "codex:"); else REVIEWERS=("claude:${REVIEW_MODEL}"); DEGRADED_FALLBACK=true; fi
 elif [ "$AUTHOR_PROVIDER" = claude ]; then
   if codex_available; then REVIEWERS=("codex:"); else REVIEWERS=("claude:${REVIEW_MODEL}"); DEGRADED_FALLBACK=true; fi
+elif ! claude_available && [ "$MODE" = qa ] && [ "$QA_PERSONAS" -eq 1 ] && codex_available; then REVIEWERS=("codex:"); DEGRADED_FALLBACK=true
 else REVIEWERS=("claude:${REVIEW_MODEL}"); fi
 [ -z "$REQUIRED_PROVIDER" ] || [ "${REVIEWERS[0]%%:*}" = "$REQUIRED_PROVIDER" ] || { echo "cross-review.sh: required reviewer $REQUIRED_PROVIDER was not selected" >&2; exit 1; }
 for reviewer in "${REVIEWERS[@]}"; do
@@ -104,19 +108,19 @@ for reviewer in "${REVIEWERS[@]}"; do
     exit 1
   fi
 done
-if [ "$DEGRADED_FALLBACK" = true ] && [ -n "$AUTHOR_MODEL" ] && [ "$REVIEW_MODEL" = "$AUTHOR_MODEL" ]; then
+if [ "$DEGRADED_FALLBACK" = true ] && [ "$QA_PERSONAS" -eq 0 ] && [ -n "$AUTHOR_MODEL" ] && [ "$REVIEW_MODEL" = "$AUTHOR_MODEL" ]; then
   echo "cross-review.sh: fallback reviewer equals author model" >&2; exit 1
 fi
-[ "$QA_PERSONAS" -eq 0 ] || [ "$DEGRADED_FALLBACK" = false ] || echo "cross-review (qa): Codex unavailable; continuing six QA personas with Claude ${REVIEW_MODEL} (degraded, model-opposite)" >&2
+[ "$QA_PERSONAS" -eq 0 ] || [ "$DEGRADED_FALLBACK" = false ] || echo "cross-review (qa): opposite provider unavailable; continuing six QA personas with ${REVIEWERS[0]%%:*} ${REVIEWERS[0]#*:} (degraded, same vendor, strongest model)" >&2
 
 FOCUS=""
 case "$MODE" in
-  concept) FOCUS='- Product coherence: goal, users, scope, non-goals, success criteria and risks agree.\n- Buildability: no decision-critical ambiguity is deferred or disguised as a later concern.\n- Boundary discipline: do not smuggle PRDs, UI design, architecture or implementation plans into the concept.\n- Grounding: claims about the existing product agree with the supplied context.' ;;
+  concept) FOCUS='- Product coherence: goal, users, scope, non-goals, success criteria and risks agree.\n- Buildability: no decision-critical ambiguity is deferred or disguised as a later concern.\n- Boundary discipline: do not smuggle PRDs, UI design, architecture or implementation plans into the concept.\n- Grounding: claims about the existing product agree with the supplied context.\n- Cap-gaming: flag load-bearing scope, success criteria or constraints removed to fit the 150-line cap while trivia remains.' ;;
   requirements) FOCUS='- Coverage and traceability: every approved concept, role, flow, state, constraint and mockup contract is represented exactly once; flag omissions, contradictions and invented scope.\n- Testability: Given/When/Then and acceptance criteria are observable, unambiguous, independently verifiable and include meaningful negative outcomes.\n- Edge behavior: permissions, empty and invalid data, failures, retries, limits, concurrency and security-sensitive paths have explicit expected behavior where relevant.\n- Cross-PRD consistency: identifiers, terminology, dependencies, preconditions and outcomes agree across the full PRD set.\n- Boundary discipline: requirements state product behavior and non-functional constraints without prematurely choosing architecture or implementation.' ;;
-  architecture) FOCUS='- Decision completeness: architecture resolves the cross-cutting choices required by the concept and PRDs.\n- Feasibility: proposed data, integrations, APIs, ownership and operations fit the supplied system truth.\n- Traceability: no requirement or constraint is silently lost, contradicted, or overbuilt.\n- Risk: identify unsafe assumptions, missing failure paths, migration concerns, and non-functional gaps.' ;;
+  architecture) FOCUS='- Decision completeness: architecture resolves the cross-cutting choices required by the concept and PRDs.\n- Feasibility: proposed data, integrations, APIs, ownership and operations fit the supplied system truth.\n- Traceability: no requirement or constraint is silently lost, contradicted, or overbuilt.\n- Risk: identify unsafe assumptions, missing failure paths, migration concerns, and non-functional gaps.\n- Baseline changes: every decision that contradicts or changes docs/ARCHITECTURE.md (stack, boundaries, data ownership, invariants) carries a Changes baseline line naming that section, and its Summary says what it supersedes; flag silent contradictions.\n- Summary fidelity: each decision'"'"'s and key flow'"'"'s Summary line is the only text implementers receive; flag one that drops, softens or contradicts a binding part of its decision or flow diagram, and an Affects list that omits a PRD it constrains.' ;;
   plan) FOCUS='- Executability: each task has clear file ownership, dependencies, acceptance criteria and verification.\n- Coverage: every relevant requirement and architecture decision is implemented exactly once.\n- Sequencing: waves are dependency-safe and expose shared-file or integration hazards.\n- Scope: reject invented work, hidden technical decisions, and plans that cannot be validated.' ;;
   qa) FOCUS='- Evidence integrity: QA claims are tied to supplied browser/test evidence, not implementation assertions or an empty selection.\n- Adversarial coverage: acceptance criteria, edge cases, security and regressions have meaningful attempts and negative controls.\n- Finding quality: severity, reproduction and anchors are actionable; do not silently downgrade a release-blocking result.\n- Release decision: reject READY when supplied evidence or the implementation diff leaves a Critical/High risk unaddressed.' ;;
-  docs) FOCUS='- Factual accuracy: every statement describes supplied ground truth, not merely plans.\n- Stale claims: flag renamed, removed, or changed modules and flows.\n- Cap-gaming: flag load-bearing truth removed to meet a size cap while trivia remains.\n- Wrong promotions: reject durable rules promoted from one-off incidents.' ;;
+  docs) FOCUS='- Factual accuracy: every statement describes supplied ground truth, not merely plans.\n- Stale claims: flag renamed, removed, or changed modules and flows.\n- Cap-gaming: flag load-bearing truth removed to meet a size cap while trivia remains.\n- Wrong promotions: reject durable rules promoted from one-off incidents.\n- Current state, not chronicle: docs/ARCHITECTURE.md describes the system as it is now; flag per-PROJ or "built in PROJ-n" sections and Changes baseline lines of the PROJ architecture whose section was not updated.' ;;
 esac
 
 MATERIAL=""
@@ -177,8 +181,8 @@ if [ "$QA_PERSONAS" -eq 1 ]; then
     'Marcus Weber — Principal Engineer|Find architecture, coupling, error-handling, testability and duplicate-domain-logic risks.'
     'Priya Sharma — Performance Engineer|Find latency, N+1, unbounded work, bundle, cache and pagination risks.'
     'Thomas Mueller — SRE / Reliability Engineer|Find failure-mode, retry, idempotency, timeout, observability, race and resource-leak risks.'
-    'Elena Rodriguez — Principal Architect|Find cross-wave coherence, scope-creep and next-PROJ architecture risks.'
-    'Ken Takahashi — Minimalism Engineer|Find YAGNI, abstraction, duplication, dead-path and needless-option risks; include a simplification sketch.'
+    'Elena Rodriguez — Principal Architect|Find cross-wave coherence, scope-creep and next-PROJ architecture risks. Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what should change for the next PROJ); it counts as a finding, so do not also emit review-clean.'
+    'Ken Takahashi — Minimalism Engineer|Find YAGNI, abstraction, duplication, dead-path and needless-option risks; include a simplification sketch. Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what to delete, inline, merge or avoid in the next PROJ); it counts as a finding, so do not also emit review-clean.'
   )
   OUT_FILES=(); PIDS=()
   for i in "${!PERSONAS[@]}"; do

@@ -24,9 +24,9 @@ This skill is aligned with the Claude variant. In Codex:
 
 - Reusable skill assets live under `~/.codex/skills/...` instead of
   `~/.claude/skills/...`.
-- No AskUserQuestion tool and no Explore subagents: run the three scan
-  passes sequentially yourself, and run the interview as numbered
-  question blocks in the conversation (one topic per block, wait for the
+- No AskUserQuestion tool and no Explore subagents: run the prepare step
+  (the three scan passes and the drafting) and the apply step inline, and
+  run the interview as numbered question blocks in the conversation (one topic per block, wait for the
   answers before the next block).
 - Everything else — provenance markers, the interview queue, the
   checkpoint reconcile, the seal check — is identical.
@@ -36,12 +36,12 @@ This skill is aligned with the Claude variant. In Codex:
 | File | Content | Cap |
 |---|---|---|
 | `docs/PRODUCT.md` | what the product is, for whom, non-goals | ½ page (≤30 non-blank lines) |
-| `docs/ARCHITECTURE.md` | the load-bearing architecture truths; details → `docs/architecture/` | ≤200 lines |
-| `docs/GUIDELINES.md` | conventions that ARE the rule (incl. Known Debt notes for losing patterns) | — |
+| `docs/ARCHITECTURE.md` | the load-bearing architecture truths as current state, in the sections `Stack` · `System shape` · `Data ownership` · `Invariants` (`0c_bootstrap` § 3); details → `docs/architecture/` | ≤200 lines |
+| `docs/GUIDELINES.md` | conventions that ARE the rule (incl. Known Debt notes for losing patterns) | ≤120 lines |
 | `docs/DESIGN-SYSTEM.md` | design **rules** extracted from code — tokens, scales, patterns, do/don't — or a pointer to **frontend-design** (1c) if none exist; never invented. No component inventory (that's `components.md`) | ≤80 lines |
 | `docs/components.md` | component registry — **generated** by `scripts/gen-component-registry.mjs` from the doc block above each component export | — |
-| `docs/security-baseline.md` | auth model, secret handling, input validation floor | — |
-| `docs/test-conventions.md` | test runner, layout, naming, what must be tested | — |
+| `docs/security-baseline.md` | auth model, secret handling, input validation floor | ≤60 lines |
+| `docs/test-conventions.md` | test runner, layout, naming, what must be tested | ≤60 lines |
 | `AGENTS.md` (root) | initial durable agent rules | ≤40 non-blank lines |
 
 `docs/DESIGN-SYSTEM.md` and `docs/components.md` are only required to seal
@@ -68,10 +68,16 @@ the same way — deltas, not rewrites.
   of from scratch; everything else (interview, checkpoint, seal) is the
   same path.
 
-### 1. Scan & draft (automated, provenance-marked)
+### 1. Prepare (subagent): scan, draft, build the queue
+
+Spawn ONE prepare subagent (foreground; inline where subagents are
+unavailable, as in the checkpoint **Roles**). It runs the scan and the
+drafting below and returns only the numbered interview queue (≤ 300
+tokens plus artifact paths) — scan output and drafts never sit in the
+interview session.
 
 Run three read passes over the repo (spawn Explore agents where useful —
-they locate, you judge):
+they locate, the prepare subagent judges):
 
 - **Arch Hat:** entry points, module boundaries, data flow, persistence,
   integrations → ARCHITECTURE draft (+ `docs/architecture/` for detail).
@@ -103,12 +109,16 @@ Near-greenfield variant: almost no code → extraction is thin and sourced
 from concept/PRDs; the interview carries the weight. Same files, same
 markers, same path.
 
-### 2. Developer interview (point by point)
+### 2. Interview and reconcile (one pass)
 
-Build ONE numbered queue: every `[gap]`, every `[assumed]`, every
-detected inconsistency. Work through it point by point as
-numbered question blocks — grouped by topic, never as one wall of
-questions.
+The orchestrator (this session) walks the queue ONCE as numbered question
+blocks — grouped by topic, never as one wall of questions. This is the
+checkpoint loop (`references/bootstrap-reconcile.md`): every queue item
+(`[gap]`, `[assumed]`, detected inconsistency) ends in exactly one of
+adopt / change / reject / defer, recorded in `specs/intake/decisions.md`
+(`D-BOOTSTRAP-<NN>` ids, `templates/decisions.md.tmpl` frame) BEFORE the
+next item. The apply subagent cascades each decision into the drafts;
+the orchestrator edits no draft.
 
 - Every answer becomes a GUIDELINES rule (or a PRODUCT/ARCHITECTURE
   statement, wherever it belongs).
@@ -118,19 +128,7 @@ questions.
 - `[assumed]` items the developer confirms lose their marker; corrected
   ones are rewritten from the answer.
 
-### 3. Reconcile via checkpoint (Bootstrap Variant)
-
-Run the Bootstrap Variant of the **checkpoint** subskill
-(`5_executing/subskills/checkpoint.md` in the installed skill tree; this
-skill is its orchestrator — the user dialogue stays here, prepare and apply
-run in subagents per its **Roles**): the generated
-docs are HYPOTHESES, not truth. Same point-by-point pattern — every
-review point ends in exactly one of adopt / change / reject / defer,
-recorded in `specs/intake/decisions.md` (`D-BOOTSTRAP-<NN>` ids,
-`templates/decisions.md.tmpl` frame) BEFORE the next point. Cascade
-every decision into the affected draft(s).
-
-### 4. Seal
+### 3. Seal
 
 1. Move the reconciled drafts to their final locations (`docs/*`, root
    `AGENTS.md`) and STRIP all provenance markers — they are working
