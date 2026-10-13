@@ -14,6 +14,7 @@ block() { # <name> -> fenced ```bash <name> block, placeholders filled
   awk -v n="$1" '$0 ~ "^ *```bash " n "$" { on=1; next } /^ *```$/ { on=0 } on' "$REF" | sed 's/^ *//; s/<X>/1/g; s/<theme>/demo/g'
 }
 block ingest >"$CASE/ingest.sh"; [ -s "$CASE/ingest.sh" ] || die 'ingest block missing'
+block seal   >"$CASE/seal.sh";   [ -s "$CASE/seal.sh" ]   || die 'seal block missing'
 block stop   >"$CASE/stop.sh";   [ -s "$CASE/stop.sh" ]   || die 'stop block missing'
 
 # --- fixture: a PROJ sitting at P5:running (quality gate passed) -----------
@@ -27,34 +28,51 @@ for p in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running"; do $S
 # 1. The driver's phase sequence is legal as written (P5 done -> ... -> P8 done).
 for p in "P5 done" "P6 running"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done
 
-# 2. Finder ingest: valid JSON lines reach the ledger, malformed ones and prose do not;
-#    the prose becomes the report and its path is recorded through state.sh.
-cat >"$CASE/finder.out" <<'EOF'
+# 2. Finder ingest fails closed. Malformed lines are dropped one by one (a bad line
+#    BEFORE a valid High finding must not hide it); empty output or a failing ledger
+#    must not record a finder report; the report holds the prose only.
+recorded() { jq -r '.qa.finder_report // empty' specs/PROJ-1-demo/state.json; }
+: >"$CASE/empty.out"
+if OUT="$CASE/empty.out" bash "$CASE/ingest.sh" >/dev/null 2>&1; then die 'empty finder output must fail the ingest'; fi
+[ -z "$(recorded)" ] || die 'empty finder output must not record a report'
+cat >"$CASE/finder.out" <<'EOF2'
+{not json
 ## QA Results
 All ACs tested.
 {"source":"qa","severity":"high","category":"bug","summary":"login drops session","file":"src/a.ts","line":3}
-{"source":"qa","severity":"low","summary":"typo in empty state","file":"src/b.ts","line":9}
 {"source":"qa","summary":"no severity, must be dropped"}
-{not json
-EOF
+{"source":"qa","severity":"low","summary":"typo in empty state","file":"src/b.ts","line":9}
+EOF2
+cp scripts/ledger.mjs "$CASE/ledger.real"; printf 'process.exit(1)\n' >scripts/ledger.mjs
+if OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1; then die 'a failing ledger must fail the ingest'; fi
+[ -z "$(recorded)" ] || die 'a failing ledger must not record a report'
+cp "$CASE/ledger.real" scripts/ledger.mjs
 OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1 || die 'ingest block failed'
-[ "$(jq '.findings | length' specs/PROJ-1-demo/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 valid findings'
-rep="$($S get 1 demo .qa.finder_report | tr -d '"')"
+[ "$(jq '.findings | length' specs/PROJ-1-demo/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 valid findings (malformed line first)'
+rep="$(recorded)"
 [ -f "$rep" ] || die "recorded finder report missing: $rep"
 grep -q '^## QA Results' "$rep" && ! grep -q '^{' "$rep" || die 'report must hold the prose only'
-[ "$(node scripts/ledger.mjs stats 1 demo | jq .open_blocking)" = 1 ] || die 'one open Critical/High expected'
 
-# 3. Seal path: P6 -> P7 -> P8 -> done is legal in order.
-for p in "P6 done" "P7 running" "P7 done" "P8 running" "P8 done"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done
+# 3. Seal: refused while a Critical/High is open (negative control), accepted once fixed;
+#    then P7 -> P8 -> done is legal in order.
+if bash "$CASE/seal.sh" >/dev/null 2>&1; then die 'seal must refuse an open High finding'; fi
+[ "$($S get 1 demo '.phase + ":" + .status' | tr -d '"')" = 'P6:running' ] || die 'refused seal must leave P6 running'
+id="$(jq -r '.findings[] | select(.severity == "high") | .id' specs/PROJ-1-demo/findings.json)"
+node scripts/ledger.mjs set-status 1 demo "$id" fixed abc1234 >/dev/null || die 'set-status failed'
+bash "$CASE/seal.sh" >/dev/null || die 'seal must accept once no Critical/High is open'
+for p in "P7 running" "P7 done" "P8 running" "P8 done"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done
 
-# 4. Stop block parks the run: reason recorded, phase blocked, resumable.
+# 4. Stop block parks the run: reason recorded, phase blocked, stop report rendered
+#    when the runner is found, resumable.
 mkdir -p specs/PROJ-2-demo2
 $S init 2 demo2 >/dev/null
 for p in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running" "P5 done" "P6 running"; do $S transition 2 demo2 $p >/dev/null; done
-sed 's/ 1 demo/ 2 demo2/g; s/<X>/2/g' "$CASE/stop.sh" >"$CASE/stop2.sh"
-REASON='three failed repair attempts on BUG-7' bash "$CASE/stop2.sh" >/dev/null || die 'stop block failed'
-[ "$($S get 2 demo2 '.phase + ":" + .status')" = 'P6:blocked' ] || die 'stop must park the phase as blocked'
+sed 's/ 1 demo/ 2 demo2/g; s/<X>/2/g; s/-1-demo/-2-demo2/g' "$CASE/stop.sh" >"$CASE/stop2.sh"
+SKILLCHAIN_RUNNER="$ROOT/runner/run-phase.sh" REASON='three failed repair attempts on BUG-7' bash "$CASE/stop2.sh" >/dev/null 2>&1 || die 'stop block failed'
+[ "$($S get 2 demo2 '.phase + ":" + .status' | tr -d '"')" = 'P6:blocked' ] || die 'stop must park the phase as blocked'
 $S get 2 demo2 .stop.reason | grep -q 'BUG-7' || die 'stop reason not recorded'
+[ -f specs/PROJ-2-demo2/5_progress/stop-report.md ] || die 'stop report not rendered'
+$S get 2 demo2 .stop.report | grep -q 'stop-report.md' || die 'stop report path not recorded'
 $S transition 2 demo2 P6 running >/dev/null || die 'a parked run must be resumable'
 
 # 5. QA personas: six concurrent processes, six distinct personas (not one prompt naming six).

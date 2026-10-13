@@ -38,7 +38,7 @@ Detached, never a foreground Bash call: a foreground call is capped at 10 minute
 and a background call at 2 hours, and an overnight run outlives both.
 
 ```bash launch
-LOG="${TMPDIR:-/tmp}/skillchain-auto-PROJ-<X>.log"
+LOG="$(mktemp --suffix=.log "${TMPDIR:-/tmp}/skillchain-auto-PROJ-<X>.XXXXXX")"
 setsid nohup "${SKILLCHAIN_RUNNER:-runner/run-phase.sh}" auto <X> <theme> >"$LOG" 2>&1 </dev/null &
 echo "log: $LOG  pid: $!"
 ```

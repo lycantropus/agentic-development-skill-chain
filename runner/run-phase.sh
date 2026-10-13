@@ -442,7 +442,7 @@ run_p6() {
   ts="$(date +%Y%m%d-%H%M%S)"
   finder_out="$LANE_DIR/P6-${PEER}-finder-${ts}.out"
   render_prompt peer "Load and execute the QA skill qa (6_qa) READ-ONLY for specs/PROJ-${PROJ}-${THEME}: find bugs, do not fix anything. Emit each finding as one JSON line on stdout ({\"source\":\"qa\",\"severity\":...,\"summary\":...}); the runner ingests them into the ledger — you must not write files or run mutating commands." finder_prompt
-  tree_before="$(git status --porcelain 2>/dev/null | sha1sum)"
+  tree_before="$({ git status --porcelain; git diff HEAD; } 2>/dev/null | sha1sum)"
   step "P6 finder lane (sequential, before controller): $PEER — output $finder_out"
   launch_lane "$PEER" peer "$finder_prompt" "$finder_out"
   finder_pid="$LANE_PID"; finder_start="$(date -Iseconds)"
@@ -450,7 +450,7 @@ run_p6() {
   record_lane "$PEER" peer "$LANE_MODEL" "$finder_start" "$(date -Iseconds)" "$WRITER_RC" "$finder_out"
   [ "$TIMED_OUT" -eq 1 ] && stop_run "P6 finder timed out after ${TIMEOUT}s" "$finder_out"
   [ "$WRITER_RC" -ne 0 ] && stop_run "P6 finder lane ($PEER) exited $WRITER_RC — no QA verdict, cannot continue" "$finder_out"
-  tree_after="$(git status --porcelain 2>/dev/null | sha1sum)"
+  tree_after="$({ git status --porcelain; git diff HEAD; } 2>/dev/null | sha1sum)"
   [ "$tree_before" = "$tree_after" ] || stop_run "P6 finder modified the working tree — finder must be read-only" "$finder_out"
   ingest_findings "$finder_out"
   store_finder_report "$finder_out" "$ts"
