@@ -731,7 +731,10 @@ its own context:
   command; they do not inherit Skill 6's QA identity.
 - **Fresh provider-opposite re-verification:** after each fix batch, a
   new read-only QA lane from the provider opposite the fixer reruns only
-  the affected checks. The fixer never certifies its own repair.
+  the affected checks. The fixer never certifies its own repair. Every
+  fixer adds a regression test (red before, green after) in the project's
+  existing test location; the controller reruns it first, and the opposite
+  check covers only what a test cannot prove.
 
 After three failed repair/re-verification attempts on the same
 Critical/High finding, P6 enters the stop behavior in §8. Exit requires

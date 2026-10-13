@@ -51,7 +51,7 @@ and continue at the matching step, so a fresh session resumes anywhere.
       ```
    2. **Controller:** follow `references/p6-controller.md` with `<X>` and
       `<theme>` filled in. Fixers are workers, tiered as in Step 5. A fixer never
-      certifies its own repair: re-verify with
+      certifies its own repair: rerun its regression test, then re-verify what a test does not prove with
       `bash scripts/cross-review.sh qa <X> <theme> --personas --persist --round N …`
       as in `6_qa` (six separate processes on the opposite provider).
    3. **Seal** only with no open Critical/High; a non-zero exit means keep
