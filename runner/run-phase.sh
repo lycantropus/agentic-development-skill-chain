@@ -186,7 +186,7 @@ render_prompt() { # role task_text out_var — writes prompt file, sets $out_var
   # compiled bundles — never the bundle text itself (the SubagentStart hook
   # injects it into Claude subagents; codex lanes read their projection file).
   local ctx=""
-  if [ -f "$BASE/context/bundles.lock.json" ] && { [ "$PHASE" = "P5" ] || [ "$PHASE" = "P7" ]; } && [ "$role" = "writer" ]; then
+  if { [ "$PHASE" = "P5" ] || [ "$PHASE" = "P7" ]; } && [ "$role" = "writer" ]; then
     ctx="
 ## Context bundles
 
@@ -199,9 +199,16 @@ providers). Rules:
   implementing.
 - Micro-fixer spawns receive NOTHING beyond the finding, file paths, and
   an optional agent.md pointer (tier 0).
-- If a bundle is missing or stale, recompile via
-  \`node scripts/compile-context-bundles.mjs compile $PROJ $THEME\` —
-  do not hand-assemble context."
+- If a bundle is missing or stale, recompile and record the lock via
+  state.sh. \`compile\` without \`--wave\` keeps the lock's current scope (P5
+  may have advanced waves since this prompt was created). If it refuses
+  (lock missing, empty or mixed), establish the current wave from the
+  execution plan and rerun it with \`--wave N\`. Do not hand-assemble context.
+
+\`\`\`bash
+node scripts/compile-context-bundles.mjs compile $PROJ $THEME &&
+  bash \"$STATE_SH\" set $PROJ $THEME .context.bundles \"\$(jq -c . \"$BASE/context/bundles.lock.json\")\"
+\`\`\`"
   fi
   tpl="$(cat "$RUNNER_DIR/prompts/lane-prompt.md.tmpl")"
   local patsub_was_on=0
@@ -300,6 +307,13 @@ ingest_findings() { # outfile — peer/finder findings -> ledger (line-validated
   else
     step "lane produced no valid finding lines (non-fatal)"
   fi
+}
+
+store_finder_report() { # outfile ts — the finder's non-JSON text -> 5_progress/qa-finder-<ts>.md (the finder stays read-only; the runner writes)
+  local report="$BASE/5_progress/qa-finder-$2.md"
+  mkdir -p "$BASE/5_progress"
+  grep -v '^{' "$1" >"$report" || true
+  "$STATE_SH" set "$PROJ" "$THEME" .qa.finder_report "$report" >/dev/null
 }
 
 open_blocking_count() {
@@ -439,6 +453,7 @@ run_p6() {
   tree_after="$(git status --porcelain 2>/dev/null | sha1sum)"
   [ "$tree_before" = "$tree_after" ] || stop_run "P6 finder modified the working tree — finder must be read-only" "$finder_out"
   ingest_findings "$finder_out"
+  store_finder_report "$finder_out" "$ts"
 
   # Stage 2/2: P6 controller — the only writer of this phase.
   local ctl_out ctl_prompt ctl_pid ctl_start task

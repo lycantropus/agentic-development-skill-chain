@@ -609,9 +609,12 @@ fi
 [[ "$CUMULATIVE_BLOCKING" -eq 0 ]] || fail "${CUMULATIVE_BLOCKING} cumulative/current open blocking finding(s) remain after review ingestion"
 assert_verified_head; assert_clean_worktree
 TS=$(date -Iseconds)
+WAVE_PLAN="${BASE}/3-4_plan/PROJ-${PROJ}-wave-${WAVE}-plan.md"
+STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[0-9]+-PRD-[0-9]+-US-[0-9]+' | sort -uV | paste -sd, - | sed 's/,/, /g'; } || true)
 cat >>"$PROGRESS" <<EOF
 
 ### Wave ${WAVE} Gate — PASSED ($TS)
+- [x] Stories: ${STORIES:-n/a (no stories table in the wave plan)}
 - [x] Current ACs: ${AC_COUNT} commands green at ${VERIFIED_HEAD}
 - [x] Declared broad regressions: ${REG_COUNT} commands green
 - [x] Build: \`${BUILD_CMD}\`

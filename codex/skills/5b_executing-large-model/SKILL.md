@@ -63,16 +63,17 @@ from `5_executing` and the same scripts enforce them.
    below before the first dispatch; if P0 already wrote it (negative controls,
    defaulted decisions), add the missing sections and keep its content. A
    legacy PROJ (`7_progress/`, `6_plan/`) keeps writing where its files already
-   are — never a second folder (`5_executing` § Legacy Folder Layout). `wave-gate.sh` and `quality-gate-proof.sh`
+   are — never a second folder (`0_chain-guide/references/legacy-layout.md`). `wave-gate.sh` and `quality-gate-proof.sh`
    parse it; keep their headings verbatim.
-3. **Wave start.** Read lazily: at PROJ start only the `## Wave shape`
-   section of `architecture-delta.md` and the wave 1 plan; at each wave start
-   only that wave's plan, never earlier ones — what previous waves built comes
-   from the Wave shape plus `progress.md`. Before dispatching wave N:
+3. **Wave start.** Read lazily: at PROJ start only the wave shape — each
+   plan's `## User Stories in this Wave` and `## Execution` sections via
+   `scripts/story-slice.mjs` (`5_executing` § Input) — and the wave 1 plan; at
+   each wave start only that wave's plan, never earlier ones — what previous
+   waves built comes from the wave shape plus `progress.md`. Before dispatching wave N:
    `git tag "wave-${WAVE}-start-PROJ-${PROJ}"` (delete and recreate on a
    re-run). The gate scopes CodeRabbit to this tag and fails hard without it.
-   When `api-contracts.md` has entries for wave N, recompile the bundles
-   wave-scoped and record the hashes before any worker starts:
+   Recompile the bundles wave-scoped (this wave's architecture decisions and
+   API contracts) and record the hashes before any worker starts:
    `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>`, then
    `bash scripts/state.sh set <X> <theme> .context.bundles "$(jq -c . specs/PROJ-<X>-<theme>/context/bundles.lock.json)"`.
 4. **Workers own edits.** Every code, test, and fix edit is worker-owned when
@@ -182,8 +183,11 @@ expected to choose the concrete steps.
   models, so a weaker reviewer is an operator choice to avoid, and any degraded
   fallback must be reported.
 - **Context.** The lead keeps worker summaries short and reads files only for
-  the next decision. Compaction, background spawning, and team versus single
-  subagent are host decisions the model makes as it goes.
+  the next decision. A session that already carried steps 3–4 (PRDs,
+  architecture, plans) starts this skill only after the user ran `/compact` or
+  in a fresh session — writing-plans ends its turn for that; if it did not,
+  ask for the flush and end the turn. Background spawning and team versus
+  single subagent are host decisions the model makes as it goes.
 - **Debugging.** Root cause before fix: full error text, reproduce, diff since
   it last worked, one hypothesis at a time. Repeated failures use the Outer
   Ralph stages in item 6 or the blocked path, never open-ended retries.
@@ -280,11 +284,13 @@ runs use `state.sh` for the blocked phase and reason and render the stop report.
 
 ## Provider notes
 
-- **Claude:** spawn `implementer` / `frontend-implementer` /
-  `backend-implementer`, or P0's `skillchain-<role>` types when available;
-  otherwise attach the bundle path from
-  `node scripts/context-injector.mjs claude <role> --path`. Background spawns
-  are the default for independent workers.
+- **Claude:** spawn P0's projected `skillchain-implementer` /
+  `skillchain-frontend-implementer` / `skillchain-backend-implementer` (the
+  only implementer agent files; they pin no model — pass `model` from the
+  wave plan's Complexity column on every spawn). If they are not projected yet, compile first;
+  for a generic type put `specs/PROJ-<X>-<theme>/context/bundle-<role>.md` in the
+  prompt ("read this first"; no file = blocked role, do not spawn). Background
+  spawns are the default for independent workers.
 - **Codex:** use `spawn_agent` worker roles with explicit file ownership; no
   `/compact`; skill assets live under `.codex/skills`; the installed
   synchronizer is `~/.codex/skills/5_executing/scripts/sync-framework.mjs`.

@@ -129,6 +129,14 @@ EOF
   grep -q review-diagnostic "$CASE/specs/PROJ-1-test/5_progress/coderabbit-wave-1-attempt-1.stderr.log" || fail "$LABEL: review stderr not separate"
   unset PARALLEL_DIR
 
+  case_dir passed-lists-stories
+  printf '## User Stories in this Wave\n\n| US ID | Scope |\n|---|---|\n| PROJ-1-PRD-2-US-1 | backend |\n| PROJ-1-PRD-1-US-1 | backend |\n\n## PROJ-1-PRD-9-US-9: not in the table\n' >"$CASE/specs/PROJ-1-test/3-4_plan/PROJ-1-wave-1-plan.md"
+  write_config "$(default_config)"; commit_case; run_gate >"$GATE_OUT" 2>&1
+  grep -qx -- '- \[x\] Stories: PROJ-1-PRD-1-US-1, PROJ-1-PRD-2-US-1' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: PASSED block missing the Stories line"
+  case_dir passed-without-plan
+  write_config "$(default_config)"; commit_case; run_gate >"$GATE_OUT" 2>&1
+  grep -q 'Stories: n/a' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: missing plan must not break the gate"
+
   case_dir final-wave-build-reuse
   printf 'out/\n' >>"$CASE/.gitignore"
   config=$(default_config | jq '.build_cmd="mkdir -p out; echo output > out/build" | .build_artifacts=["out"]')

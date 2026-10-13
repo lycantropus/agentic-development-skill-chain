@@ -30,6 +30,7 @@ OPTIONAL_SKILLS=(
   refactor-dreamer
   sonar-cli
   supabase-local-dev
+  update-chain
   vibecoder
 )
 EXPECTED=("${CORE_SKILLS[@]}" "${OPTIONAL_SKILLS[@]}")
@@ -123,6 +124,8 @@ while IFS= read -r bugfix_file; do
 done < <(find "$ROOT/codex/skills/bugfixing" -type f | sort)
 check_identical "$ROOT/claude/skills/5b_executing-large-model/SKILL.md" \
   "$ROOT/codex/skills/5b_executing-large-model/SKILL.md"
+check_identical "$ROOT/claude/skills/update-chain/SKILL.md" \
+  "$ROOT/codex/skills/update-chain/SKILL.md"
 check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
   "$ROOT/codex/skills/vibecoder/SKILL.md"
 check_identical "$ROOT/claude/skills/1a_clarification/SKILL.md" \
@@ -170,6 +173,8 @@ HARNESS_NAMES=(); HARNESS_PIDS=()
 harness() { local name="$1"; shift; "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
+harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
+harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
 harness ledger              bash "$ROOT/scripts/test-ledger.sh"
 harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"

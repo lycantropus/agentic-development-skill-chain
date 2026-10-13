@@ -51,7 +51,7 @@ docs(PROJ-<X>): explore UI layout approaches for <theme>
 
 ### 1. Read Concept And Existing UI
 
-Read the concept doc:
+Read `docs/PRODUCT.md` (purpose and audience; 30 lines), then these concept sections only — `Problem And Goal`, `Primary Users And Scenarios`, `Scope`, `Selected Direction` / `Candidate Directions`, `Key Behaviors And Flows`, `Data, Permissions, And Constraints`, `Decomposition Context`:
 
 ```text
 specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md
@@ -63,7 +63,7 @@ Then inspect the existing app so the exploration fits what is already there:
 - Layout shells: app layouts, dashboard layouts, nav components
 - Existing interaction containers: modal, dialog, drawer, sidepanel, sheet, popover, tabs, command palette, wizard/stepper
 - Components: `docs/components.md`, every `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`)
-- Design/system hints: `docs/DESIGN-SYSTEM.md`, `docs/TECHNICAL.md`, `AGENTS.md`, existing CSS/Tailwind/component conventions
+- Design/system hints: `docs/DESIGN-SYSTEM.md`, existing CSS/Tailwind/component conventions
 
 Note the design system state explicitly — this is the earliest point where it is
 cheap to decide, and every later step (1c, 1d, P0 preflight, the wave gate) reads
@@ -246,11 +246,6 @@ Use this structure:
 - Design constraints:
 - Anti-goals:
 
-## Conversation Notes
-- Questions asked:
-- User answers:
-- Assumptions:
-
 ## Finding
 <filled after the user chooses: the answer to the Decision Question, the deciding reason, and the variants rejected and why>
 
@@ -310,24 +305,4 @@ Do not transition until the user has explicitly selected or approved a direction
 | Technical architecture | `architecture` |
 | Production implementation | `executing` |
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

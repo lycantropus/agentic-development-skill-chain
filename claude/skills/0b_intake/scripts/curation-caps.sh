@@ -5,6 +5,9 @@
 #   docs/PRODUCT.md        <= 30 non-blank lines   ("half page")
 #   docs/ARCHITECTURE.md   <= 200 lines
 #   docs/DESIGN-SYSTEM.md  <= 80 lines    (injected into every frontend bundle)
+#   docs/GUIDELINES.md     <= 120 lines   (injected into every tier-1 bundle)
+#   docs/security-baseline.md <= 60 lines (backend / generic bundles)
+#   docs/test-conventions.md  <= 60 lines (every tier-1 bundle)
 #   src/**/agent.md        <= 100 lines each
 #   AGENTS.md (root)       <= 40 non-blank lines   (existing 7_documentation cap)
 #
@@ -77,6 +80,13 @@ if [ -f AGENTS.md ]; then
 else
   missing AGENTS.md
 fi
+
+# GUIDELINES, security-baseline and test-conventions go into every tier-1
+# bundle; without a cap their growth surfaces only as a blocked role at P0.
+# Capped only when they exist (backend-only or pre-intake repos lack some).
+[ -f docs/GUIDELINES.md ]        && check docs/GUIDELINES.md        "$(total docs/GUIDELINES.md)"        120 "lines"
+[ -f docs/security-baseline.md ] && check docs/security-baseline.md "$(total docs/security-baseline.md)"  60 "lines"
+[ -f docs/test-conventions.md ]  && check docs/test-conventions.md  "$(total docs/test-conventions.md)"   60 "lines"
 
 if [ -d src ]; then
   while IFS= read -r f; do

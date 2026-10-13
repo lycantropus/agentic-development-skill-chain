@@ -470,12 +470,16 @@ serves the implementing agents.
 1. **Read the baseline:** `docs/ARCHITECTURE.md`. If it is missing →
    intake (see Brownfield Model). Verify stale-looking sections against
    the code.
-2. **Draft the delta:** `specs/PROJ-<X>-<theme>/architecture-delta.md` — only the
-   NEW decisions of this PROJ. References standing decisions instead of
-   repeating them ("uses the standing auth decision; NEW: event queue
-   for status transitions, because …").
+2. **Draft the delta:** `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` —
+   only the NEW decisions of this PROJ, each with `Affects` and a one-line
+   `Summary`. References standing decisions instead of repeating them
+   ("uses the standing auth decision; NEW: event queue for status
+   transitions, because …"). A decision that changes the baseline says so
+   with `Changes baseline: docs/ARCHITECTURE.md § <section>`. It is the ONE
+   architecture file: the implementer view is compiled from it (§5), never
+   written as a second file.
 3. **Pre-mortem:** automated review (the-fool modes: devil's advocate,
-   pre-mortem, evidence audit) against delta + PRDs, PLUS a cross-model
+   pre-mortem, evidence audit) against architecture + PRDs, PLUS a cross-model
    pass via `cross-review` (below). Authorship is explicit:
    `state.json` assigns ONE provider as the delta author
    (framework.config; alternates per PROJ by default). The non-author
@@ -483,9 +487,12 @@ serves the implementing agents.
    independent risk-and-assumption sketch — that sketch feeds the
    pre-mortem as input, it is not a second delta to reconcile. The
    non-author then delivers the blocking critique.
-4. **Derive contracts:** `specs/PROJ-<X>-<theme>/api-contracts.md` — interfaces
-   between soon-to-be-parallel stories are pinned down HERE, not guessed
-   by implementers.
+4. **Derive contracts:** interfaces between soon-to-be-parallel stories are
+   pinned down before execution, not guessed by implementers. The architecture
+   names the boundary; `writing-plans` (P4) writes
+   `specs/PROJ-<X>-<theme>/api-contracts.md` with one `## Wave N: <interface>`
+   section per wave once it knows which stories run in parallel — the bundle
+   compiler injects only the running wave's sections.
 
 ### Cross-Model Review Skill `cross-review` (new)
 
@@ -519,7 +526,7 @@ a core dependency.
 |---|---|---|
 | Concept review (automatic) | written concept | missing assumptions, contradictions, scope and feasibility risks |
 | Requirements review (required) | complete PRD set + approved concept + compact UI contracts | gaps in stories/ACs/edge cases, contradictions, untestable requirements |
-| P3 pre-mortem (automatic) | full architecture + architecture-delta + migration design when present, against PRDs | wrong/missing decisions, unstated assumptions, contradictions with the baseline |
+| P3 pre-mortem (automatic) | PROJ architecture + migration design when present, against PRDs | wrong/missing decisions, unstated assumptions, contradictions with the baseline |
 | P4 plan review (automatic) | wave plans + wave-gate-config + api-contracts | unsafe ordering, weak AC commands, missing contracts |
 | P6 QA review (required) | QA summary/evidence + implementation diff | evidence integrity, release decision, security, architecture, performance, reliability, cross-wave drift, minimalism |
 | P7 docs review (required) | curated docs delta (+ full capped docs) vs. the PROJ diff | factual accuracy ("does ARCHITECTURE.md describe what was actually BUILT?"), stale claims, cap-gaming (shrinking docs by deleting true load-bearing statements) |
@@ -555,9 +562,9 @@ Opus-authored artifacts via `claude -p --model`. The invariant that survives deg
 gate is never satisfied by the same model that authored the artifact.
 Every degraded review is logged and flagged in the morning report and
 the PR body ("cross-review: model-opposite fallback") — never silent. For
-six-persona QA, Claude-authored evidence may fall back loudly to six Claude
-workers if Codex is unavailable. Codex-authored QA fails closed if Claude is
-unavailable; a same-provider Codex substitution cannot satisfy the gate.
+six-persona QA, evidence may fall back loudly to six same-vendor workers if
+the opposite provider is unavailable (Claude: its strongest model, even the
+author's; Codex: its default), flagged degraded.
 
 ### Focused Bug Repair Skill `bugfixing` (optional)
 
@@ -604,7 +611,7 @@ reconcile loop (generalizing the proven pattern from
 `2c_review-reconcile`):
 
 1. **Present:** a compact review package instead of raw artifacts —
-   decision summary (delta), wave overview with rationales, open risks
+   decision summary (each decision's Summary line), wave overview with rationales, open risks
    from the pre-mortem.
 2. **Collect feedback in a structured way:** point by point
    (AskUserQuestion or guided conversation); every point ends with a
@@ -613,7 +620,7 @@ reconcile loop (generalizing the proven pattern from
    decision with rationale. The P7 curation reads it (decisions with
    lasting value migrate into ARCHITECTURE.md/ADRs).
 4. **Cascade updates into artifacts:** one change ("drop US-7, cut
-   Wave 2 differently") touches architecture-delta + wave plans +
+   Wave 2 differently") touches the PROJ architecture + wave plans +
    wave-gate-config + api-contracts. The skill propagates the change
    through ALL affected artifacts and then re-runs the plan self-review
    (the consistency check from Skill 4).
@@ -649,7 +656,7 @@ orchestrator (or the runner's P0 lane):
    commands serialize through a lock in the common Git directory.
 2. **Check/update the context pack** (context-curator agent): the
    baseline from `docs/` is the foundation; PROJ-specific additions are
-   architecture-delta, api-contracts, ground-file
+   the PROJ architecture (compiled implementer view), api-contracts, ground-file
 3. **Generate the ground file** (common-ground principle): surface
    assumptions about stack/conventions/data model, validate them against
    the codebase
@@ -708,7 +715,7 @@ ledger processing, fix dispatch, and re-verification. This preserves an
 independent QA verdict without sacrificing unattended repair.
 
 Three parallel read-only collection streams:
-- Code review gate (code-reviewer-gate, as today)
+- Code review gate (`skillchain-reviewer`)
 - `sonar-scanner` full quality gate (once at PROJ end)
 - QA: browser E2E + red team + UI audit + persona panel (Skill 6)
 
@@ -739,7 +746,10 @@ debt section in the PR — not mid-run.
 1. Generate/update documentation (README, PROJECT.md, TECHNICAL.md)
 2. **Curation step (the brownfield core):**
    - `docs/ARCHITECTURE.md` ← merge surviving decisions from
-     architecture-delta; document deviations
+     the PROJ architecture into its current-state sections (Stack ·
+     System shape · Data ownership · Invariants), driven by the
+     `Changes baseline` lines — rewrite in place, never a per-PROJ
+     section; document deviations
      ("planned X, built Y, because …")
    - `docs/PRODUCT.md` ← new domain terms/scope changes
    - `docs/GUIDELINES.md` + merge candidates into project-root
@@ -830,7 +840,6 @@ specs/PROJ-<X>-<theme>/        ← PROJ artifacts
 ├── 3-4_plan/                    ← architecture + wave plans + gate config
 ├── 5_progress/                ← progress, stop reports, autonomous log
 ├── 2b_handoff/                 ← generated discovery packages; immutable runs
-├── architecture-delta.md      ← new decisions of this PROJ
 ├── api-contracts.md           ← interfaces between parallel stories
 ├── ground-file.md             ← validated assumptions
 ├── state.json                 ← state machine
@@ -867,7 +876,7 @@ change what context a role receives.
 |---|:---:|:---:|
 | PRODUCT.md | ✅ | ✅ |
 | ARCHITECTURE.md (overview) | ✅ | ✅ |
-| architecture-delta.md | ✅ | ✅ |
+| PROJ architecture (compiled: the wave's decision and key-flow Summaries) | ✅ | ✅ |
 | GUIDELINES.md | ✅ | ✅ |
 | Minimalism ladder | via the provider's Ponytail plugin adapter (§7); same mode/version on Claude and Codex ||
 | DESIGN-SYSTEM.md + components.md | ✅ | — |
@@ -885,7 +894,9 @@ change what context a role receives.
   `docs/` — whatever is validated and has lasting value migrates into
   ARCHITECTURE/GUIDELINES via curation and is removed from the ground
   file.
-- `architecture-delta.md` references the baseline, never repeats it.
+- The PROJ architecture references the baseline, never repeats it; its
+  implementer view is compiled (decision and key-flow Summaries filtered to
+  the wave's PRDs), never hand-written as a second file.
 - `api-contracts` are scoped per wave/US, not injected as a whole-PROJ
   file.
 

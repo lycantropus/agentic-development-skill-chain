@@ -1,6 +1,6 @@
 ---
 name: explore
-description: "Spawned as a read-only search/scout agent (Explore, component-scout, codebase surveys). Use when: a lane needs facts located in the codebase, not judged. Not for: reviews with verdicts (use reviewer), any write work."
+description: "Spawned as a read-only search/scout agent (Explore, codebase surveys). Use when: a lane needs facts located in the codebase, not judged. Not for: reviews with verdicts (use reviewer), any write work."
 tier: 2
 scope: any
 inject: []

@@ -82,7 +82,7 @@ for round in 4 100; do
   [ "$(jq -r '.cross_review[-1].round' specs/PROJ-1-test/state.json)" -eq "$round" ]
 done
 
-# Degraded fallback: Codex unavailable → strongest Claude model that is not the author model.
+# Degraded fallback: Codex unavailable → strongest Claude model that is not the author model; QA personas take the strongest even when it is the author.
 mkdir -p "$CASE/nocodex"
 printf '#!/usr/bin/env bash\nexit 1\n' >"$CASE/nocodex/codex"
 cat >"$CASE/nocodex/claude" <<'EOF2'
@@ -103,6 +103,26 @@ run_degraded() { # author_model
 [ "$(run_degraded claude-fable-5-1)" = opus ] || { cat "$CASE/out" >&2; exit 1; }
 [ "$(run_degraded opus)" = fable ] || { cat "$CASE/out" >&2; exit 1; }
 [ "$(CLAUDE_REVIEW_MODEL=sonnet run_degraded fable)" = sonnet ] || { cat "$CASE/out" >&2; exit 1; }
+run_degraded_qa() { # author_model
+  : >"$CASE/models"
+  PATH="$CASE/nocodex:$PATH" MODEL_CAPTURE="$CASE/models" \
+    bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider claude --author-model "$1" --personas \
+      --diff-base "$BASE_SHA" --diff-paths src --round 1 >"$CASE/out" 2>&1
+  sort -u "$CASE/models"
+}
+[ "$(run_degraded_qa claude-fable-5-1)" = fable ] || { cat "$CASE/out" >&2; exit 1; }
+[ "$(run_degraded_qa opus)" = fable ] || { cat "$CASE/out" >&2; exit 1; }
+
+# Codex-authored QA personas: Claude unavailable -> six Codex workers, flagged degraded.
+mkdir -p "$CASE/noclaude"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$CASE/noclaude/claude"; chmod +x "$CASE/noclaude/claude"
+qa_codex() { PATH="$CASE/noclaude:$CASE/bin:$PATH" PROMPT_CAPTURE="$CASE/prompt" bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider codex "$@"; }
+qa_codex --personas >"$CASE/out" 2>&1 || { cat "$CASE/out" >&2; exit 1; }
+grep -q 'opposite provider unavailable; continuing six QA personas with codex' "$CASE/out" || { cat "$CASE/out" >&2; exit 1; }
+# Everything else stays fail-closed for a Codex author without Claude.
+if qa_codex >"$CASE/out" 2>&1; then echo "qa without --personas must fail closed" >&2; exit 1; fi
+grep -q 'Claude is required' "$CASE/out"
+if PATH="$CASE/noclaude:$CASE/bin:$PATH" PROMPT_CAPTURE="$CASE/prompt" bash "$SCRIPT" docs 1 test --artifacts artifact.md --author-provider codex >"$CASE/out" 2>&1; then echo "docs review must fail closed" >&2; exit 1; fi
 
 echo 'cross-review diff-scope, manual-round and degraded-model tests passed'
 

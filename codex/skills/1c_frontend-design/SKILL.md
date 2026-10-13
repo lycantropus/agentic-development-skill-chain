@@ -51,8 +51,9 @@ Artifact handling:
 
 ## Input
 
-- Concept doc from Step 1 (`specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md`) — understand the app's purpose and audience
-- Visual Companion output (`specs/PROJ-<X>-<theme>/1b_visual-companion/layout-decision.md` and `layout-exploration.html`) — understand selected UI structure, `Project Mode`, `Shape Brief`, and interaction containers
+- `docs/PRODUCT.md` (30 lines) — the product's purpose and audience
+- Concept doc from Step 1 (`specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md`), `Problem And Goal` and `Primary Users And Scenarios` sections only
+- Visual Companion output (`specs/PROJ-<X>-<theme>/1b_visual-companion/layout-decision.md`) — understand selected UI structure, `Project Mode`, `Shape Brief`, and interaction containers
 - User preferences expressed during concept
 
 ## Process
@@ -75,7 +76,7 @@ Wait for the answer. Then ask whether the user has inspirations (products, sites
 
 Then establish any remaining context that is not already clear from the spec:
 
-- **Who uses this?** (developers, consumers, enterprise, creative professionals)
+- **Who uses this?** — from `docs/PRODUCT.md`; ask only if it is missing
 - **Dark mode?** (yes/no/both)
 - **Which UI stack?** — read `docs/ARCHITECTURE.md` § Stack; the framework, styling, and component library are decided there by `bootstrap` (0c) or extracted by `intake` (0b). Only if that section does not exist (a repo that predates it, or a discovery workspace with no code): detect from `package.json`, otherwise ask — and record the answer in `docs/ARCHITECTURE.md` § Stack, not only in the design language document. The components in step 4 are written in this stack.
 
@@ -339,7 +340,7 @@ The design language document at `specs/PROJ-<X>-<theme>/1c_design/design-languag
 - **Step 1d (Prototyping):** Mockups use the defined colors, fonts, spacing, and reference catalog components by name
 - **Step 3 (Architecture):** Tech design documents the inherited UI stack and references the design tokens
 - **Step 5 (Executing):** frontend-implementer composes catalog components instead of writing new UI
-- **Step 6 (QA):** ui-auditor checks compliance against the catalog, the registry, and the showcase route
+- **Step 6 (QA):** QA's UI consistency check verifies compliance against the catalog, the registry, and the showcase route
 
 ## Handoff
 
@@ -357,24 +358,4 @@ After the design language is approved, invoke `prototyping`. Do not invoke `requ
 - **One writer per artifact** — never copy the component inventory into `docs/DESIGN-SYSTEM.md`. Two lists drift, and both are paid for in every agent's context budget.
 - **English** — all documentation in English
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

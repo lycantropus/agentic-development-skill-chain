@@ -17,10 +17,10 @@ flowchart LR
 
 Inputs:
 
-- Wave shape in `specs/PROJ-<X>-<theme>/architecture-delta.md` (read at PROJ start)
+- Wave shape: each plan's `## User Stories in this Wave` and `## Execution`, sliced with `story-slice.mjs` (read at PROJ start)
 - Wave plans in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (one per wave, read at that wave's start)
 - PRDs in `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` (authoritative; opened only when a plan/PRD AC conflict is suspected)
-- Architecture in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (on demand; workers get `architecture-delta.md` through their context bundle)
+- Architecture in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (on demand; workers get its compiled implementer view — their wave's decision Summaries — through their context bundle)
 - Gate config in `specs/PROJ-<X>-<theme>/3-4_plan/wave-gate-config.json`
 - UI handoff in `specs/PROJ-<X>-<theme>/1d_prototypes/implementation-handoff.md`, when the PROJ has UI work
 
@@ -36,7 +36,7 @@ Outputs:
 ```mermaid
 flowchart TD
   A[P0 creates or resumes persistent PROJ worktree] --> B[Re-enter worktree and record BASE_SHA]
-  B --> C[Read Wave shape]
+  B --> C[Slice wave shape from the plans]
   C --> D[Start wave N: read its plan, tag wave base]
   D --> E[Implement each user story with TDD]
   E --> F[One bounded Inner Ralph self-review per worker]
@@ -131,7 +131,7 @@ For implementation, the skill chooses the implementer type by scope:
 
 Each worker's spawn prompt embeds its story section of the wave plan verbatim, printed by `scripts/story-slice.mjs <wave-plan> <US-ID>`; the lead adds only what the slice lacks (execution mode, ownership and lock rules, a prior-wave summary from `progress.md`, `agent.md` and UI-handoff pointers).
 
-Parallel waves can run multiple independent user stories at once. In those cases, an integration guard monitors file ownership and overlap. Single-story waves do not need team overhead.
+Parallel waves can run multiple independent user stories at once. In those cases, the lead monitors file ownership and overlap (`worker-lifecycle.md`). Single-story waves do not need team overhead.
 
 The lead asks an active worker for status before considering cancellation; quiet files or a single process snapshot do not establish a hang. Replacement requires a confirmed stop, released child commands/resources, and an explicit transfer of files and partial work. Never message a retired worker or send its replacement to negotiate ownership: messages can resume stopped Claude teammates. The lead owns the handover.
 
@@ -256,7 +256,7 @@ After all waves pass, the quality gate checks the assembled feature diff from `B
 
 It focuses on assembled cross-wave risks and does not replay wave ACs. It includes:
 
-- Cross-wave contracts, shared state, authorization boundaries and unresolved wave findings. The reviewer follows affected interfaces and callers instead of repeating the wave review or QA's six-persona panel.
+- Cross-wave contracts, shared state, authorization boundaries and unresolved wave findings. The reviewer follows affected interfaces and callers instead of repeating the wave review or QA's opposite-provider persona review.
 - A verified PROJ build using `build_cmd`, with conservative final-wave artifact reuse.
 - Sonar at PROJ end: an initial scan and bounded fix/rescans. If the configured wrapper also generates coverage, split it into `coverage_cmd` plus a scanner-only `sonar_cmd`, retaining the ordinary combined wrapper entry point for other callers. Coverage failures block; uploading partial coverage is not a passing test result.
 - Declared `quality` phase tests and lint. CI/nightly commands are checked for workflow wiring, not replayed locally. Wave ACs are not replayed here.

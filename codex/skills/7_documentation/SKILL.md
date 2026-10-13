@@ -55,25 +55,25 @@ Read in this priority order. Structured data first; raw reconstruction only as f
 **Structured inputs, filled by Skills 4/5/6:**
 
 1. `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md`
-   - `### Wave N Gate - PASSED` blocks: authoritative wave completion proof
+   - `### Wave N Gate — PASSED` blocks: authoritative wave completion proof, including the `Stories:` line (shipped user stories)
    - `## QA Results`: QA summary and residual risk
    - `## PROJ Retrospective`: implementation lessons and durable observations
    - `## AGENTS.md Candidates`: proposed durable agent rules awaiting approval
+   - Framework runs: QA's read-only finder wrote its `QA Results`, `PROJ Retrospective` and candidates to `5_progress/qa-finder-<ts>.md` (path: `state.sh get <X> <theme> .qa.finder_report`) instead of progress.md; read that file for those three sections.
 2. `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md`
    - app/feature purpose, target user, in-scope/out-of-scope boundaries
 3. `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md`
-   - user stories, feature names, acceptance criteria, edge cases
+   - title, purpose paragraph and `## User Story` heading lines only (see step 1.3)
 4. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`
    - architecture, data model, data flows, cross-cutting decisions
-5. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md`
-   - shipped user-story scope per wave
-6. `src/features/*/agent.md`
+5. `src/features/*/agent.md`
    - non-obvious gotchas surfaced during implementation
-7. `package.json` at `BASE_SHA` and `HEAD`
+6. `package.json` at `BASE_SHA` and `HEAD`
    - dependency and script deltas for setup/technical docs
 
 **Fallback only if structured inputs are absent:**
 
+7. `3-4_plan/PROJ-<X>-wave-*-plan.md` story headings, for PROJs gated before the `Stories:` line existed
 8. `git log --oneline --grep="PROJ-<X>" --reverse`
 9. focused code structure scan
 
@@ -117,8 +117,8 @@ Documentation arrives late in the chain. Keep the main context focused on `progr
 Start with `5_progress/PROJ-<X>-progress.md`. Then collect only the extra inputs needed for triggered outputs:
 
 1. **Feature purpose and boundaries:** read the concept file if `PROJECT.md` or `README.md` needs human-facing purpose/scope text.
-2. **Shipped stories:** parse Wave PASSED blocks first; fall back to `3-4_plan/PROJ-<X>-wave-*-plan.md` headings matching `## PROJ-<X>-PRD-<Y>-US-<Z>:`.
-3. **Feature behavior:** read PRDs only to summarize capabilities, user workflows, edge cases, and links. Do not paste acceptance criteria.
+2. **Shipped stories:** the `Stories:` line of each `### Wave N Gate — PASSED` block. Fall back to wave-plan headings matching `## PROJ-<X>-PRD-<Y>-US-<Z>:` only for PROJs gated before this line existed.
+3. **Feature behavior:** read each PRD's title, purpose paragraph and the `## User Story` heading lines only (`grep -n '^## \|^# ' <prd>`, then targeted `sed -n` ranges). Open a full story only when PROJECT.md needs a workflow it cannot state from the heading. Do not paste acceptance criteria.
 4. **Technical structure:** read architecture and relevant `agent.md` files when `TECHNICAL.md` triggers.
 5. **Dependency delta:** compare `package.json` at `BASE_SHA` to `HEAD` using structured JSON over `dependencies` and `devDependencies`.
 6. **Runtime/deployment facts:** inspect package scripts, config files, env examples, and deployment notes only when README or TECHNICAL needs them.
@@ -331,7 +331,7 @@ Guidelines:
 
 ### 5. AGENTS.md merge
 
-Runs only if `## AGENTS.md Candidates` in progress.md has `[PROPOSED]` entries.
+Runs only if `## AGENTS.md Candidates` (in progress.md, or the QA finder report in framework runs) has `[PROPOSED]` entries.
 
 **Algorithm:**
 
@@ -392,10 +392,19 @@ failing.
 
 **7a. Curate the long-lived docs** (judgment first, gates after):
 
-1. Merge surviving decisions from `specs/.../architecture-delta.md` and
+1. Merge surviving decisions from `specs/.../3-4_plan/PROJ-<X>-architecture.md` and
    `decisions.md` entries with lasting value into `docs/ARCHITECTURE.md`.
-   Document deviations as "planned X, built Y, because ..." — never
-   silently overwrite the baseline.
+   Start from every `**Changes baseline:**` line of the PROJ architecture:
+   each names a section to rewrite. `docs/ARCHITECTURE.md` describes the
+   system as it is NOW in its sections (Stack · System shape · Data
+   ownership · Invariants) — edit the affected section in place, never
+   append a per-PROJ or "built in PROJ-n" section; that history is what
+   `docs/DECISIONS.md` and git are for. Where the build deviated from the
+   plan, the section states what was built and the DECISIONS.md entry says
+   "planned X, built Y, because ..." — never silently overwrite the baseline.
+   A baseline from before these four sections (an older intake) keeps its
+   headings: rewrite the section that holds the affected statement; when
+   none fits, add the missing one of the four sections — never a per-PROJ one.
    Entries with lasting WHY (rejected alternatives, constraints, trade-offs)
    are appended to `docs/DECISIONS.md` — append-only, one `D-<X>-<NN>`
    entry each (Decision, Context, Alternatives, Status), `ARCHITECTURE.md`
@@ -422,6 +431,7 @@ bash scripts/state.sh set <X> <theme> '.authorship["docs-delta"]' \
 
 **7c. FORM gate:** `bash scripts/curation-caps.sh` — exit != 0 means a
 cap is breached (PRODUCT <= 30 non-blank lines, ARCHITECTURE <= 200
+lines, GUIDELINES <= 120, security-baseline and test-conventions <= 60
 lines, each agent.md <= 100 lines, AGENTS.md <= 40 non-blank lines).
 Shrink by curating — move detail into `docs/architecture/`, delete stale
 statements — and re-run until exit 0. Never delete true load-bearing
@@ -508,24 +518,4 @@ Framework runs: seal the phase afterwards — `bash scripts/state.sh transition 
 - After Step 6 QA passes for a PROJ-X.
 - When the user explicitly asks for documentation, feature docs, technical docs, diagrams, data model explanation, or data-flow explanation.
 
-## Legacy Folder Layout
-
-PROJ folders created before the layout rename use different subfolder
-names. Mapping, old → current:
-
-`2_visual-companion/` → `1b_visual-companion/` · `4_design/` → `1c_design/` ·
-`5_mockups/`, `1d_mockups/` → `1d_prototypes/` · `3_PRDs/` → `2_PRDs/` ·
-`8_handoff/` → `2b_handoff/` · `6_plan/` → `3-4_plan/` ·
-`7_progress/` → `5_progress/`
-
-If an expected folder is missing but its legacy twin exists, **read from the
-legacy one and keep writing where the existing files already are**. Never
-create a second folder next to it — a split PROJ is worse than an old name.
-Say it once, then continue either way:
-
-> "This PROJ uses the old folder layout (`<old>`). Rename the folders to the
-> current names, or continue with the existing layout?"
-
-Renaming is a `git mv` per folder plus a search for the old paths in the
-PROJ's own documents, never inside generated `2b_handoff/` runs (only
-`handoff-package` writes those). It is never a precondition for this skill.
+Legacy PROJ folders: see `0_chain-guide/references/legacy-layout.md`.

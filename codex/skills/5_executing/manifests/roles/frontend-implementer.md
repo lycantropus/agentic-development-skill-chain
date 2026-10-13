@@ -6,7 +6,7 @@ scope: frontend
 inject:
   - product
   - architecture-overview
-  - architecture-delta
+  - proj-architecture
   - guidelines
   - design-system
   - components

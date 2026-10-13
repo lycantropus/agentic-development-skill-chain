@@ -60,7 +60,7 @@ it never touches real branches) and read the JSON verdict:
   branch, regenerate the trivial files (e.g. re-run the package
   manager), commit, re-run the probe. It must now report `none`.
 - `semantic` → ONE bounded resolution attempt using
-  `api-contracts.md`/architecture-delta as the reference. Resolved →
+  `api-contracts.md`/the PROJ architecture as the reference. Resolved →
   commit + re-probe. Unresolved → record the affected files as a risk
   assessment in state (`.summary` addendum) so it renders into the PR
   body, and continue to PR creation — the human decides at CP2. A

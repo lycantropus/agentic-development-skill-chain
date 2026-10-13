@@ -6,7 +6,7 @@ scope: any
 inject:
   - product
   - architecture-overview
-  - architecture-delta
+  - proj-architecture
   - guidelines
   - api-contracts-own-wave
   - security-baseline

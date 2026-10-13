@@ -24,9 +24,12 @@ Ownership boundary — never blur it:
 3. **Fix spawns (tier 0)** per confirmed cluster: BEFORE dispatching a
    fixer, count the attempt — `node scripts/ledger.mjs record-attempt <id>`
    (this is what makes the three-attempt stop rule enforceable). Each
-   fixer receives ONLY the finding text, the code anchor, the relevant
-   `agent.md` excerpt, and the verification command — no context pack,
-   no QA identity. Only after the fix is verified:
+   fixer receives ONLY the finding text, the code anchor (symbol or
+   regex, never a line number — parallel fixers shift lines), the
+   relevant `agent.md` excerpt, and the verification command — no
+   context pack, no QA identity, ≤ 2000 tokens in total. One cluster
+   (one file) per fixer; bugs in the same file run sequentially, and a
+   bug spanning files goes to its primary file's cluster. Only after the fix is verified:
    `node scripts/ledger.mjs set-status <id> fixed <commit-sha>`.
 4. **Fresh opposite re-verification:** after each fix batch, a NEW
    read-only QA check from the provider (or in degraded mode: model)
