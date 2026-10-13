@@ -45,7 +45,9 @@ from `5_executing` and the same scripts enforce them.
    - `CP1:approved`, `P0:running`, `P0:blocked` → one subagent on
      `5_executing/subskills/setup.md` with `<X> <theme>` and this checkout's
      path. `P0:blocked` back → stop and report its reason. Relay any defaulted
-     decisions, then `cd` into the returned `.worktree.path`.
+     decisions (including the suggested `complexity_cmd` / `arch_rules_cmd` /
+     `mutation_cmd` candidates; absent keys simply skip), then `cd` into the
+     returned `.worktree.path`.
    - `P0:done` or `P5:*` → continue. The runner's P5 lane arrives here; its
      P0 lane already ran setup. `P6:*`–`P8:*` → resume the in-session driver
      (`5_executing/references/in-session-driver.md`) at that phase.
@@ -123,15 +125,17 @@ from `5_executing` and the same scripts enforce them.
    Still red after stage four → the existing blocked path.
 7. **Wave gate.** `bash scripts/wave-gate.sh <N> <X> <theme>` must exit 0
    before any worker for wave N+1 is dispatched. On success the script appends
-   `### Wave N Gate — PASSED`; that block is the only proof of completion.
+   `### Wave N Gate — PASSED` (listing the static checks it ran or skipped); that
+   block is the only proof of completion.
    Then `bash scripts/state.sh set <X> <theme> .waves '{…}'` with current,
    total, and per-story status. Do not stop between waves and do not ask the
    user; the gate is the signal.
 8. **Quality Gate.** After the last wave, follow
    `5_executing/references/quality-gate.md`: declared quality-phase commands,
    an integration-focused review of `BASE_SHA..HEAD`, mutation hardening
-   first when `mutation_cmd` is set (tests-only fix rounds, survivors carried
-   forward after three), build via
+   first when `mutation_cmd` is set (tests-only fix rounds by a worker owning
+   test files only; a survivor needing production change goes to QA as a
+   finding; survivors carried forward after three), build via
    `quality-evidence.mjs`, coverage, Sonar once per PROJ with at most three fix rounds,
    combined recovery rounds. Zero P0/P1 review findings to pass. Fill the
    `## Quality Gate — PROJ-X` section, then `bash scripts/quality-gate-proof.sh <X> <theme>`
@@ -211,7 +215,10 @@ expected to choose the concrete steps.
   Ralph stages in item 6 or the blocked path, never open-ended retries.
 - **Reviews.** CodeRabbit inside the wave gate and the Quality Gate reviewer
   are the only Step 5 reviews. No minimalism persona, no six-persona panel;
-  those belong to Skill 6.
+  those belong to Skill 6. Structure and test quality are judged by the
+  project's tools (`complexity_cmd`, `arch_rules_cmd`, `mutation_cmd`), not by
+  an extra reviewer or a cleaner agent: a failing tool feeds the recovery
+  stages above.
 
 ## Worker brief
 
@@ -234,8 +241,9 @@ implementation or required tests.
 Every behavior change needs a test that failed before and passes after; run it
 and read the output. <only when the PROJ config has complexity_cmd: Do not
 polish structure beyond the story; the wave gate checks complexity and
-dependency rules and returns failures to you.> Before reporting, re-read your diff against the story once,
-fix what you find, run targeted tests once, then report in ≤300 tokens:
+dependency rules and returns failures to you.> Before reporting, re-read your
+diff against the story once, fix what you find, run targeted tests once, then
+report in ≤300 tokens:
 files changed, tests added and their commands, anything unresolved.
 Sequential wave: commit as feat(PROJ-<X>-PRD-<Y>): implement US-<N> <task>.
 Parallel wave: do not stage or commit; the lead integrates and commits.
@@ -288,6 +296,7 @@ Status: pending
 ## Variant Notes
 - Complexity column present: yes/no; worker models used per story.
 - Recovery stage reached per wave: …
+- Mutation (when `mutation_cmd` set): rounds used, survivors carried forward.
 - Static checks (when `complexity_cmd`/`arch_rules_cmd` set): first-attempt
   failures per wave, parallel vs sequential, and the rules that fired
   (input for deciding on per-story checks and on trimming `GUIDELINES.md`).
