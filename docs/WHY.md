@@ -94,7 +94,10 @@ diluted in a long working session, and fast agents leave mess that compounds
 from wave to wave. So a project can plug in tools that measure complexity and
 dependency direction after every wave; when they fail, the exact output goes
 back to fresh workers. Clean is defined by a check that fails, not by a
-sentence that was once in a prompt.
+sentence that was once in a prompt. Test quality gets the same treatment:
+once per feature, a tool deliberately breaks the new code in small ways and
+checks that the tests notice; tests that don't are strengthened before the
+feature moves on.
 
 ### The paperwork is generated, not freehand
 

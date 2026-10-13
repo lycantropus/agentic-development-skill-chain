@@ -223,6 +223,9 @@ Status: pending | ran | skipped (sonar CLI unavailable) | skipped (project not c
 | Minor | 0 | 0 | 0 |
 | Info | 0 | 0 | 0 |
 
+### Mutation (once per PROJ, via top-level `mutation_cmd`)
+Status: pending | ran | ran (survivors carried forward) | skipped (not configured)
+
 ### Build
 Status: pending | passed
 
@@ -620,7 +623,7 @@ After all waves for this PROJ-X are complete and their gates passed, run the Qua
 
 See `references/quality-gate.md` for full instructions.
 
-**Run the integration reviewer alongside build and coverage where safe; start Sonar after coverage is ready.** Use the command/evidence sequence in `references/quality-gate.md`; keep DB/browser work serialized. Collect every stream before dispatching a combined fix round.
+**Run mutation hardening first when `mutation_cmd` is configured (tests-only fix rounds, survivors carried forward after three), then coverage, then Sonar. Run the integration reviewer alongside build and coverage where safe; start Sonar after coverage is ready.** Use the command/evidence sequence in `references/quality-gate.md`; keep DB/browser work serialized. Collect every stream before dispatching a combined fix round.
 
 Sonar runs here at PROJ end, with bounded fix/rescans — no wave gate runs it. Skip is allowed
 only when the tooling genuinely is not available; `scripts/quality-gate-proof.sh`
@@ -666,6 +669,7 @@ Do NOT blindly implement every finding. Apply this discipline:
 
 **Exit criteria:**
 - Zero P0/P1 code review findings
+- If `mutation_cmd` is configured: mutation evidence is current; survivors after three tests-only rounds are carried forward in `progress.md`, never blocking
 - `build_cmd` from `wave-gate-config.json` passes once for the assembled PROJ
 - Every `quality` phase command passes once; CI/nightly workflow wiring is verified
 - If Sonar ran: zero BLOCKER/CRITICAL/MAJOR sonar issues, or every remaining one is documented as carried-forward after the 3-round fix loop (carried-forward Sonar issues do not block this gate)

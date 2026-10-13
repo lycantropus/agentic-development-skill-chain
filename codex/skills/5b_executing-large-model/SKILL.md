@@ -129,8 +129,10 @@ from `5_executing` and the same scripts enforce them.
    user; the gate is the signal.
 8. **Quality Gate.** After the last wave, follow
    `5_executing/references/quality-gate.md`: declared quality-phase commands,
-   an integration-focused review of `BASE_SHA..HEAD`, build via
-   `quality-evidence.mjs`, Sonar once per PROJ with at most three fix rounds,
+   an integration-focused review of `BASE_SHA..HEAD`, mutation hardening
+   first when `mutation_cmd` is set (tests-only fix rounds, survivors carried
+   forward after three), build via
+   `quality-evidence.mjs`, coverage, Sonar once per PROJ with at most three fix rounds,
    combined recovery rounds. Zero P0/P1 review findings to pass. Fill the
    `## Quality Gate — PROJ-X` section, then `bash scripts/quality-gate-proof.sh <X> <theme>`
    must exit 0.
@@ -266,6 +268,9 @@ Standards: <findings, worst> — vs AGENTS.md/conventions
 
 ### SonarCloud
 Status: pending
+
+### Mutation
+Status: pending | ran | ran (survivors carried forward) | skipped (not configured)
 
 ### Build
 Status: pending

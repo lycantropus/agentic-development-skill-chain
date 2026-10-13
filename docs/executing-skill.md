@@ -259,6 +259,7 @@ It focuses on assembled cross-wave risks and does not replay wave ACs. It includ
 
 - Cross-wave contracts, shared state, authorization boundaries and unresolved wave findings. The reviewer follows affected interfaces and callers instead of repeating the wave review or QA's opposite-provider persona review.
 - A verified PROJ build using `build_cmd`, with conservative final-wave artifact reuse.
+- Mutation hardening (optional `mutation_cmd`), first: scoped to `BASE_SHA..HEAD` through the `BASE_SHA` and `CHANGED_FILES` environment variables, with a mutant-count positive control. Survivors go to a tests-only fix round (a survivor that needs production change is escalated as a finding, not fixed here), at most three rounds; remaining survivors are carried forward like Sonar's, never blocking, and QA assigns their severity. Order: mutation → coverage → Sonar; build and the reviewer stay parallel.
 - Sonar at PROJ end: an initial scan and bounded fix/rescans. If the configured wrapper also generates coverage, split it into `coverage_cmd` plus a scanner-only `sonar_cmd`, retaining the ordinary combined wrapper entry point for other callers. Coverage failures block; uploading partial coverage is not a passing test result.
 - Declared `quality` phase tests and lint. CI/nightly commands are checked for workflow wiring, not replayed locally. Wave ACs are not replayed here.
 

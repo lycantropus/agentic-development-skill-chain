@@ -31,7 +31,7 @@ expect_failure() {
   fi
 }
 
-for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7'; do
+for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7' '.mutation_cmd=[]'; do
   prepare_case plan-valid.md config-valid.json
   jq "$expression" "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
   mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
@@ -39,7 +39,7 @@ for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lin
 done
 
 prepare_case plan-valid.md config-valid.json
-jq '.complexity_cmd="npm run complexity" | .arch_rules_cmd="npm run arch"' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
+jq '.complexity_cmd="npm run complexity" | .arch_rules_cmd="npm run arch" | .mutation_cmd="npm run mutate"' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
 mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
 run_validator >/dev/null
 

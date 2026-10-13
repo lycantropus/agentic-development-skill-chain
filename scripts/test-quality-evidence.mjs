@@ -67,6 +67,44 @@ try {
     assert.equal(fs.readFileSync(path.join(cwd, `${progress}/auth-calls.log`), 'utf8'), 'called\n');
     config.build_cmd = 'exit 8'; saveConfig(); commit(); bad('run', 'build');
     const failedBuild = JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-build.json`), 'utf8')); assert.equal(failedBuild.rc, 8);
+
+    // Mutation hardening: positive control, env handoff, survivors, proof status agreement, staleness.
+    delete config.build_artifacts; delete config.coverage_artifacts; delete config.coverage_cmd; delete config.auth_budget;
+    Object.assign(config, { build_cmd: 'true', sonar_cmd: 'mkdir -p .scannerwork; echo ceTaskId=9 > .scannerwork/report-task.txt', phase_commands: [] });
+    git('tag', 'proj-PROJ-1-base', execFileSync('git', ['rev-list', '--max-parents=0', 'HEAD'], { cwd, encoding: 'utf8' }).trim());
+    saveConfig(); commit();
+    assert.match(bad('run', 'mutation'), /missing command for mutation/);
+    config.mutation_cmd = 'echo analysed everything'; saveConfig(); commit();
+    bad('run', 'mutation'); bad('check'); // exit 0 without a mutant count is a silent no-op
+    config.mutation_cmd = 'echo "base=$BASE_SHA"; echo "files:$CHANGED_FILES"; echo "Mutants: 5"'; saveConfig(); commit();
+    ok('run', 'mutation');
+    const mutationRecord = () => JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-mutation.json`), 'utf8'));
+    assert.equal(mutationRecord().mutants, 5); assert.equal(mutationRecord().selected, undefined);
+    const mutationLog = fs.readFileSync(path.join(cwd, mutationRecord().log), 'utf8');
+    assert.match(mutationLog, /base=[0-9a-f]{40}/); assert.match(mutationLog, /source\.txt/);
+    ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
+    const statuses2 = ['Code Review', 'Build', 'Tests', 'Lint'].map(name => `### ${name}\nStatus: passed\n`).join('');
+    const progressFile = mutation => write(`${progress}/PROJ-1-progress.md`, `## Quality Gate — PROJ-1\n${statuses2}### SonarCloud\nStatus: ran\n${mutation ? `### Mutation\nStatus: ${mutation}\n` : ''}`);
+    const proofCall = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/quality-gate-proof.sh'), '1', 'test'], { cwd, encoding: 'utf8' });
+    progressFile('ran'); assert.equal(proofCall().status, 0, proofCall().stderr);
+    progressFile('skipped (not configured)'); assert.match(proofCall().stderr, /needs Status: ran/);
+    progressFile('pending'); assert.notEqual(proofCall().status, 0);
+    progressFile(null); assert.notEqual(proofCall().status, 0, 'configured mutation needs a Mutation block');
+    progressFile('ran (survivors carried forward)'); assert.match(proofCall().stderr, /shows none/);
+    // Survivors: non-zero exit with mutants analysed is evidence, not a silent no-op; the status must say so.
+    config.mutation_cmd = 'echo "2 mutants survived"; echo "Mutants: 5"; exit 1'; saveConfig(); commit();
+    assert.match(bad('run', 'mutation'), /surviving mutants/); assert.equal(mutationRecord().rc, 1);
+    ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
+    progressFile('ran'); assert.match(proofCall().stderr, /surviving mutants/);
+    progressFile('ran (survivors carried forward)'); assert.equal(proofCall().status, 0, proofCall().stderr);
+    // A later commit (e.g. a Sonar fix) makes mutation evidence stale until it is rerun.
+    write('source.txt', 'three'); commit(); bad('check'); assert.notEqual(proofCall().status, 0);
+    // Unconfigured: an absent block or an explicit skip passes; claiming a run does not.
+    delete config.mutation_cmd; saveConfig(); commit();
+    ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`);
+    progressFile(null); assert.equal(proofCall().status, 0, proofCall().stderr);
+    progressFile('skipped (not configured)'); assert.equal(proofCall().status, 0, proofCall().stderr);
+    progressFile('ran'); assert.notEqual(proofCall().status, 0);
   }
   console.log('quality evidence behavior tests (codex + claude): PASS');
 } finally { fs.rmSync(temp, { recursive: true, force: true }); }

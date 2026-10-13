@@ -148,6 +148,9 @@ current ACs plus declared regressions—not every earlier AC command.
 Projects may add `complexity_cmd` and `arch_rules_cmd` to the gate config: the wave gate runs
 them last in the AC pass (ACs green first), so structure is judged by tools that fail and the
 failure goes back to fresh workers through the existing recovery stages, not by a cleaner agent.
+`mutation_cmd` is the PROJ-end counterpart for test quality: mutation testing scoped to the feature
+diff runs once in the Quality Gate before coverage and Sonar, survivors get a tests-only fix round, and
+unresolved survivors are carried forward to QA instead of blocking.
 Legacy string AC entries are rejected by the current wave gate. Upgrade them to
 structured AC metadata in Writing Plans and reapprove before execution; the
 runtime does not infer AC identity from an old array position.
