@@ -41,7 +41,7 @@ if jq -e '(.mutation_cmd // "") | test("\\S")' "$CONFIG" >/dev/null; then
   if grep -qE '^Status: ran$' <<<"$MUTATION"; then
     jq -e '.rc == 0' "$RECORD" >/dev/null || fail "Mutation says ran but the evidence shows surviving mutants; use Status: ran (survivors carried forward)"
   elif grep -qE '^Status: ran \(survivors carried forward\)$' <<<"$MUTATION"; then
-    jq -e '.rc != 0' "$RECORD" >/dev/null || fail "Mutation says survivors were carried forward but the evidence shows none"
+    jq -e '.rc == 1' "$RECORD" >/dev/null || fail "Mutation says survivors were carried forward but the evidence shows none"
   else
     fail "Mutation needs Status: ran or ran (survivors carried forward) because mutation_cmd is configured"
   fi

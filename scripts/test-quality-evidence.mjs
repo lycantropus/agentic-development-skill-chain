@@ -91,6 +91,15 @@ try {
     progressFile('pending'); assert.notEqual(proofCall().status, 0);
     progressFile(null); assert.notEqual(proofCall().status, 0, 'configured mutation needs a Mutation block');
     progressFile('ran (survivors carried forward)'); assert.match(proofCall().stderr, /shows none/);
+    // Only exit 1 means survivors; a crash or timeout with a printed count is a failed run.
+    config.mutation_cmd = 'echo "Mutants: 5"; exit 2'; saveConfig(); commit();
+    bad('run', 'mutation'); bad('check');
+    // The recorded base tag is part of the evidence: moving it makes the scope differ.
+    config.mutation_cmd = 'echo "Mutants: 5"'; saveConfig(); commit(); ok('run', 'mutation');
+    ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
+    const baseTag = execFileSync('git', ['rev-parse', 'proj-PROJ-1-base'], { cwd, encoding: 'utf8' }).trim();
+    git('tag', '-f', 'proj-PROJ-1-base', 'HEAD'); assert.match(bad('check'), /base tag moved/);
+    git('tag', '-f', 'proj-PROJ-1-base', baseTag); ok('check');
     // Survivors: non-zero exit with mutants analysed is evidence, not a silent no-op; the status must say so.
     config.mutation_cmd = 'echo "2 mutants survived"; echo "Mutants: 5"; exit 1'; saveConfig(); commit();
     assert.match(bad('run', 'mutation'), /surviving mutants/); assert.equal(mutationRecord().rc, 1);

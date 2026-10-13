@@ -204,7 +204,7 @@ run_static_check() {
   set -e; heartbeat
   assert_verified_head; assert_clean_worktree
   STATIC_COUNT=$(analysed_count "$log")
-  if [[ "$rc" -eq 124 ]]; then echo "   ✗ ${label} timed out after ${timeout_secs}s (log: $log)" >&2; return 1; fi
+  if [[ "$rc" -eq 124 ]]; then echo "   ✗ ${label} timed out after ${timeout_secs}s (log: $log) — partial output follows" >&2; cat "$log" >&2; return 1; fi
   if [[ "$rc" -ne 0 ]]; then
     echo "   ✗ ${label} failed rc=${rc} (log: $log) — tool output follows" >&2; cat "$log" >&2; return 1
   fi

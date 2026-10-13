@@ -166,7 +166,7 @@ Read the `### SonarCloud` block in `5_progress/PROJ-<X>-progress.md`.
 Read the `### Mutation` block in `5_progress/PROJ-<X>-progress.md`.
 
 - `Status: ran (survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
-- `Status: ran`: no survivors; record it and continue.
+- `Status: ran`: the tool's own threshold was met; record it and continue.
 - `Status: skipped (not configured)`: record Mutation as skipped; not a QA blocker.
 - Never run `mutation_cmd` during QA. The run belongs to Skill 5's Quality Gate; QA consumes its result.
 

@@ -551,9 +551,10 @@ EOF
   ! grep -q 'Gate — PASSED' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: wave certified despite static failure"
 
   case_dir static-check-timeout
-  write_config "$(default_config | jq '.timeouts.complexity_seconds=1 | .complexity_cmd="sleep 3; echo Analysed 1 files"')"; commit_case
+  write_config "$(default_config | jq '.timeouts.complexity_seconds=1 | .complexity_cmd="echo partial-output; sleep 3; echo Analysed 1 files"')"; commit_case
   expect_rc 1 ac_only_gate
   grep -q 'complexity timed out after 1s' "$GATE_OUT" || fail "$LABEL: complexity timeout not enforced"
+  grep -q 'partial-output' "$GATE_OUT" || fail "$LABEL: partial output lost on timeout"
 
   case_dir static-check-after-red-ac
   write_config "$(default_config | jq '.waves["1"].ac_commands[0].command="exit 1" | .complexity_cmd="echo Analysed 1 files"')"; commit_case
