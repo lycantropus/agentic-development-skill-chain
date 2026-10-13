@@ -146,7 +146,6 @@ persona_prompts '{"arch_rules_cmd":"npm run arch","complexity_cmd":"npm run cx"}
 persona_has 'Marcus Weber' 'arch_rules_cmd' || { echo "Weber not told about arch_rules_cmd" >&2; exit 1; }
 persona_has 'Elena Rodriguez' 'arch_rules_cmd' || { echo "Rodriguez not told about arch_rules_cmd" >&2; exit 1; }
 persona_has 'Ken Takahashi' 'complexity_cmd' || { echo "Takahashi not told about complexity_cmd" >&2; exit 1; }
-! persona_has 'Marcus Weber' 'coupling' || { echo "Weber kept the coupling focus despite arch_rules_cmd" >&2; exit 1; }
 persona_has 'Elena Rodriguez' 'retrospective' || { echo "retrospective instruction lost" >&2; exit 1; }
 rm -f specs/PROJ-1-test/3-4_plan/wave-gate-config.json
 

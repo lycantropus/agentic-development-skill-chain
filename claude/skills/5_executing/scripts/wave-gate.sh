@@ -204,13 +204,11 @@ run_static_check() {
   set -e; heartbeat
   assert_verified_head; assert_clean_worktree
   STATIC_COUNT=$(analysed_count "$log")
-  if [[ "$rc" -eq 124 ]]; then echo "   ✗ ${label} timed out after ${timeout_secs}s (log: $log) — partial output follows" >&2; cat "$log" >&2; return 1; fi
-  if [[ "$rc" -ne 0 ]]; then
-    echo "   ✗ ${label} failed rc=${rc} (log: $log) — tool output follows" >&2; cat "$log" >&2; return 1
-  fi
-  if [[ "$STATIC_COUNT" -le 0 ]]; then
-    echo "   ✗ ${label} analysed 0 files or printed no analysed-file count — treated as a silent no-op (log: $log)" >&2; cat "$log" >&2; return 1
-  fi
+  local why=""
+  if [[ "$rc" -eq 124 ]]; then why="timed out after ${timeout_secs}s"
+  elif [[ "$rc" -ne 0 ]]; then why="failed rc=${rc}"
+  elif [[ "$STATIC_COUNT" -le 0 ]]; then why="analysed 0 files or printed no analysed-file count — treated as a silent no-op"; fi
+  if [[ -n "$why" ]]; then echo "   ✗ ${label} ${why} (log: $log) — tool output follows" >&2; cat "$log" >&2; return 1; fi
   echo "   ✓ ${label} (${STATIC_COUNT} files)"
 }
 

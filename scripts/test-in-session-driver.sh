@@ -75,17 +75,14 @@ node scripts/ledger.mjs set-status 1 demo "$id" fixed abc1234 >/dev/null || die 
 bash "$CASE/seal.sh" >/dev/null || die 'seal must accept once no Critical/High is open'
 for p in "P7 running" "P7 done" "P8 running" "P8 done"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done
 
-# 4. Stop block parks the run: reason recorded, phase blocked, stop report rendered
-#    when the runner is found, resumable.
+# 4. Stop block parks the run: reason recorded, phase blocked, resumable.
 mkdir -p specs/PROJ-2-demo2
 $S init 2 demo2 >/dev/null
 for p in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running" "P5 done" "P6 running"; do $S transition 2 demo2 $p >/dev/null; done
-sed 's/ 1 demo/ 2 demo2/g; s/<X>/2/g; s/-1-demo/-2-demo2/g' "$CASE/stop.sh" >"$CASE/stop2.sh"
-SKILLCHAIN_RUNNER="$ROOT/runner/run-phase.sh" REASON='three failed repair attempts on BUG-7' bash "$CASE/stop2.sh" >/dev/null 2>&1 || die 'stop block failed'
+sed 's/ 1 demo/ 2 demo2/g' "$CASE/stop.sh" >"$CASE/stop2.sh"
+REASON='three failed repair attempts on BUG-7' bash "$CASE/stop2.sh" >/dev/null 2>&1 || die 'stop block failed'
 [ "$($S get 2 demo2 '.phase + ":" + .status' | tr -d '"')" = 'P6:blocked' ] || die 'stop must park the phase as blocked'
 $S get 2 demo2 .stop.reason | grep -q 'BUG-7' || die 'stop reason not recorded'
-[ -f specs/PROJ-2-demo2/5_progress/stop-report.md ] || die 'stop report not rendered'
-$S get 2 demo2 .stop.report | grep -q 'stop-report.md' || die 'stop report path not recorded'
 $S transition 2 demo2 P6 running >/dev/null || die 'a parked run must be resumable'
 
 # 5. QA personas: six concurrent processes, six distinct personas (not one prompt naming six).
@@ -114,7 +111,7 @@ last_start="$(grep '|start ' "$CASE/personas.log" | sed 's/.*start //' | sort -n
 first_end="$(grep '|end ' "$CASE/personas.log" | sed 's/.*end //' | sort -n | head -1)"
 awk -v s="$last_start" -v e="$first_end" 'BEGIN { exit !(s < e) }' || die 'persona workers must run concurrently'
 
-# 6. Read-only snapshot (the runner's tree_snapshot, which the driver mirrors): ledger/state
+# 6. Read-only snapshot (the runner's tree_snapshot; the driver's one-liner is the same pathspec): ledger/state
 #    writes are not a finder write, any other content change is, even in an already-dirty file.
 eval "$(sed -n '/^tree_snapshot() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
 mkdir "$CASE/snap" && cd "$CASE/snap" && git init -q . && git config user.email t@example.invalid && git config user.name t

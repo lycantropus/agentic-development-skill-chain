@@ -4,12 +4,25 @@ Asked once per PROJ, in the lead, after P0 is sealed. Run from `.worktree.path`
 with `<X> <theme>` filled in. `scripts/test-unattended-handoff.sh` executes both
 blocks against stubs.
 
+Run the probe. `SKIP` → continue silently. `ASK` → ask the user once (a
+numbered question where there is no question tool), with its prerequisite lines
+shown: "Run P5 to PR unattended (`runner/run-phase.sh auto <X> <theme>`), drive
+it to the PR in this session (keep it going with `/goal`), or continue
+interactively?" A missing prerequisite names what degrades or blocks; the
+choice stays the user's.
+
+- **Unattended** → run the launch block, print what it lists below, and end the
+  turn: no polling, no further work here.
+- **In this session** → follow `in-session-driver.md` from the Quality Gate to
+  the PR and tell the user to set the `/goal` it names.
+- **Interactive** → continue.
+
 ## Probe
 
 Prints `SKIP` (no question: the runner's own P5 lane, or any phase other than
 `P0:done`) or `ASK` plus one line per prerequisite. P0's `preflight.sh` already
-made `claude`, `coderabbit` and, with frontend waves, `agent-browser` hard
-stops; this re-reads them from the shell the detached run will inherit.
+hard-stops on `claude`, `coderabbit` and (frontend waves) `agent-browser`; this checks only what
+it does not.
 
 ```bash probe
 S=specs/PROJ-<X>-<theme>/state.json
@@ -20,16 +33,11 @@ else
   { command -v codex >/dev/null && codex login status >/dev/null 2>&1; } \
     && echo "codex: ok" \
     || echo "codex: missing or unauthenticated -> single-provider run, flagged in the morning report and PR body"
-  for t in coderabbit agent-browser; do
-    command -v "$t" >/dev/null && echo "$t: ok" || echo "$t: MISSING -> its gate step fails and parks the run"
-  done
   off=; for f in ~/.claude/settings.json .claude/settings.json .claude/settings.local.json /etc/claude-code/managed-settings.json; do
     jq -e '.permissions.disableBypassPermissionsMode == "disable"' "$f" >/dev/null 2>&1 && off=1
   done
   [ -z "$off" ] && echo "permissions: ok" || echo "permissions: bypass mode disabled -> the claude lane stops at its first prompt"
-  RUN="${SKILLCHAIN_RUNNER:-}"; for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do
-    [ -n "$RUN" ] || { [ -x "$c" ] && RUN="$c"; }
-  done
+  RUN="${SKILLCHAIN_RUNNER:-$(for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do [ -x "$c" ] && { echo "$c"; break; }; done)}"
   [ -x "$RUN" ] && echo "runner: ok" \
     || echo "runner: NOT FOUND (unattended only) -> run the chain's install script, or set SKILLCHAIN_RUNNER=<path>/run-phase.sh"
 fi
@@ -41,9 +49,7 @@ Detached, never a foreground Bash call: a foreground call is capped at 10 minute
 and a background call at 2 hours, and an overnight run outlives both.
 
 ```bash launch
-RUN="${SKILLCHAIN_RUNNER:-}"; for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do
-  [ -n "$RUN" ] || { [ -x "$c" ] && RUN="$c"; }
-done
+RUN="${SKILLCHAIN_RUNNER:-$(for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do [ -x "$c" ] && { echo "$c"; break; }; done)}"
 LOG="$(mktemp --suffix=.log "${TMPDIR:-/tmp}/skillchain-auto-PROJ-<X>.XXXXXX")"
 setsid nohup "$RUN" auto <X> <theme> >"$LOG" 2>&1 </dev/null &
 echo "log: $LOG  pid: $!"
