@@ -81,23 +81,29 @@ if [ "$WRITER_MODEL" = "$REVIEW_MODEL" ]; then
   exit 64
 fi
 
+skill_file() { # <skill> <relative-path> -> first existing copy: chain checkout layout, then the installed layout (runner shipped to <skills>/5_executing/runner)
+  local c
+  for c in "$RUNNER_DIR/../claude/skills/$1/$2" "$RUNNER_DIR/../codex/skills/$1/$2" "$RUNNER_DIR/../../$1/$2"; do
+    [ -e "$c" ] && { echo "$c"; return 0; }
+  done
+  return 1
+}
+
 # state.sh: prefer the repo copy (P0 setup installs it), fall back to the skill tree
 if [ -x scripts/state.sh ]; then
   STATE_SH="scripts/state.sh"
-elif [ -x "$RUNNER_DIR/../claude/skills/5_executing/scripts/state.sh" ]; then
-  STATE_SH="$RUNNER_DIR/../claude/skills/5_executing/scripts/state.sh"
+elif STATE_SH="$(skill_file 5_executing scripts/state.sh)" && [ -x "$STATE_SH" ]; then
+  :
 else
   echo "run-phase.sh: state.sh not found (scripts/state.sh or skill tree)" >&2; exit 1
 fi
 
 LEDGER=""
 [ -f scripts/ledger.mjs ] && LEDGER="scripts/ledger.mjs"
-[ -z "$LEDGER" ] && [ -f "$RUNNER_DIR/../claude/skills/6_qa/scripts/ledger.mjs" ] && LEDGER="$RUNNER_DIR/../claude/skills/6_qa/scripts/ledger.mjs"
+[ -n "$LEDGER" ] || LEDGER="$(skill_file 6_qa scripts/ledger.mjs || true)"
 
 WORKTREE_HELPER=""
-for candidate in scripts/worktree.sh \
-  "$RUNNER_DIR/../claude/skills/5_executing/scripts/worktree.sh" \
-  "$RUNNER_DIR/../codex/skills/5_executing/scripts/worktree.sh"; do
+for candidate in scripts/worktree.sh "$(skill_file 5_executing scripts/worktree.sh || true)"; do
   if [ -x "$candidate" ]; then WORKTREE_HELPER="$(realpath -m "$candidate")"; break; fi
 done
 WORKTREE_WAS_REMOVED=0
@@ -335,14 +341,14 @@ open_cross_review_blocking() {
 curation_caps_path() { # repo copy first (P0 setup installs it), then skill tree
   if [ -f scripts/curation-caps.sh ]; then
     echo "scripts/curation-caps.sh"
-  elif [ -f "$RUNNER_DIR/../claude/skills/7_documentation/scripts/curation-caps.sh" ]; then
-    echo "$RUNNER_DIR/../claude/skills/7_documentation/scripts/curation-caps.sh"
+  else
+    skill_file 7_documentation scripts/curation-caps.sh || true
   fi
 }
 
 quality_gate_proof_path() {
   local p
-  for p in scripts/quality-gate-proof.sh "$RUNNER_DIR/../claude/skills/5_executing/scripts/quality-gate-proof.sh"; do
+  for p in scripts/quality-gate-proof.sh "$(skill_file 5_executing scripts/quality-gate-proof.sh || true)"; do
     [ -f "$p" ] && { echo "$p"; return 0; }
   done
   return 1
@@ -350,7 +356,7 @@ quality_gate_proof_path() {
 
 ci_poll_path() {
   local p
-  for p in scripts/ci-poll.sh "$RUNNER_DIR/../claude/skills/8_delivery/scripts/ci-poll.sh"; do
+  for p in scripts/ci-poll.sh "$(skill_file 8_delivery scripts/ci-poll.sh || true)"; do
     [ -f "$p" ] && { echo "$p"; return 0; }
   done
   return 1

@@ -76,7 +76,10 @@ that modified the tree. Record the cause, park the run, and end the turn:
 ```bash stop
 bash scripts/state.sh set <X> <theme> .stop "{\"reason\": $(jq -Rn --arg r "$REASON" '$r'), \"at\": \"$(date -Iseconds)\"}"
 bash scripts/state.sh transition <X> <theme> "$(bash scripts/state.sh get <X> <theme> .phase)" blocked
-RR="$(dirname "${SKILLCHAIN_RUNNER:-runner/run-phase.sh}")/render-report.mjs"
+RUN="${SKILLCHAIN_RUNNER:-}"; for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do
+  [ -n "$RUN" ] || { [ -x "$c" ] && RUN="$c"; }
+done
+RR="$(dirname "${RUN:-./x}")/render-report.mjs"
 [ -f "$RR" ] && node "$RR" stop <X> <theme> --reason "$REASON" \
   && bash scripts/state.sh set <X> <theme> .stop.report "specs/PROJ-<X>-<theme>/5_progress/stop-report.md"
 ```

@@ -5,6 +5,10 @@ Codex lanes per phase, keeps exactly one writer per phase, and hands
 state between phases ONLY via `specs/PROJ-<X>-<theme>/state.json` and
 files on disk. No conversation history crosses a phase boundary.
 
+`scripts/install-claude.sh` / `install-codex.sh` copy this directory to
+`<skills>/5_executing/runner/`, where Step 5's unattended handoff finds it
+(override with `SKILLCHAIN_RUNNER=<path>/run-phase.sh`).
+
 ## Contents
 
 | File | Purpose |

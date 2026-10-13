@@ -86,4 +86,25 @@ grep -qx 'stdin: /dev/null' "$LOG" || die 'runner stdin must be /dev/null'
 [ "$pid" != "$$" ] && [ "$(sed -n 's/^pgid: //p' "$LOG")" != "$(ps -o pgid= $$ | tr -d ' ')" ] || die 'runner shares the caller process group'
 for _ in $(seq 1 30); do grep -qx finished "$LOG" && break; sleep 0.2; done
 grep -qx finished "$LOG" || die 'detached runner did not run to completion'
+
+# 6. Installers ship the runner next to its skill, and the probe finds that copy without ./runner
+#    or SKILLCHAIN_RUNNER (HOME is the sandbox, so ~/.claude/skills is the installed tree).
+rm -rf runner
+out="$(bash probe.sh 2>&1)"; printf '%s\n' "$out" | grep -q '^runner: NOT FOUND' || die "no runner anywhere must report NOT FOUND: $out"
+CLAUDE_HOME="$CASE/.claude" bash "$ROOT/scripts/install-claude.sh" >/dev/null
+CODEX_HOME="$CASE/codexhome" bash "$ROOT/scripts/install-codex.sh" >/dev/null
+for h in "$CASE/.claude" "$CASE/codexhome"; do
+  [ -x "$h/skills/5_executing/runner/run-phase.sh" ] && [ -f "$h/skills/5_executing/runner/render-report.mjs" ] \
+    && [ -d "$h/skills/5_executing/runner/prompts" ] || die "installer must ship the runner into $h"
+  ls "$h"/skills/5_executing/runner/spike-*.sh >/dev/null 2>&1 && die 'spikes are dev-only and must not be installed'
+done
+out="$(bash probe.sh 2>&1)"; printf '%s\n' "$out" | grep -qx 'runner: ok' || die "installed runner must be found: $out"
+# The runner finds its helpers in both layouts (chain checkout and installed copy), outside any project scripts/.
+eval "$(sed -n '/^skill_file() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
+for RUNNER_DIR in "$ROOT/runner" "$CASE/.claude/skills/5_executing/runner" "$CASE/codexhome/skills/5_executing/runner"; do
+  for f in "5_executing scripts/state.sh" "5_executing scripts/worktree.sh" "6_qa scripts/ledger.mjs" "7_documentation scripts/curation-caps.sh" "8_delivery scripts/ci-poll.sh"; do
+    [ -f "$(skill_file $f)" ] || die "runner at $RUNNER_DIR cannot resolve helper: $f"
+  done
+done
+mkdir "$CASE/empty" && (cd "$CASE/empty" && bash "$CASE/.claude/skills/5_executing/runner/run-phase.sh" P5 1 demo 2>&1 | grep -q 'state.sh not found') && die 'installed runner must find state.sh from the skill tree'
 echo "unattended-handoff: ok"

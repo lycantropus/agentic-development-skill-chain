@@ -27,8 +27,11 @@ else
     jq -e '.permissions.disableBypassPermissionsMode == "disable"' "$f" >/dev/null 2>&1 && off=1
   done
   [ -z "$off" ] && echo "permissions: ok" || echo "permissions: bypass mode disabled -> the claude lane stops at its first prompt"
-  [ -x "${SKILLCHAIN_RUNNER:-runner/run-phase.sh}" ] && echo "runner: ok" \
-    || echo "runner: NOT FOUND (unattended only) -> set SKILLCHAIN_RUNNER=<chain checkout>/runner/run-phase.sh, or continue interactively"
+  RUN="${SKILLCHAIN_RUNNER:-}"; for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do
+    [ -n "$RUN" ] || { [ -x "$c" ] && RUN="$c"; }
+  done
+  [ -x "$RUN" ] && echo "runner: ok" \
+    || echo "runner: NOT FOUND (unattended only) -> run the chain's install script, or set SKILLCHAIN_RUNNER=<path>/run-phase.sh"
 fi
 ```
 
@@ -38,8 +41,11 @@ Detached, never a foreground Bash call: a foreground call is capped at 10 minute
 and a background call at 2 hours, and an overnight run outlives both.
 
 ```bash launch
+RUN="${SKILLCHAIN_RUNNER:-}"; for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do
+  [ -n "$RUN" ] || { [ -x "$c" ] && RUN="$c"; }
+done
 LOG="$(mktemp --suffix=.log "${TMPDIR:-/tmp}/skillchain-auto-PROJ-<X>.XXXXXX")"
-setsid nohup "${SKILLCHAIN_RUNNER:-runner/run-phase.sh}" auto <X> <theme> >"$LOG" 2>&1 </dev/null &
+setsid nohup "$RUN" auto <X> <theme> >"$LOG" 2>&1 </dev/null &
 echo "log: $LOG  pid: $!"
 ```
 
