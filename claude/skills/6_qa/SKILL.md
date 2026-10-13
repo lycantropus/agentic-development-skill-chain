@@ -169,6 +169,7 @@ Read the `### Mutation` block in `5_progress/PROJ-<X>-progress.md`.
 - `Status: ran`: the tool's own threshold was met; record it and continue.
 - `Status: skipped (not configured)`: record Mutation as skipped; not a QA blocker.
 - Never run `mutation_cmd` during QA. The run belongs to Skill 5's Quality Gate; QA consumes its result.
+- Document it under `### Mutation Quality Input` (§7): the status with the survivor count, and the survivors promoted to QA bugs with BUG-IDs and severity.
 
 ### 2. Browser E2E Testing (Playwright Or Agent Browser)
 
@@ -248,7 +249,7 @@ Before production-readiness is decided, run a focused maintainability pass on th
 
 Ken Takahashi is the primary persona feeding this gate, but the gate itself belongs to QA. Marcus may contribute supporting findings, but Ken owns the minimalism lens. Do not run Ken as a second, separate gate; merge his concrete findings into the Simplicity Gate results.
 
-Step 5's gates already enforce structural complexity, duplication and dependency direction through the project's `complexity_cmd` and `arch_rules_cmd` (check `wave-gate-config.json`). This gate is for what tools cannot decide: code that no PRD or architecture decision requires — scope creep, premature abstraction, speculative options. When a command is configured, do not re-flag what it measures (threshold breaches, mechanical duplicates, forbidden imports); when it is absent, judge those bullets here as before.
+Step 5's gates already enforce structural complexity, duplication and dependency direction through the project's `complexity_cmd` and `arch_rules_cmd` (check `wave-gate-config.json`). This gate is for what tools cannot decide: code that no PRD or architecture decision requires — scope creep, premature abstraction, speculative options. When a command is configured, do not re-flag what it measures (threshold breaches, mechanical duplicates, forbidden imports); otherwise judge them here.
 
 Flag a QA bug when the implementation adds complexity that is not required by the PRDs, architecture, or visible product behavior:
 
@@ -302,10 +303,6 @@ Also document the `### Simplicity Gate Results` for the PROJ:
 - Simplification candidates that should become AGENTS.md rules if they are project-wide and repeatable
 
 Also document `### Spec vs Standards` (separate lists, no merged ranking): **Spec** = missing/partial/wrong requirements and scope creep against the PRDs, with the AC quoted; **Standards** = violations of `AGENTS.md`/documented conventions, with the rule cited. Carry over the Quality Gate's axis tags and add QA's own findings.
-
-Also document `### Mutation Quality Input`:
-- `ran`, `ran (survivors carried forward)` with the survivor count, or `skipped (not configured)`
-- Surviving mutants promoted to QA bugs, with BUG-IDs and severity (High on security/auth paths, otherwise Medium)
 
 Also document `### Sonar Quality Input`:
 - `ran` with counts by severity, or `skipped` with the exact reason from Skill 5

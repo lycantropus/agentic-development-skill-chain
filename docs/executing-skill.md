@@ -208,7 +208,7 @@ The script is the hard boundary and validates:
 - Every structured `ac_commands` entry for the wave exits 0 and selects tests.
 - A cached AC pass matches its command, test files, auth context, configuration hash, positive selected count, and committed `verified_head`.
 - Every declared `regression_commands` entry passes before build; selection-aware suites cannot pass empty. Only entries with `reuse_passed: true` can reuse deterministic, non-auth local results on unchanged HEAD/configuration; external or auth-dependent tests run live.
-- Optional `complexity_cmd` and `arch_rules_cmd` static checks run last in the AC pass, after the ACs are green and before build and CodeRabbit, so CodeRabbit reviews cleaned code. Each must exit 0 and print an analysed-file count above zero (a zero or missing count is a silent no-op). The tool's output goes to the recovery workers verbatim, the four Outer Ralph recovery stages apply, and the rerun re-proves the ACs on the new `HEAD`. Absent keys are skipped and noted in the PASSED block. Thresholds live in the project's own tool config.
+- Optional `complexity_cmd` and `arch_rules_cmd` static checks run last in the AC pass, after the ACs are green and before build and CodeRabbit, so CodeRabbit reviews cleaned code. Failures go verbatim through the four Outer Ralph recovery stages; the rerun re-proves the ACs. Contract (positive control, timeouts) in `wave-gate-config.md`.
 - The configured `build_cmd` exits 0.
 - CodeRabbit archives unique raw and normalized evidence for every attempt,
   ingests validated finding records, and leaves no cumulative open blocking ledger findings.
@@ -259,7 +259,7 @@ It focuses on assembled cross-wave risks and does not replay wave ACs. It includ
 
 - Cross-wave contracts, shared state, authorization boundaries and unresolved wave findings. The reviewer follows affected interfaces and callers instead of repeating the wave review or QA's opposite-provider persona review.
 - A verified PROJ build using `build_cmd`, with conservative final-wave artifact reuse.
-- Mutation hardening (optional `mutation_cmd`), first: scoped to `BASE_SHA..HEAD` through the `BASE_SHA` and `CHANGED_FILES` environment variables, with a mutant-count positive control. Survivors go to a tests-only fix round (a survivor that needs production change is escalated as a finding, not fixed here), at most three rounds; remaining survivors are carried forward like Sonar's, never blocking, and QA assigns their severity. Order: mutation → coverage → Sonar; build and the reviewer stay parallel.
+- Mutation hardening (optional `mutation_cmd`), first, scoped to the feature diff: at most three tests-only fix rounds (a survivor needing a production change becomes a finding), then survivors are carried forward like Sonar's, never blocking; QA assigns their severity.
 - Sonar at PROJ end: an initial scan and bounded fix/rescans. If the configured wrapper also generates coverage, split it into `coverage_cmd` plus a scanner-only `sonar_cmd`, retaining the ordinary combined wrapper entry point for other callers. Coverage failures block; uploading partial coverage is not a passing test result.
 - Declared `quality` phase tests and lint. CI/nightly commands are checked for workflow wiring, not replayed locally. Wave ACs are not replayed here.
 

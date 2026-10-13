@@ -23,9 +23,9 @@ bash "$STATE" init 1 demo >/dev/null
 for p in "CP1 running" "CP1 approved" "P0 running" "P0 done"; do bash "$STATE" transition 1 demo $p >/dev/null; done
 jq -e '.phase == "P0" and .status == "done"' specs/PROJ-1-demo/state.json >/dev/null || die 'fixture must sit at P0:done'
 
-# Stubs: codex authenticated, coderabbit/agent-browser present, runner records how it was started.
+# Stubs: codex authenticated, runner records how it was started.
 mkdir -p bin runner
-for t in codex coderabbit agent-browser; do printf '#!/bin/sh\nexit 0\n' >"bin/$t"; done
+for t in codex; do printf '#!/bin/sh\nexit 0\n' >"bin/$t"; done
 cat >runner/run-phase.sh <<'STUB'
 #!/usr/bin/env bash
 echo "args: $*"; echo "pgid: $(ps -o pgid= $$ | tr -d ' ')"; echo "stdin: $(readlink /proc/$$/fd/0)"
@@ -39,7 +39,7 @@ unset SKILLCHAIN_RUNNER_MANAGED SKILLCHAIN_RUNNER || true
 out="$(bash probe.sh 2>&1)" || die 'probe failed'
 [ "$(printf '%s\n' "$out" | grep -c '^ASK$')" = 1 ] || die "expected exactly one ASK, got: $out"
 [ "$(printf '%s\n' "$out" | grep -c -E '^(SKIP)$')" = 0 ] || die 'ASK and SKIP together'
-for l in 'codex: ok' 'coderabbit: ok' 'agent-browser: ok' 'permissions: ok' 'runner: ok'; do
+for l in 'codex: ok' 'permissions: ok' 'runner: ok'; do
   printf '%s\n' "$out" | grep -qx "$l" || die "missing prerequisite line '$l' in: $out"
 done
 
@@ -57,10 +57,10 @@ out="$(bash probe.sh 2>&1)"; [ "$out" = SKIP ] || die "no state.json must SKIP, 
 mkdir -p specs/PROJ-1-demo && bash "$STATE" init 1 demo >/dev/null
 for p in "CP1 running" "CP1 approved" "P0 running" "P0 done"; do bash "$STATE" transition 1 demo $p >/dev/null; done
 rm runner/run-phase.sh
-mkdir bin2; ln -s "$(command -v jq)" bin2/jq   # PATH with only jq: codex/coderabbit/agent-browser absent
+mkdir bin2; ln -s "$(command -v jq)" bin2/jq   # PATH with only jq: codex absent
 mkdir -p .claude; echo '{"permissions":{"disableBypassPermissionsMode":"disable"}}' >.claude/settings.json
 out="$(PATH="$CASE/bin2" "$BASH" probe.sh 2>&1)"
-for l in '^ASK$' '^codex: missing' '^coderabbit: MISSING' '^agent-browser: MISSING' '^permissions: bypass mode disabled' '^runner: NOT FOUND'; do
+for l in '^ASK$' '^codex: missing' '^permissions: bypass mode disabled' '^runner: NOT FOUND'; do
   printf '%s\n' "$out" | grep -q "$l" || die "degraded probe lacks '$l' in: $out"
 done
 rm -f .claude/settings.json

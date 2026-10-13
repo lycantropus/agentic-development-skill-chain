@@ -74,18 +74,8 @@ Before doing implementation work:
      persistent PROJ worktree and the runner re-executes there; do not implement
      from the control checkout. Dependencies are isolated, while `.env.local`,
      development data, and hosted-auth limits are deliberately shared.
-   - **Unattended handoff, once, on `P0:done`:** run, in `.worktree.path`, the probe
-     block of `references/unattended-handoff.md`. `SKIP` (runner-managed lane, or past
-     P0) → continue silently. `ASK` → ask the user once (a numbered question
-     where there is no question tool), with its prerequisite lines shown:
-     "Run P5 to PR unattended (`runner/run-phase.sh auto <X> <theme>`), drive
-     it to the PR in this session (keep it going with `/goal`), or continue
-     interactively?" A missing prerequisite names what degrades or blocks; the
-     choice stays the user's. Unattended → run the launch block, print what the
-     file lists, and end the turn: no polling, no further work here. In this
-     session → follow `references/in-session-driver.md` from the quality gate
-     to the PR and tell the user to set the `/goal` it names. Interactive →
-     continue.
+   - **Unattended handoff, once, on `P0:done`:** follow `references/unattended-handoff.md`
+     in `.worktree.path` (one probe, at most one question: unattended, in this session, or interactive).
    - **On every implementation start or resume**, after verifying the worktree path and before launching workers, run `node ~/.codex/skills/5_executing/scripts/sync-framework.mjs`. Use the installed command, not a potentially stale project copy. A non-zero result blocks implementation: reconcile reported differences against installed sources, test adaptations, and rerun with `--adopt <reviewed-path>` for each resolved file. Never overwrite or blindly adopt project customizations.
    - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If a refresh changes context tooling or role templates, recompile the context bundles and record them via `state.sh`. This new commit invalidates old gate evidence; never refresh during workers or a gate.
    - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/state.sh transition <X> <theme> P5 running`.
@@ -131,7 +121,7 @@ The script validates:
 2. **Declared targeted regressions** — every `regression_commands` entry covers shared behavior affected by this wave and runs after the current ACs and before smoke; selection-aware entries must prove that they selected tests. Broad hosted-auth/browser suites belong in `phase_commands`, not every wave.
 3. **Smoke Test** — the configured dev server is reused or started by the gate. Anonymous routes must match URL and characteristic content; redirects are failures. Protected routes require auth state or authenticated E2E coverage.
 4. **Component registry** — `gen-component-registry.mjs --check` passes where applicable.
-5. **Static checks (optional)** — top-level `complexity_cmd` and `arch_rules_cmd`, run last in the AC pass (`--ac-only` and the full gate) once the ACs are green, with `WAVE_BASE_SHA` in the environment. Each must exit 0 and print an analysed-file count above zero (`Analysed N files`, `N files checked`, `N modules cruised`); a zero or missing count is a silent no-op and fails. Absent keys are skipped and noted in the PASSED block. Failure output is printed verbatim; every attempt keeps its own log.
+5. **Static checks (optional)** — `complexity_cmd` and `arch_rules_cmd`, run last in the AC pass (`--ac-only` and the full gate) once the ACs are green; contract in `4_writing-plans/references/wave-gate-config.md`. Absent keys are skipped and noted in the PASSED block.
 6. **Build** — `build_cmd` from config exits 0; runs in parallel with CodeRabbit as the last phase.
 7. **CodeRabbit** — every attempt archives raw and normalized evidence, validates the finding count, ingests it, and then requires zero cumulative open blocking findings in the ledger.
 
@@ -503,7 +493,7 @@ if failures still remain: use the existing blocked-run evidence path
 - Failure output is passed **verbatim** to correction and diagnostic workers — not summarized or interpreted.
 - Reuse requires the same committed `HEAD` and complete gate-config fingerprint. Identical AC commands with matching `test_files` and `auth_consuming` share successful execution across AC IDs, with separate evidence for every ID. Identical failed/empty/timed-out commands also share their result within one AC-only invocation, but failures are retried on the next invocation; infrastructure and auth exhaustion still stop immediately. Every correction commit invalidates reuse; no cross-HEAD impact inference is supported. Remove cached Ralph evidence after dependency, runtime, or environment changes.
 - Recovery has exactly four stages: normal fix round 1, normal fix round 2 with fresh workers, fresh diagnosis, then a different diagnosis-driven implementer. Do not add retries or silently weaken an AC.
-- A static-check failure (`complexity_cmd`, `arch_rules_cmd`) exits the pass non-zero like a red AC and follows the same four stages with the tool output verbatim; the rerun re-proves the ACs on the new `HEAD`, so behaviour preservation is evidenced. These are gate failures, not ledger findings.
+- A static-check failure is a red AC: same four stages, tool output verbatim; the rerun re-proves the ACs on the new `HEAD`. Gate failure, not a ledger finding.
 - If diagnosis finds an invalid or contradictory AC, record the evidence and use the existing blocked/escalation path.
 - Exit 76 with `blocked_external` is a missing declared prerequisite, not a
   code defect and not a green AC. Keep the test and plan scope; no repair rounds,
@@ -621,7 +611,7 @@ After all waves for this PROJ-X are complete and their gates passed, run the Qua
 
 See `references/quality-gate.md` for full instructions.
 
-**Run mutation hardening first when `mutation_cmd` is configured (tests-only fix rounds, survivors carried forward after three), then coverage, then Sonar. Run the integration reviewer alongside build and coverage where safe; start Sonar after coverage is ready.** Use the command/evidence sequence in `references/quality-gate.md`; keep DB/browser work serialized. Collect every stream before dispatching a combined fix round.
+**Order: mutation (when configured) → coverage → Sonar; the integration reviewer runs alongside build and coverage where safe.** Use the command/evidence sequence in `references/quality-gate.md`; keep DB/browser work serialized. Collect every stream before dispatching a combined fix round.
 
 Sonar runs here at PROJ end, with bounded fix/rescans — no wave gate runs it. Skip is allowed
 only when the tooling genuinely is not available; `scripts/quality-gate-proof.sh`

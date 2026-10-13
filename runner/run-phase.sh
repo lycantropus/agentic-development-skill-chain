@@ -300,7 +300,7 @@ wait_lanes() { # writer_pid [peer_pid]
   ACTIVE_PIDS=()
 }
 
-ingest_findings() { # outfile — peer/finder findings -> ledger (line-validated)
+ingest_findings() { # outfile — advisory peer-lane findings -> ledger (valid lines only, non-fatal)
   local out="$1"
   [ -n "$LEDGER" ] && [ -f "$out" ] || return 0
   local valid_lines="" line v
@@ -463,7 +463,11 @@ run_p6() {
   [ "$TIMED_OUT" -eq 1 ] && stop_run "P6 finder timed out after ${TIMEOUT}s" "$finder_out"
   [ "$WRITER_RC" -ne 0 ] && stop_run "P6 finder lane ($PEER) exited $WRITER_RC — no QA verdict, cannot continue" "$finder_out"
   [ "$tree_before" = "$tree_after" ] || stop_run "P6 finder modified the working tree — finder must be read-only" "$finder_out"
-  ingest_findings "$finder_out"
+  # Strict, unlike the advisory peer lanes: ledger.mjs add rejects the whole batch on any malformed line.
+  grep -q 'Production-ready recommendation' "$finder_out" || stop_run "P6 finder returned no complete QA report" "$finder_out"
+  if grep -q '^{' "$finder_out"; then
+    grep '^{' "$finder_out" | node "$LEDGER" add "$PROJ" "$THEME" || stop_run "P6 finder emitted malformed finding lines — nothing ingested" "$finder_out"
+  fi
   store_finder_report "$finder_out" "$ts"
 
   # Stage 2/2: P6 controller — the only writer of this phase.

@@ -18,42 +18,30 @@ and continue at the matching step, so a fresh session resumes anywhere.
       One fresh, read-only subagent: "Load and execute the QA skill qa (6_qa)
       READ-ONLY for specs/PROJ-<X>-<theme>: find bugs, do not fix anything. Emit
       each finding as one JSON line on stdout ({"source":"qa","severity":...,"summary":...});
-      you must not write files or run mutating commands." Its persona review
-      (`cross-review.sh --personas`) is the opposite-provider panel: six
-      separate Codex workers, or six Claude workers on the strongest model when
-      Codex is unavailable (say so). A finder that errors, returns no complete
-      report (no `Production-ready recommendation:` line), emits a malformed
-      finding line, or changes the tree is a stop: re-run it once, a second
-      failure parks the run. Snapshot the tree right after the finder returns, before any bookkeeping, and compare with the snapshot taken before it:
-      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | sha1sum`
-      (only the ledger and state the QA scripts legitimately write are
-      excluded; edits to existing untracked or ignored files are not covered). There is no wall-clock bound in-session; only the detached runner
-      has `--timeout`. Ingest fails closed: the report is recorded only after
-      the ledger accepted every finding line.
+      you must not write files or run mutating commands." The tree must be
+      unchanged afterwards; compare this snapshot taken before and right after
+      the finder, before any bookkeeping (it excludes only the ledger and state
+      the QA scripts write):
+      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | sha1sum`.
+      A finder that errors, changes the tree, or fails the ingest is re-run
+      once; a second failure is a stop. `ledger.mjs add` rejects the whole
+      batch on any malformed line, so nothing partial is recorded:
 
       ```bash ingest
-      if [ ! -s "$OUT" ] || ! grep -q 'Production-ready recommendation' "$OUT"; then
+      if ! grep -q 'Production-ready recommendation' "$OUT" 2>/dev/null; then
         echo "finder returned no complete QA report"; false
+      elif ! grep -q '^{' "$OUT" || grep '^{' "$OUT" | node scripts/ledger.mjs add <X> <theme>; then
+        REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
+        grep -v '^{' "$OUT" >"$REPORT" || true
+        bash scripts/state.sh set <X> <theme> .qa.finder_report "$REPORT"
       else
-        VALID=""; BAD=0
-        while IFS= read -r l; do
-          v="$(jq -c 'select(type == "object" and .source? and .severity? and .summary?)' <<<"$l" 2>/dev/null)"; rc=$?
-          if [ "$rc" = 0 ] && [ "$(printf '%s\n' "$v" | grep -c .)" = 1 ]; then VALID+="$v"$'\n'; else BAD=$((BAD + 1)); fi
-        done < <(grep '^{' "$OUT")
-        if [ "$BAD" != 0 ]; then echo "$BAD malformed finding line(s); re-run the finder"; false; else
-          { [ -z "$VALID" ] || printf '%s' "$VALID" | node scripts/ledger.mjs add <X> <theme>; } && {
-            REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
-            grep -v '^{' "$OUT" >"$REPORT" || true
-            bash scripts/state.sh set <X> <theme> .qa.finder_report "$REPORT"
-          }
-        fi
+        echo "ledger rejected the finding lines (nothing written); re-run the finder"; false
       fi
       ```
    2. **Controller:** follow `references/p6-controller.md` with `<X>` and
-      `<theme>` filled in. Fixers are workers, tiered as in Step 5. A fixer never
-      certifies its own repair: rerun its regression test, then re-verify what a test does not prove with
-      `bash scripts/cross-review.sh qa <X> <theme> --personas --persist --round N …`
-      as in `6_qa` (six separate processes on the opposite provider).
+      `<theme>` filled in. Fixers are workers, tiered as in Step 5. The opposite
+      re-verification is `bash scripts/cross-review.sh qa <X> <theme> --personas --persist --round N …`
+      as in `6_qa`.
    3. **Seal** only with no open Critical/High; a non-zero exit means keep
       fixing or stop:
 
@@ -71,19 +59,14 @@ and continue at the matching step, so a fresh session resumes anywhere.
 
 **Stop conditions** are the runner's: three failed repair attempts on the same
 Critical/High finding, a red gate, a sealed P6 with open Critical/High, a finder
-that modified the tree. Record the cause, park the run, and end the turn:
+that modified the tree. Record the cause, park the run, and end the turn with
+the reason as the stop report:
 
 ```bash stop
 bash scripts/state.sh set <X> <theme> .stop "{\"reason\": $(jq -Rn --arg r "$REASON" '$r'), \"at\": \"$(date -Iseconds)\"}"
 bash scripts/state.sh transition <X> <theme> "$(bash scripts/state.sh get <X> <theme> .phase)" blocked
-RUN="${SKILLCHAIN_RUNNER:-}"; for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do
-  [ -n "$RUN" ] || { [ -x "$c" ] && RUN="$c"; }
-done
-RR="$(dirname "${RUN:-./x}")/render-report.mjs"
-[ -f "$RR" ] && node "$RR" stop <X> <theme> --reason "$REASON" \
-  && bash scripts/state.sh set <X> <theme> .stop.report "specs/PROJ-<X>-<theme>/5_progress/stop-report.md"
 ```
 
-Uncommitted work stays in the worktree (no rescue branch in-session). Without the runner there is no stop report; the reason is in `.stop`. Tell the user to clear the goal
+Uncommitted work stays in the worktree (no rescue branch in-session). Tell the user to clear the goal
 (`/goal clear`): a parked run cannot meet it. After the fix:
 `bash scripts/state.sh transition <X> <theme> <phase> running`, then re-invoke Step 5.

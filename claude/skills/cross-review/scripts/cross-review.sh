@@ -182,13 +182,9 @@ if [ "$QA_PERSONAS" -eq 1 ]; then
   WEBER_FOCUS='Find architecture, coupling, error-handling, testability and duplicate-domain-logic risks.'
   RODRIGUEZ_FOCUS='Find cross-wave coherence, scope-creep and next-PROJ architecture risks.'
   TAKAHASHI_FOCUS='Find YAGNI, abstraction, duplication, dead-path and needless-option risks; include a simplification sketch.'
-  if cfg_has arch_rules_cmd; then
-    WEBER_FOCUS='Find boundary and contract fit, error-handling, testability and duplicate-domain-logic risks. Dependency direction and import layering are machine-checked by the project (arch_rules_cmd); do not re-flag them.'
-    RODRIGUEZ_FOCUS='Find cross-wave coherence, scope-creep and next-PROJ risks at module boundaries and contracts. Dependency direction is machine-checked by the project (arch_rules_cmd); do not re-flag it.'
-  fi
-  if cfg_has complexity_cmd; then
-    TAKAHASHI_FOCUS='Find YAGNI, abstraction, dead-path and needless-option risks, and duplication of established project primitives; include a simplification sketch. Complexity and mechanical duplication are machine-checked by the project (complexity_cmd); do not re-flag them.'
-  fi
+  ARCH_NOTE=' Dependency direction and import layering are machine-checked by the project (arch_rules_cmd); do not re-flag them.'
+  cfg_has arch_rules_cmd && { WEBER_FOCUS+="$ARCH_NOTE"; RODRIGUEZ_FOCUS+="$ARCH_NOTE"; }
+  cfg_has complexity_cmd && TAKAHASHI_FOCUS+=' Complexity thresholds and mechanical duplication are machine-checked by the project (complexity_cmd); do not re-flag them, only duplication of established project primitives.'
   PERSONAS=(
     'Dr. Sarah Chen — Security Lead|Find security/auth/injection/secret/authorization risks in the QA evidence and diff.'
     "Marcus Weber — Principal Engineer|$WEBER_FOCUS"

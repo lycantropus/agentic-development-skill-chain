@@ -95,6 +95,7 @@ function main() {
   }
   if (action !== 'run' && action !== 'record-build') throw new Error('unknown action');
   const key = action === 'record-build' ? 'build' : kind;
+  const isMut = key === 'mutation', baseSha = isMut ? mutationBase() : undefined;
   const command = commandFor(key, config);
   if (!command?.trim()) throw new Error(`missing command for ${key}`);
   const artifactNames = config[`${key}_artifacts`] ?? [];
@@ -129,17 +130,13 @@ function main() {
     }
     // Mutation gets the changed files as env: BASE_SHA (the P0 base tag) and CHANGED_FILES (newline-separated, deleted files excluded).
     // Passed to the child only, so the input fingerprint (which hashes process.env) is unaffected.
-    let env = process.env;
-    if (key === 'mutation') {
-      const baseSha = mutationBase();
-      env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES: git('diff', '--name-only', '--diff-filter=d', `${baseSha}..HEAD`) };
-    }
+    const env = isMut ? { ...process.env, BASE_SHA: baseSha, CHANGED_FILES: git('diff', '--name-only', '--diff-filter=d', `${baseSha}..HEAD`) } : process.env;
     const result = spawnSync('timeout', ['--kill-after=5s', String(seconds), ...invocation], { stdio: ['ignore', fd, fd], env });
     fs.closeSync(fd); rc = result.status ?? 1;
   }
   const output = fs.readFileSync(log, 'utf8');
-  const count = key === 'mutation' ? mutants(output) : selected(output);
-  if ((key === 'coverage' || key.startsWith('test:') || key === 'mutation') && !count) rc ||= 1;
+  const count = isMut ? mutants(output) : selected(output);
+  if ((key === 'coverage' || key.startsWith('test:') || isMut) && !count) rc ||= 1;
   if (inputs() !== fingerprint || git('rev-parse', 'HEAD') !== head) rc ||= 1;
   let files = [];
   if (rc === 0) {
@@ -149,8 +146,8 @@ function main() {
       files = artifacts([task]);
     } else files = artifacts(artifactNames);
   }
-  write(key, { head, inputs: fingerprint, command, rc, ...(key === 'mutation' ? { mutants: count, base_sha: mutationBase() } : { selected: count }), log, log_hash: snapshotFile(log), artifacts: files });
-  if (rc) throw new Error(`${key} failed (${rc})${key === 'mutation' && count && rc === 1 ? ' — surviving mutants, see log' : ''}; log: ${log}`);
+  write(key, { head, inputs: fingerprint, command, rc, ...(isMut ? { mutants: count, base_sha: baseSha } : { selected: count }), log, log_hash: snapshotFile(log), artifacts: files });
+  if (rc) throw new Error(`${key} failed (${rc})${isMut && count && rc === 1 ? ' — surviving mutants, see log' : ''}; log: ${log}`);
   if (key === 'sonar') fs.rmSync(evidencePath('sonar-skip'), { force: true });
   console.log(`✓ ${key}: ${log}`);
 }
