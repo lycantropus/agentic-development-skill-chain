@@ -24,11 +24,10 @@ and continue at the matching step, so a fresh session resumes anywhere.
       Codex is unavailable (say so). A finder that errors, returns no complete
       report (no `Production-ready recommendation:` line), emits a malformed
       finding line, or changes the tree is a stop: re-run it once, a second
-      failure parks the run. Snapshot the tree before and after with
-      `{ git status --porcelain; git diff HEAD -- . ':(exclude)specs'; } | sha1sum`
-      (edits to existing untracked or ignored files are not covered; `specs/`
-      is excluded because the QA scripts legitimately write the ledger and
-      state). There is no wall-clock bound in-session; only the detached runner
+      failure parks the run. Snapshot the tree right after the finder returns, before any bookkeeping, and compare with the snapshot taken before it:
+      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | sha1sum`
+      (only the ledger and state the QA scripts legitimately write are
+      excluded; edits to existing untracked or ignored files are not covered). There is no wall-clock bound in-session; only the detached runner
       has `--timeout`. Ingest fails closed: the report is recorded only after
       the ledger accepted every finding line.
 
@@ -36,13 +35,13 @@ and continue at the matching step, so a fresh session resumes anywhere.
       if [ ! -s "$OUT" ] || ! grep -q 'Production-ready recommendation' "$OUT"; then
         echo "finder returned no complete QA report"; false
       else
-        ALL="$(grep -c '^{' "$OUT" || true)"
-        VALID="$(grep '^{' "$OUT" | while IFS= read -r l; do
-          jq -c 'select(type == "object" and .source? and .severity? and .summary?)' <<<"$l" 2>/dev/null
-        done)"
-        GOOD="$(printf '%s' "$VALID" | grep -c . || true)"
-        if [ "$GOOD" != "$ALL" ]; then echo "malformed finding line(s): $GOOD of $ALL valid; re-run the finder"; false; else
-          { [ -z "$VALID" ] || printf '%s\n' "$VALID" | node scripts/ledger.mjs add <X> <theme>; } && {
+        VALID=""; BAD=0
+        while IFS= read -r l; do
+          v="$(jq -c 'select(type == "object" and .source? and .severity? and .summary?)' <<<"$l" 2>/dev/null)"; rc=$?
+          if [ "$rc" = 0 ] && [ "$(printf '%s\n' "$v" | grep -c .)" = 1 ]; then VALID+="$v"$'\n'; else BAD=$((BAD + 1)); fi
+        done < <(grep '^{' "$OUT")
+        if [ "$BAD" != 0 ]; then echo "$BAD malformed finding line(s); re-run the finder"; false; else
+          { [ -z "$VALID" ] || printf '%s' "$VALID" | node scripts/ledger.mjs add <X> <theme>; } && {
             REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
             grep -v '^{' "$OUT" >"$REPORT" || true
             bash scripts/state.sh set <X> <theme> .qa.finder_report "$REPORT"

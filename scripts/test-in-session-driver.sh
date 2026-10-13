@@ -46,6 +46,10 @@ Production-ready recommendation: NO
 {"source":"qa","severity":"high","summary":"login drops session"}
 EOF2
 ingest_fails 'a malformed line before a valid High' "$CASE/malformed-first.out"
+printf '## QA Results\nProduction-ready recommendation: NO\n{"source":"qa","severity":"high","summary":"a"}{"source":"qa","severity":"high","summary":"b"}\n' >"$CASE/two-objects.out"
+ingest_fails 'two objects on one line' "$CASE/two-objects.out"
+printf '## QA Results\nProduction-ready recommendation: NO\n{"source":"qa","severity":"high","summary":"a"}{garbage\n' >"$CASE/trailing-garbage.out"
+ingest_fails 'a valid object followed by garbage' "$CASE/trailing-garbage.out"
 cat >"$CASE/finder.out" <<'EOF2'
 ## QA Results
 All ACs tested.
@@ -109,4 +113,18 @@ starts="$(grep -c '|start ' "$CASE/personas.log")"
 last_start="$(grep '|start ' "$CASE/personas.log" | sed 's/.*start //' | sort -n | tail -1)"
 first_end="$(grep '|end ' "$CASE/personas.log" | sed 's/.*end //' | sort -n | head -1)"
 awk -v s="$last_start" -v e="$first_end" 'BEGIN { exit !(s < e) }' || die 'persona workers must run concurrently'
+
+# 6. Read-only snapshot (the runner's tree_snapshot, which the driver mirrors): ledger/state
+#    writes are not a finder write, any other content change is, even in an already-dirty file.
+eval "$(sed -n '/^tree_snapshot() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
+mkdir "$CASE/snap" && cd "$CASE/snap" && git init -q . && git config user.email t@example.invalid && git config user.name t
+mkdir -p specs/PROJ-1-demo src && echo '{}' >specs/PROJ-1-demo/state.json && echo '{}' >specs/PROJ-1-demo/findings.json
+echo plan >specs/PROJ-1-demo/plan.md && echo a >src/a.ts && git add -A >/dev/null && git commit -qm base
+echo dirty >>specs/PROJ-1-demo/plan.md; echo dirty >>src/a.ts          # already-dirty tracked files
+before="$(tree_snapshot)"
+echo '{"x":1}' >specs/PROJ-1-demo/state.json; echo '{"x":1}' >specs/PROJ-1-demo/findings.json
+[ "$(tree_snapshot)" = "$before" ] || die 'ledger/state writes must not count as a finder write (clean tracked state)'
+echo more >>src/a.ts;                [ "$(tree_snapshot)" != "$before" ] || die 'edit of an already-dirty source file must be caught'
+git checkout -q src/a.ts; echo dirty >>src/a.ts
+echo more >>specs/PROJ-1-demo/plan.md; [ "$(tree_snapshot)" != "$before" ] || die 'edit of an already-dirty tracked plan must be caught'
 echo "in-session-driver: ok"
