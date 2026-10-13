@@ -176,13 +176,26 @@ done <"$TMPL" >"$PROMPT_FILE"
 run_adapter() { local provider="${1%%:*}" model="${1#*:}" out="$2" prompt="${3:-$PROMPT_FILE}"; local args=(--prompt "$prompt" --timeout "$TIMEOUT"); [ -n "$model" ] && args+=(--model "$model"); bash "$SCRIPT_DIR/review-with-${provider}.sh" "${args[@]}" >"$out"; }
 RCS=(); OUT_FILES=("$OUT_A" "$OUT_B")
 if [ "$QA_PERSONAS" -eq 1 ]; then
+  # Tool-measured concerns leave the persona focus only when the project configured the tool.
+  GATE_CFG="$BASE/3-4_plan/wave-gate-config.json"
+  cfg_has() { [ -f "$GATE_CFG" ] && jq -e --arg k "$1" '(.[$k] // "") | type == "string" and test("\\S")' "$GATE_CFG" >/dev/null 2>&1; }
+  WEBER_FOCUS='Find architecture, coupling, error-handling, testability and duplicate-domain-logic risks.'
+  RODRIGUEZ_FOCUS='Find cross-wave coherence, scope-creep and next-PROJ architecture risks.'
+  TAKAHASHI_FOCUS='Find YAGNI, abstraction, duplication, dead-path and needless-option risks; include a simplification sketch.'
+  if cfg_has arch_rules_cmd; then
+    WEBER_FOCUS='Find boundary and contract fit, error-handling, testability and duplicate-domain-logic risks. Dependency direction and import layering are machine-checked by the project (arch_rules_cmd); do not re-flag them.'
+    RODRIGUEZ_FOCUS='Find cross-wave coherence, scope-creep and next-PROJ risks at module boundaries and contracts. Dependency direction is machine-checked by the project (arch_rules_cmd); do not re-flag it.'
+  fi
+  if cfg_has complexity_cmd; then
+    TAKAHASHI_FOCUS='Find YAGNI, abstraction, dead-path and needless-option risks, and duplication of established project primitives; include a simplification sketch. Complexity and mechanical duplication are machine-checked by the project (complexity_cmd); do not re-flag them.'
+  fi
   PERSONAS=(
     'Dr. Sarah Chen — Security Lead|Find security/auth/injection/secret/authorization risks in the QA evidence and diff.'
-    'Marcus Weber — Principal Engineer|Find architecture, coupling, error-handling, testability and duplicate-domain-logic risks.'
+    "Marcus Weber — Principal Engineer|$WEBER_FOCUS"
     'Priya Sharma — Performance Engineer|Find latency, N+1, unbounded work, bundle, cache and pagination risks.'
     'Thomas Mueller — SRE / Reliability Engineer|Find failure-mode, retry, idempotency, timeout, observability, race and resource-leak risks.'
-    'Elena Rodriguez — Principal Architect|Find cross-wave coherence, scope-creep and next-PROJ architecture risks. Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what should change for the next PROJ); it counts as a finding, so do not also emit review-clean.'
-    'Ken Takahashi — Minimalism Engineer|Find YAGNI, abstraction, duplication, dead-path and needless-option risks; include a simplification sketch. Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what to delete, inline, merge or avoid in the next PROJ); it counts as a finding, so do not also emit review-clean.'
+    "Elena Rodriguez — Principal Architect|$RODRIGUEZ_FOCUS "'Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what should change for the next PROJ); it counts as a finding, so do not also emit review-clean.'
+    "Ken Takahashi — Minimalism Engineer|$TAKAHASHI_FOCUS "'Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what to delete, inline, merge or avoid in the next PROJ); it counts as a finding, so do not also emit review-clean.'
   )
   OUT_FILES=(); PIDS=()
   for i in "${!PERSONAS[@]}"; do

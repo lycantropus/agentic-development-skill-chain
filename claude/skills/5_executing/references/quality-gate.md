@@ -37,7 +37,7 @@ Survivors go to **one tests-only fix round** per round: dispatch a worker whose 
 
 ## Gate 1: Code Review Expert
 
-Review cross-wave integration across the feature diff: contracts between waves, shared state, authorization boundaries, and unresolved earlier findings. Consult wave review evidence first; do not repeat its generic checklist or QA's persona review. The reviewer is the `skillchain-reviewer` agent; put the integration focus and the diff scope in its prompt (they fill the bundle's `review-criteria` and `diff-scope`). Do not replay wave ACs here.
+Review cross-wave integration across the feature diff: contracts between waves, shared state, authorization boundaries, and unresolved earlier findings. Consult wave review evidence first; do not repeat its generic checklist or QA's persona review. The reviewer is the `skillchain-reviewer` agent; put the integration focus and the diff scope in its prompt (they fill the bundle's `review-criteria` and `diff-scope`). Do not replay wave ACs here. When the config has `arch_rules_cmd`, dependency direction is machine-checked by the wave gates: judge only boundary and contract fit, and do not re-flag import layering.
 
 ### Steps
 
