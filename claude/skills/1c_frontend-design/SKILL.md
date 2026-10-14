@@ -12,7 +12,7 @@ The chain keeps this in three artifacts with one writer each, so a plan can say 
 | Artifact | Answers | Owner |
 |---|---|---|
 | `docs/DESIGN-SYSTEM.md` | How does it look? Tokens, scales, patterns, do/don't | this skill (or `0b_intake` for brownfield extraction), curated by P7 |
-| `docs/components.md` | What exists? Name, path, purpose, variants | **generated** from the doc block above each component export (`scripts/gen-component-registry.mjs`) — never hand-edited |
+| `docs/components.md` | What exists? Name, path, purpose, variants | **generated** from the doc block above each component export (`scripts/chain render registry`) — never hand-edited |
 | `/dev/components` | Is it really true? Rendered, light and dark | built here, extended in P5, checked in P6 |
 
 The PROJ-scoped `1c_design/design-language.md` keeps the **why** (audience, tone, references, rejected directions). Same shape the chain uses for architecture: PROJ artifact carries the reasoning, the `docs/` baseline carries the standing truth.
@@ -240,7 +240,7 @@ Include a short implementation-facing section:
 
 **The components themselves** — implement each catalog entry in the chosen stack, in the project's component directory (for example `src/components/ui/`). Tokens only: no hardcoded hex values, no arbitrary pixel sizes. Every component must be usable without further styling by the consumer.
 
-**`docs/DESIGN-SYSTEM.md`** — the curated baseline slot the chain already reserves for the design system (`0b_intake` lists it and points at this skill when no design system exists). It is compiled into every `frontend-implementer` and full-stack `implementer` worker file, so it is **capped at 80 lines** (`curation-caps.sh`) and holds rules only — no component inventory, no rationale:
+**`docs/DESIGN-SYSTEM.md`** — the curated baseline slot the chain already reserves for the design system (`0b_intake` lists it and points at this skill when no design system exists). It is compiled into every `frontend-implementer` and full-stack `implementer` worker file, so it is **capped at 80 lines** (`chain check caps`) and holds rules only — no component inventory, no rationale:
 
 ```markdown
 # Design System — [Project Name]
@@ -279,7 +279,7 @@ Variant before new component. Procedure: `1c_frontend-design` → Extending The 
 
 Write tokens as **classes, not hex palettes** — the implementer needs what to type. The hex values live in the design language document and in the CSS variables.
 
-**`docs/components.md`** — the component registry. **Do not write it by hand.** Each component carries its own metadata in a doc block above the export, and `scripts/gen-component-registry.mjs` collects them from every outermost `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`, …; a nested app root writes the repo-root registry with `<app> --out docs/components.md`):
+**`docs/components.md`** — the component registry. **Do not write it by hand.** Each component carries its own metadata in a doc block above the export, and `scripts/chain render registry` collects them from every outermost `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`, …; a nested app root writes the repo-root registry with `<app> --out docs/components.md`):
 
 ```tsx
 /** Actions. Not for navigation — use Link.
@@ -288,7 +288,7 @@ Write tokens as **classes, not hex palettes** — the implementer needs what to 
 export function Button(props) { … }
 ```
 
-Write the doc block while you write the component, then run `node scripts/gen-component-registry.mjs` (nested app root: `<app> --out docs/components.md`). The purpose line and the "not for" hint are the only parts no parser can derive — they belong next to the code, not in a second list. From here on the registry stays current the same way: implementers (P5) write doc blocks, the wave gate verifies with `--check`, P7 curates the prose, never the table.
+Write the doc block while you write the component, then run `bash scripts/chain render registry` (nested app root: `<app> --out docs/components.md`). The purpose line and the "not for" hint are the only parts no parser can derive — they belong next to the code, not in a second list. From here on the registry stays current the same way: implementers (P5) write doc blocks, the wave gate verifies with `--check`, P7 curates the prose, never the table.
 
 **Showcase page** — the one artifact that carries the detail, because it costs no context budget and cannot lie: every component with all variants, sizes, and states, in light and dark mode.
 
@@ -303,7 +303,7 @@ Structure — three sections, in this order:
 2. **Components.** One section per registry entry, in **registry order (alphabetical)**, so a missing component is a visual diff and not a search. Each section carries: the purpose line verbatim from the doc block · the import line · one row per variant · one row per size · one row per state (incl. disabled, loading, error) · a `Don't:` example only where a real trap exists.
 3. **Patterns.** One section per entry under `## Patterns` in `docs/DESIGN-SYSTEM.md` — no more, no less, so the list stays self-limiting. Anchors `#pattern-<name>`. A one-line rule ("label above field, error below, submit bottom-right") does not produce identical screens; the rendered composition does. This is what stops `1d_prototyping` and P5 from inventing their own form layout per screen.
 
-**Anchors are the contract:** `id` = kebab-case of the registry name (`BulkBar` → `#bulk-bar`; patterns `#pattern-form`). Mockups, PRDs, and wave plans link straight to `/dev/components#bulk-bar`, so the registry needs no link column. `gen-component-registry.mjs --check` fails when a registered component has no section on the page — the showcase is the only one of the three artifacts that could otherwise rot in silence.
+**Anchors are the contract:** `id` = kebab-case of the registry name (`BulkBar` → `#bulk-bar`; patterns `#pattern-form`). Mockups, PRDs, and wave plans link straight to `/dev/components#bulk-bar`, so the registry needs no link column. `chain render registry --check` fails when a registered component has no section on the page — the showcase is the only one of the three artifacts that could otherwise rot in silence.
 
 A sticky header carries: project · stack · links to `docs/DESIGN-SYSTEM.md` and `docs/components.md` · the light/dark toggle.
 
@@ -319,8 +319,8 @@ The component showcase remains static — no props playground. Interactive exper
 - Confirm the showcase renders the minimum-set `Button` and labeled text `Field`/`Input`, including focus, disabled, and error states
 - Open the showcase page and check every component in light and dark mode
 - Every `## Patterns` entry in `docs/DESIGN-SYSTEM.md` has a `#pattern-<name>` section on the page
-- Run `node scripts/gen-component-registry.mjs --check` (nested app root: `<app> --check --out docs/components.md`) — it fails if a component has no doc block, the registry is stale, or a component has no showcase section
-- Run `curation-caps.sh` (or count lines): `docs/DESIGN-SYSTEM.md` must fit its 80-line cap. If it does not, move detail to the showcase page — never to a second markdown file
+- Run `bash scripts/chain render registry --check` (nested app root: `<app> --check --out docs/components.md`) — it fails if a component has no doc block, the registry is stale, or a component has no showcase section
+- Run `chain check caps` (or count lines): `docs/DESIGN-SYSTEM.md` must fit its 80-line cap. If it does not, move detail to the showcase page — never to a second markdown file
 
 ## Extending The Design System
 

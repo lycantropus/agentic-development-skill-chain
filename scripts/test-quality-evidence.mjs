@@ -11,8 +11,8 @@ try {
     const base = 'specs/PROJ-1-test', progress = `${base}/5_progress`;
     const write = (name, value) => fs.writeFileSync(path.join(cwd, name), value);
     const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
-    const helper = path.join(root, platform, 'skills/5_executing/scripts/quality-evidence.mjs');
-    const call = (...args) => spawnSync('node', [helper, '1', 'test', ...args], { cwd, encoding: 'utf8' });
+    const chain = path.join(root, platform, 'skills/5_executing/scripts/chain');
+    const call = (...args) => spawnSync('bash', [chain, 'quality', '1', 'test', ...args], { cwd, encoding: 'utf8' });
     const ok = (...args) => { const r = call(...args); assert.equal(r.status, 0, r.stderr); return r.stdout; };
     const bad = (...args) => { const r = call(...args); assert.notEqual(r.status, 0, r.stdout); return r.stderr; };
     fs.mkdirSync(path.join(cwd, `${base}/3-4_plan`), { recursive: true });
@@ -43,7 +43,7 @@ try {
     write(buildProof.log, 'tampered log'); bad('check'); write(buildProof.log, savedLog); ok('check');
     const statuses = ['Code Review', 'Build', 'Tests', 'Lint'].map(name => `### ${name}\nStatus: passed\n`).join('');
     write(`${progress}/PROJ-1-progress.md`, `## Quality Gate — PROJ-1\n${statuses}### SonarCloud\nStatus: ran\n`);
-    const proof = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/quality-gate-proof.sh'), '1', 'test'], { cwd, encoding: 'utf8' });
+    const proof = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/chain'), 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8' });
     // This fixture's .env.local is not sourced for direct helper calls.
     const sourceEnv = process.env.SETTING; process.env.SETTING = 'new';
     assert.notEqual(proof().status, 0, 'environment change must invalidate apparently green statuses');
@@ -85,7 +85,7 @@ try {
     ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
     const statuses2 = ['Code Review', 'Build', 'Tests', 'Lint'].map(name => `### ${name}\nStatus: passed\n`).join('');
     const progressFile = mutation => write(`${progress}/PROJ-1-progress.md`, `## Quality Gate — PROJ-1\n${statuses2}### SonarCloud\nStatus: ran\n${mutation ? `### Mutation\nStatus: ${mutation}\n` : ''}`);
-    const proofCall = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/quality-gate-proof.sh'), '1', 'test'], { cwd, encoding: 'utf8' });
+    const proofCall = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/chain'), 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8' });
     progressFile('ran'); assert.equal(proofCall().status, 0, proofCall().stderr);
     progressFile('skipped (not configured)'); assert.match(proofCall().stderr, /needs Status: ran/);
     progressFile('pending'); assert.notEqual(proofCall().status, 0);

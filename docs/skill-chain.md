@@ -84,7 +84,7 @@ After decomposition:
 | 2c | review-reconcile | Resolve PRD review gaps point by point; defer engineering items to a developer meeting (discovery endpoint or requested full-chain export) |
 | 3 | architecture | Produce the PROJ technical architecture for developers |
 | 4 | writing-plans | Split independently verifiable stories into dependency-ordered waves; use expand–contract for wide migrations |
-| 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through the subskills below, then the waves with the same state.sh, wave tag, wave-gate, Outer Ralph recovery, Quality Gate proof and Skill 6 handoff as `5_executing`; TDD choreography and persona reviews replaced by intent and invariants, workers tiered by `Complexity`, the strongest model leads |
+| 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through the subskills below, then the waves with the same `chain state`, wave tag, wave gate, Outer Ralph recovery, Quality Gate proof and Skill 6 handoff as `5_executing`; TDD choreography and persona reviews replaced by intent and invariants, workers tiered by `Complexity`, the strongest model leads |
 | 5 | executing | Full-procedure alternative for weaker writer models. Hosts the subskills: run Checkpoint 1 and P0 in subagents — `subskills/checkpoint.md` (structured reconcile loop: decision log, cascaded plan updates, seal `CP1:approved`; the user dialogue stays with the orchestrator; the same loop serves CP2 via delivery and bootstrap via intake) and `subskills/setup.md` (persistent PROJ worktree + branch/BASE_SHA, tool/auth preflight, reproducible dependency install, framework helpers synchronized from installed skills with an adaptation-protecting hash manifest) — then delegate code/test/fix edits to workers, run TDD plus one wave-scoped Ralph pass and hard wave gates, then an integration-focused PROJ gate and direct Skill 6 handoff |
 | 6 | qa | Run E2E QA, security, the required opposite-provider six-persona review (the only persona panel), simplicity review (what the Step 5 static and mutation gates cannot decide), and mutation-survivor input; strictly read-only finder in framework runs |
 | 7 | documentation | Curate feature and technical docs, then merge approved AGENTS.md candidates |
@@ -104,7 +104,7 @@ rendered stop report — instead of continuing degraded. A successful run ends
 in P8 with a one-line summary (final CI head, open PR or removed worktree, post-merge rerun command); the
 renderer is skipped there because the worktree must stay clean for post-merge
 cleanup. The cross-PROJ morning report is rendered on demand with
-`node runner/render-report.mjs morning specs`. If the `codex` CLI is missing or unauthenticated,
+`bash ~/.claude/skills/5_executing/scripts/chain render report morning specs`. If the `codex` CLI is missing or unauthenticated,
 the run degrades to single-provider with a model-opposite review lane —
 flagged in the morning report and PR body, never silent. See
 [runner/README.md](../runner/README.md) and CONCEPT.md for the full model.
@@ -128,15 +128,15 @@ worktree is kept for review follow-up and the summary prints the post-merge
 rerun command. Any other refusal retains its path, cleanup reason,
 and the safe P8 resume command that reseals before retrying cleanup.
 
-`worktree.sh with-shared-lock` is exclusive by default across worktrees for
+`chain worktree with-shared-lock` is exclusive by default across worktrees for
 commands that acquire it, including auth-consuming gate commands. Proven
 independent fixture lifecycles may opt into `--shared` on the same lock file;
 migrations, resets and overlapping mutable fixtures remain exclusive. This
 preserves migration exclusion without automatically parallelizing the gate or
 isolating test data/auth budgets. Neither mode prevents a worktree advancing
 the schema before a sibling next uses its older `supabase/migrations/`. For a
-project on Supabase, `preflight.sh` (P0) and `wave-gate.sh` (every wave) both
-run `migration-drift-check.sh`, hard-failing with the exact drifted migration
+project on Supabase, `chain check preflight` (P0) and `chain gate wave` (every wave) both
+run `chain check migrations`, hard-failing with the exact drifted migration
 version(s) and the `supabase db reset` fix. See the `supabase-local-dev`
 skill for the same check outside the chain's P0/wave-gate flow.
 
@@ -173,13 +173,13 @@ Stage 2 adds the bootstrap and the full context system:
   curated docs baseline (PRODUCT, ARCHITECTURE, GUIDELINES, DESIGN-SYSTEM,
   components, security-baseline, test-conventions, root AGENTS.md) →
   developer interview → checkpoint-subskill bootstrap reconcile → sealed
-  baseline commit (`intake-seal-check.sh`; no state.json — concept (1)
+  baseline commit (`chain check intake`; no state.json — concept (1)
   creates one per PROJ).
 - **Worker context files:** P0 compiles one file per worker from the
-  baseline (`compile-context-bundles.mjs`): `context/workers/wave-N/<US-ID>.md`
+  baseline (`chain render context`): `context/workers/wave-N/<US-ID>.md`
   per story — role rules, project context, the PROJ architecture filtered to
   the wave, the wave's API contracts and `## Deine Story` with the story's
-  wave-plan section verbatim (`story-slice.mjs`) — and
+  wave-plan section verbatim (`chain render slice`) — and
   `context/roles/wave-N/<role>.md` for roles without a story (reviewer,
   Quality-Gate fix workers). The story's role is the `Agent Type` column of the
   plan table; every wave compiles on its own, there is no cross-wave view. Per-role
@@ -194,7 +194,7 @@ Stage 2 adds the bootstrap and the full context system:
   the running wave (projects planned before Summary lines existed get
   `architecture-delta.md`, else the whole file unfiltered — fallback, no
   migration required); the files are recompiled at every wave start
-  (`compile --wave N`). `compile-context-bundles.mjs check` runs in
+  (`compile --wave N`). `chain render context check` runs in
   writing-plans and at CP1, so a role over budget or a story without a role
   surfaces before approval. `compile` also removes the retired context-injector
   hook; running projects migrate with `sync-framework` → `compile --wave N`.
@@ -208,7 +208,7 @@ Stage 2 adds the bootstrap and the full context system:
   `src/**/agent.md` — `docs/ARCHITECTURE.md` stays a current-state
   description (Stack · System shape · Data ownership · Invariants), edited in
   place from the PROJ's `Changes baseline` lines, never a per-PROJ
-  chronicle — then must pass FORM (`curation-caps.sh`: PRODUCT
+  chronicle — then must pass FORM (`chain check caps`: PRODUCT
   ≤30 non-blank lines, ARCHITECTURE ≤200 lines, agent.md ≤100 lines,
   GUIDELINES ≤120, security-baseline and test-conventions ≤60) and
   TRUTH (`cross-review`: the provider opposite the curation author
@@ -235,7 +235,7 @@ Stage 2 adds the bootstrap and the full context system:
   run concurrently where resources allow; Sonar waits for coverage. See
   [Executing Skill](executing-skill.md#proj-quality-gate).
 - **Hard gates:** P6 cannot seal with an open Critical/High finding. P7
-  cannot seal unless the curated docs pass both FORM (`curation-caps.sh`,
+  cannot seal unless the curated docs pass both FORM (`chain check caps`,
   caps above) and TRUTH (a `cross-review` that actually ran this P7 with
   no blocking findings left). The runner independently re-verifies every
   gate after its seal.
@@ -254,8 +254,8 @@ For a detailed explanation of Step 5 loops, gates, proof files, and QA handoff, 
 | bugfixing | Reproduce and diagnose one reported defect, prove a regression test red before the fix, dispatch a narrow repair, run at most three Ralph repair attempts, and explain why prior tests missed it; standalone evidence lives in `specs/_bugfixing/BUGFIX-YYYYMMDD-HHMM-<slug>/bugfix-report.md` |
 | refactor-dreamer | Run an overnight/deep codebase scan for architecture drift, larger refactor opportunities, ADR candidates, fitness functions, and chain-ready input |
 | vibecoder | Freeform exploratory coding on a scratch branch with a live-appended journal, distilled at wrap-up into a `chain-input.md` feature seed for `1_concept` |
-| update-chain | Clone the upstream skill-chain repo, show which installed skills change, and run the installer for the current provider; project helper copies are left to Step 5's `sync-framework.mjs` |
+| update-chain | Clone the upstream skill-chain repo, show which installed skills change, and run the installer for the current provider; project helper copies are left to Step 5's `chain sync` |
 | sonar-cli | Set up and operate SonarScanner CLI and SonarQube CLI for project analysis, quality gates, and issue triage |
-| supabase-local-dev | Diagnose shared-local-Supabase-DB problems outside the chain's own P0/wave-gate flow: migration drift between git worktrees sharing one Postgres instance (keyed by `config.toml`'s committed `project_id`), RLS/grant surprises from testing as the `postgres` superuser, and `config.toml` vs. deployed truth; same `migration-drift-check.sh` check |
+| supabase-local-dev | Diagnose shared-local-Supabase-DB problems outside the chain's own P0/wave-gate flow: migration drift between git worktrees sharing one Postgres instance (keyed by `config.toml`'s committed `project_id`), RLS/grant surprises from testing as the `postgres` superuser, and `config.toml` vs. deployed truth; same `chain check migrations` check |
 
 Claude-specific experimental or personal skills are intentionally excluded.

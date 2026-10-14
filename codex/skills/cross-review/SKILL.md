@@ -34,15 +34,15 @@ support.
 
 ## Run it
 
-If `scripts/cross-review.sh` has not been installed in the project yet, use
-`~/.codex/skills/cross-review/scripts/cross-review.sh` in the commands below.
+If `scripts/chain review` has not been installed in the project yet, use
+`~/.codex/skills/5_executing/scripts/chain review` in the commands below.
 Run from the project root so artifact paths resolve correctly.
 
 Before P0, state.json does not exist. Pass the author explicitly; findings are
 written to stdout for the human, never to a ledger:
 
 ```bash
-bash scripts/cross-review.sh concept <X> <theme> \
+bash scripts/chain review concept <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md \
   --ground-truth specs/PROJ-<X>-<theme>/0_context/existing-state.md \
   --author-provider claude --author-model <writer-model> --round 1
@@ -53,7 +53,7 @@ compact UI contracts that exist. Prefer `implementation-handoff.md`, sitemap,
 layout decision, and design language over embedding every mockup HTML file:
 
 ```bash
-bash scripts/cross-review.sh requirements <X> <theme> \
+bash scripts/chain review requirements <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md \
   --ground-truth specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md \
     specs/PROJ-<X>-<theme>/1d_prototypes/implementation-handoff.md \
@@ -69,7 +69,7 @@ replacement.
 
 After P0, omit `--author-provider` and use `--author-key` to resolve authorship
 from state.json. That is the persistent gate path: findings are added only via
-`ledger.mjs`, and the round is appended only via `state.sh`.
+`chain findings`, and the round is appended only via `chain state`.
 
 When the caller knows the author but must persist the review, pass both
 `--author-provider <claude|codex>` and `--persist`. `--require-provider codex`
@@ -87,10 +87,10 @@ still fail closed without Claude. Keep `--require-provider`
 for handoffs where a fallback must instead stop the gate.
 
 ```bash
-bash scripts/cross-review.sh docs <X> <theme> \
+bash scripts/chain review docs <X> <theme> \
   --artifacts docs/ARCHITECTURE.md docs/PRODUCT.md docs/GUIDELINES.md \
   --author-key docs-delta \
-  --diff-base "$(bash scripts/state.sh get <X> <theme> .base_sha)" \
+  --diff-base "$(bash scripts/chain state get <X> <theme> .base_sha)" \
   --diff-paths . ':(exclude)specs/**' ':(exclude)**/*.test.*' \
     ':(exclude)**/*.spec.*' ':(exclude)tests/**' ':(exclude)e2e/**' \
   --round 1
@@ -108,7 +108,7 @@ when there are no findings. Exit `0` alone does not mean zero findings: inspect
 the emitted findings or the persisted round's `findings_added` count.
 Each script invocation runs one read-only review; the producing skill applies
 fixes between calls (QA delegates fixes to its P6 controller). On persistent
-runs, update finding status through `ledger.mjs` before re-review.
+runs, update finding status through `chain findings` before re-review.
 Three rounds is the automatic maximum: remaining Critical/High findings block handoff
 and go to the human; remaining Medium/Low findings are reported or deferred
 as debt. Additional manually requested rounds have no limit: continue with

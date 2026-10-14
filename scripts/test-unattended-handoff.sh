@@ -17,10 +17,10 @@ block probe  >"$CASE/probe.sh";  [ -s "$CASE/probe.sh" ]  || die 'probe block mi
 block launch >"$CASE/launch.sh"; [ -s "$CASE/launch.sh" ] || die 'launch block missing'
 
 cd "$CASE"
-STATE="$ROOT/claude/skills/5_executing/scripts/state.sh"
+STATE="$ROOT/claude/skills/5_executing/scripts/chain state"
 mkdir -p specs/PROJ-1-demo
-bash "$STATE" init 1 demo >/dev/null
-for p in "CP1 running" "CP1 approved" "P0 running" "P0 done"; do bash "$STATE" transition 1 demo $p >/dev/null; done
+bash $STATE init 1 demo >/dev/null
+for p in "CP1 running" "CP1 approved" "P0 running" "P0 done"; do bash $STATE transition 1 demo $p >/dev/null; done
 jq -e '.phase == "P0" and .status == "done"' specs/PROJ-1-demo/state.json >/dev/null || die 'fixture must sit at P0:done'
 
 # Stubs: codex authenticated, runner records how it was started.
@@ -48,14 +48,14 @@ out="$(SKILLCHAIN_RUNNER_MANAGED=1 bash probe.sh 2>&1)"
 [ "$out" = SKIP ] || die "SKILLCHAIN_RUNNER_MANAGED=1 must print only SKIP, got: $out"
 
 # 3. any phase other than P0:done (resume) -> SKIP.
-bash "$STATE" transition 1 demo P5 running >/dev/null
+bash $STATE transition 1 demo P5 running >/dev/null
 out="$(bash probe.sh 2>&1)"; [ "$out" = SKIP ] || die "P5:running must SKIP, got: $out"
 rm -f specs/PROJ-1-demo/state.json
 out="$(bash probe.sh 2>&1)"; [ "$out" = SKIP ] || die "no state.json must SKIP, got: $out"
 
 # 4. Missing prerequisites are named and still ASK (the user decides).
-mkdir -p specs/PROJ-1-demo && bash "$STATE" init 1 demo >/dev/null
-for p in "CP1 running" "CP1 approved" "P0 running" "P0 done"; do bash "$STATE" transition 1 demo $p >/dev/null; done
+mkdir -p specs/PROJ-1-demo && bash $STATE init 1 demo >/dev/null
+for p in "CP1 running" "CP1 approved" "P0 running" "P0 done"; do bash $STATE transition 1 demo $p >/dev/null; done
 rm runner/run-phase.sh
 mkdir bin2; ln -s "$(command -v jq)" bin2/jq   # PATH with only jq: codex absent
 mkdir -p .claude; echo '{"permissions":{"disableBypassPermissionsMode":"disable"}}' >.claude/settings.json
@@ -102,9 +102,9 @@ out="$(bash probe.sh 2>&1)"; printf '%s\n' "$out" | grep -qx 'runner: ok' || die
 # The runner finds its helpers in both layouts (chain checkout and installed copy), outside any project scripts/.
 eval "$(sed -n '/^skill_file() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
 for RUNNER_DIR in "$ROOT/runner" "$CASE/.claude/skills/5_executing/runner" "$CASE/codexhome/skills/5_executing/runner"; do
-  for f in "5_executing scripts/state.sh" "5_executing scripts/worktree.sh" "6_qa scripts/ledger.mjs" "7_documentation scripts/curation-caps.sh" "8_delivery scripts/ci-poll.sh"; do
+  for f in "5_executing scripts/chain" "5_executing scripts/state.sh" "5_executing scripts/worktree.sh" "6_qa scripts/ledger.mjs" "7_documentation scripts/curation-caps.sh" "8_delivery scripts/ci-poll.sh"; do
     [ -f "$(skill_file $f)" ] || die "runner at $RUNNER_DIR cannot resolve helper: $f"
   done
 done
-mkdir "$CASE/empty" && (cd "$CASE/empty" && bash "$CASE/.claude/skills/5_executing/runner/run-phase.sh" P5 1 demo 2>&1 | grep -q 'state.sh not found') && die 'installed runner must find state.sh from the skill tree'
+mkdir "$CASE/empty" && (cd "$CASE/empty" && bash "$CASE/.claude/skills/5_executing/runner/run-phase.sh" P5 1 demo 2>&1 | grep -q 'chain not found') && die 'installed runner must find chain in the skill tree'
 echo "unattended-handoff: ok"

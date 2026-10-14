@@ -97,7 +97,7 @@ and not in `concept`.
 
 **`docs/PRODUCT.md`** — the curated baseline slot. Injected into every
 context bundle, therefore **capped at 30 non-blank lines**
-(`curation-caps.sh`). It answers what/who/not, nothing else:
+(`chain check caps`). It answers what/who/not, nothing else:
 
 ```markdown
 # <Product>
@@ -173,7 +173,7 @@ not be yet — the files are the durable artifact either way):
 
 `docs: product vision — PRODUCT.md + roadmap (N PROJs)`
 
-Run `bash scripts/curation-caps.sh` if it is already in the repo; otherwise
+Run `bash scripts/chain check caps` if it is already in the repo; otherwise
 count: `docs/PRODUCT.md` must fit 30 non-blank lines. Over the cap means the
 vision is carrying feature detail — cut it, never raise the cap.
 

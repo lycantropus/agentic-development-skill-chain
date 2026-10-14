@@ -1,6 +1,6 @@
 ---
 name: update-chain
-description: "Update the installed skill chain from the upstream GitHub repo: shallow-clone silviobeer/agentic-development-skill-chain (main, or a given branch/tag), show which installed skills change, and run the repo's own installer for the current provider. Use when the user asks to update, upgrade, refresh, or pull the latest skill chain or skills. Not part of the 0-8 chain. Not for: editing skills in this repo (edit the repo, then run its install script), updating a project's helper copies (Step 5 runs sync-framework.mjs on every start or resume)."
+description: "Update the installed skill chain from the upstream GitHub repo: shallow-clone silviobeer/agentic-development-skill-chain (main, or a given branch/tag), show which installed skills change, and run the repo's own installer for the current provider. Use when the user asks to update, upgrade, refresh, or pull the latest skill chain or skills. Not part of the 0-8 chain. Not for: editing skills in this repo (edit the repo, then run its install script), updating a project's helper copies (Step 5 runs chain sync on every start or resume)."
 ---
 
 # Update Chain
@@ -29,9 +29,9 @@ inside those folders are overwritten. Skills not shipped by the repo are left
 alone.
 
 Report the installed commit and the changed skills from the diff. Then add one
-line: project helper copies (`scripts/state.sh`, `wave-gate.sh`, …) are not
+line: project helper copies (`scripts/chain state`, `chain gate wave`, …) are not
 touched; Step 5 refreshes them on its next start or resume, or preview now with
-`node <installed>/5_executing/scripts/sync-framework.mjs --check` inside a
+`bash <installed>/5_executing/scripts/chain sync --check` inside a
 project.
 
 If the clone fails (offline, unknown ref), stop and report the error. Do not

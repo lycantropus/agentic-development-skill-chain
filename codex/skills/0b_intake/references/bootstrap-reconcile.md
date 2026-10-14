@@ -24,6 +24,6 @@ them into a baseline the developer actually stands behind.
   draft(s) — a GUIDELINES ruling may also touch ARCHITECTURE or add a
   Known Debt note. No plan validator runs.
 - **Seal:** a git COMMIT of the curated baseline (done by the intake
-  skill after `intake-seal-check.sh` passes) — explicitly NO
-  `state.sh init` and NO phase transition. The bootstrap is pre-PROJ:
+  skill after `chain check intake` passes) — explicitly NO
+  `chain state init` and NO phase transition. The bootstrap is pre-PROJ:
   each PROJ's state.json is created later by concept (1).

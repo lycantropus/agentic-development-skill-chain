@@ -13,16 +13,16 @@ Ownership boundary — never blur it:
 ## Loop
 
 1. **Script, no LLM:** findings arrive deduplicated in
-   `specs/<PROJ>/findings.json` via `node scripts/ledger.mjs add <X> <theme>` (the
+   `specs/<PROJ>/findings.json` via `bash scripts/chain findings add <X> <theme>` (the
    wave gates and QA lanes already wrote theirs). Get the picture with
-   `node scripts/ledger.mjs stats <X> <theme>` and the fix queue with
-   `node scripts/ledger.mjs queue <X> <theme>` (open Critical/High, clustered by file).
+   `bash scripts/chain findings stats <X> <theme>` and the fix queue with
+   `bash scripts/chain findings queue <X> <theme>` (open Critical/High, clustered by file).
 2. **Verifier batches:** spawn read-only verifier agents per cluster to
    weed out false positives. You
    receive only verdicts. False positives →
-   `node scripts/ledger.mjs set-status <X> <theme> <id> false-positive`.
+   `bash scripts/chain findings set-status <X> <theme> <id> false-positive`.
 3. **Fix spawns (tier 0)** per confirmed cluster: BEFORE dispatching a
-   fixer, count the attempt — `node scripts/ledger.mjs record-attempt <X> <theme> <id>`
+   fixer, count the attempt — `bash scripts/chain findings record-attempt <X> <theme> <id>`
    (this is what makes the three-attempt stop rule enforceable). Each
    fixer receives ONLY the finding text, the code anchor (symbol or
    regex, never a line number — parallel fixers shift lines), the
@@ -35,7 +35,7 @@ Ownership boundary — never blur it:
    `not scriptable: <reason>`. One cluster
    (one file) per fixer; bugs in the same file run sequentially, and a
    bug spanning files goes to its primary file's cluster. Only after the fix is verified:
-   `node scripts/ledger.mjs set-status <X> <theme> <id> fixed <commit-sha>`.
+   `bash scripts/chain findings set-status <X> <theme> <id> fixed <commit-sha>`.
 4. **Re-verification, scripts first:** rerun each fixer's reported
    regression test yourself; red or missing (without an accepted
    `not scriptable` reason) = failed attempt, no opposite check needed.
@@ -47,10 +47,10 @@ Ownership boundary — never blur it:
    reported `not scriptable`, plus the batch as a whole where the test
    covers only part of the finding. The fixer never
    certifies its own repair. If re-verification finds the problem again,
-   report it as a fresh open finding via `ledger.mjs add <X> <theme>` — the ledger
+   report it as a fresh open finding via `chain findings add <X> <theme>` — the ledger
    REOPENS a `fixed` finding on an open re-report; never leave a failed
    repair marked fixed.
-5. Repeat until `node scripts/ledger.mjs stats <X> <theme>` shows `open_blocking: 0`.
+5. Repeat until `bash scripts/chain findings stats <X> <theme>` shows `open_blocking: 0`.
    A finding whose `fix_attempts` reaches 3 and is still open is a STOP
    CONDITION (§8) — do not dispatch a fourth attempt.
 
@@ -59,8 +59,8 @@ Ownership boundary — never blur it:
 - Three failed repair/re-verification attempts on the SAME
   Critical/High finding → STOP CONDITION: report it in your final
   output and do not seal the phase.
-- Medium/Low: `node scripts/ledger.mjs auto-defer <X> <theme>` — debt marker
+- Medium/Low: `bash scripts/chain findings auto-defer <X> <theme>` — debt marker
   (`ponytail:` convention) in the code where applicable; the human
   decides at Checkpoint 2, never mid-run.
 - Exit requires: no Critical/High open. Then seal:
-  `bash scripts/state.sh transition <X> <theme> P6 done`.
+  `bash scripts/chain state transition <X> <theme> P6 done`.

@@ -33,7 +33,7 @@ This copies the bundled chain into:
 The framework's minimalism ladder is the third-party
 [Ponytail](https://github.com/DietrichGebert/ponytail) plugin — installed
 on BOTH providers, same version, mode `full`. The P0 preflight
-(`ponytail-check.sh`) blocks runs on absence or version/mode mismatch.
+(`chain check ponytail`) blocks runs on absence or version/mode mismatch.
 
 ```bash
 # Claude Code
@@ -45,7 +45,7 @@ codex plugin add ponytail@ponytail
 ```
 
 The shared mode lives in `~/.config/ponytail/config.json`
-(`{"defaultMode":"full"}` — `ponytail-check.sh` persists it if absent).
+(`{"defaultMode":"full"}` — `chain check ponytail` persists it if absent).
 Leave `PONYTAIL_SUBAGENT_MATCHER` unset. Ponytail then reaches every normal
 subagent, including generic implementation fallbacks; P0 rejects a scoped
 matcher because it silently misses those fallbacks.
@@ -60,8 +60,8 @@ P0 and every implementation start/resume run the installed synchronizer before
 workers start:
 
 ```bash
-node ~/.codex/skills/5_executing/scripts/sync-framework.mjs
-# Claude: node ~/.claude/skills/5_executing/scripts/sync-framework.mjs
+bash ~/.codex/skills/5_executing/scripts/chain sync
+# Claude: bash ~/.claude/skills/5_executing/scripts/chain sync
 ```
 
 Run from the PROJ worktree root, or pass `--target /path/to/worktree`.
@@ -93,8 +93,8 @@ not a remote branch, and never silently discards project-specific adaptations.
 ## Updating an existing PROJ for the optimized gates
 
 Refresh before starting/resuming implementation, with workers and gates stopped.
-The helper inventory includes `quality-evidence.mjs` alongside `wave-gate.sh`
-and `quality-gate-proof.sh`. Commit the synchronized helper set and manifest
+The helper inventory includes the `chain` dispatcher and the helpers behind
+`chain quality`, `chain gate wave` and `chain quality seal`. Commit the synchronized helper set and manifest
 together. If repository-wide lint includes generated framework scripts, extend
 its existing exclusions for newly introduced helpers using the P0 preflight
 inventory; syncing files alone does not change lint configuration.
@@ -106,7 +106,7 @@ also declare the same coverage command as a quality-phase test. Projects without
 these options continue running their existing commands without artifact reuse.
 
 Old markdown-only PROJ gate statuses cannot satisfy the new proof checker.
-Generate current evidence through `quality-evidence.mjs`; do not fabricate or
+Generate current evidence through `chain quality`; do not fabricate or
 copy success records from an earlier run. The [execution guide](executing-skill.md#proj-quality-gate)
 describes the commands and invalidation rules. An already-running agent is not
 updated mid-gate; resume with the refreshed skill instructions and helper set.
@@ -123,13 +123,13 @@ test harness or copied helpers.
   `check_command` describe a real authorized decision and readiness check.
   An absent prerequisite produces `blocked_external` / exit 76 without
   certifying the wave. Refresh the plan validator and PR renderer too; update
-  the framework checkout used to run `runner/render-report.mjs` for matching
+  the framework checkout used to run `chain render report` for matching
   stop/morning reports.
 - Browser regressions with filtered selection can add `selection_check_cmd`:
   a read-only discovery command using the real selector and printing a positive
   supported test count. It runs before AC verification. Existing suites need
   no automatic file split; files above 800 lines receive an advisory warning.
-- `worktree.sh with-shared-lock` remains exclusive. Opt into `--shared` only
+- `chain worktree with-shared-lock` remains exclusive. Opt into `--shared` only
   after proving fixture/actor isolation, using the same lock path in all
   worktrees. Migrations, resets and global changes remain exclusive.
   Auth-consuming gate commands still hold an exclusive outer lock over the

@@ -20,7 +20,7 @@ choice stays the user's.
 ## Probe
 
 Prints `SKIP` (no question: the runner's own P5 lane, or any phase other than
-`P0:done`) or `ASK` plus one line per prerequisite. P0's `preflight.sh` already
+`P0:done`) or `ASK` plus one line per prerequisite. P0's `chain check preflight` already
 hard-stops on `claude`, `coderabbit` and (frontend waves) `agent-browser`; this checks only what
 it does not.
 
@@ -58,5 +58,5 @@ echo "log: $LOG  pid: $!"
 Then print, and end the turn (the waiting session never polls):
 
 - the log path and `pid`; stop the run with `kill -TERM -- -<pid>` (the runner kills both lane process groups)
-- progress: `jq -r '.phase + ":" + .status' specs/PROJ-<X>-<theme>/state.json`, or `node <runner dir>/render-report.mjs morning specs`
-- after a stop: `bash scripts/state.sh transition <X> <theme> <phase> running`, then relaunch the block above
+- progress: `jq -r '.phase + ":" + .status' specs/PROJ-<X>-<theme>/state.json`, or `chain render report morning specs` (the installed `5_executing/scripts/chain`)
+- after a stop: `bash scripts/chain state transition <X> <theme> <phase> running`, then relaunch the block above

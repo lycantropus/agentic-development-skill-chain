@@ -46,13 +46,13 @@ operational records remain lead-owned through their existing commands.
 
 ### 0. Gate + phase transition
 
-`bash scripts/state.sh get <X> <theme> '.phase + ":" + .status'` must be
+`bash scripts/chain state get <X> <theme> '.phase + ":" + .status'` must be
 `P7:done` (or an interrupted `P8` state when resuming). Then:
-`bash scripts/state.sh transition <X> <theme> P8 running`
+`bash scripts/chain state transition <X> <theme> P8 running`
 
 ### 1. Conflict probe against main
 
-Run `bash scripts/conflict-probe.sh <X> <theme>` (throwaway worktree —
+Run `bash scripts/chain check conflicts <X> <theme>` (throwaway worktree —
 it never touches real branches) and read the JSON verdict:
 
 - `none` → continue.
@@ -68,9 +68,9 @@ it never touches real branches) and read the JSON verdict:
 
 ### 2. Complete the ledger before rendering
 
-1. `bash scripts/harvest-debt.sh <X> <theme>` — collect `ponytail:` markers
-2. `node scripts/ledger.mjs auto-defer <X> <theme>` — open Medium/Low → debt (§8)
-3. `node scripts/ledger.mjs stats <X> <theme>` — **open_blocking MUST be 0.**
+1. `bash scripts/chain findings harvest <X> <theme>` — collect `ponytail:` markers
+2. `bash scripts/chain findings auto-defer <X> <theme>` — open Medium/Low → debt (§8)
+3. `bash scripts/chain findings stats <X> <theme>` — **open_blocking MUST be 0.**
    If not, P8 must not deliver: route back to the P6 fix loop; after
    three failed repairs on the same finding it is a stop condition.
 
@@ -78,12 +78,12 @@ it never touches real branches) and read the JSON verdict:
 
 <HARD-GATE>
 1. Set the run summary in state (the ONE place free text enters):
-   `bash scripts/state.sh set <X> <theme> .summary "<2–4 sentences: what was built, notable decisions, semantic-conflict risk note if any>"`
-   Optionally record doc changes: `bash scripts/state.sh set <X> <theme> .docs_changed '["docs/ARCHITECTURE.md", …]'`
+   `bash scripts/chain state set <X> <theme> .summary "<2–4 sentences: what was built, notable decisions, semantic-conflict risk note if any>"`
+   Optionally record doc changes: `bash scripts/chain state set <X> <theme> .docs_changed '["docs/ARCHITECTURE.md", …]'`
 2. `git push -u origin proj/PROJ-<X>`
-3. `node scripts/render-pr-body.mjs <X> <theme> > /tmp/pr-body.md`
+3. `bash scripts/chain render pr <X> <theme> > /tmp/pr-body.md`
 4. `gh pr create --title "PROJ-<X>: <theme>" --body-file /tmp/pr-body.md --base main`
-5. Record it: `bash scripts/state.sh set <X> <theme> .pr '{"number": <N>, "url": "<url>", "ci": "pending"}'`
+5. Record it: `bash scripts/chain state set <X> <theme> .pr '{"number": <N>, "url": "<url>", "ci": "pending"}'`
 
 Never write the PR description by hand and never edit the rendered body
 — fix the data (state/ledger) and re-render instead. Mode B (Jira)
@@ -92,9 +92,9 @@ sync-back is Stage 3 — do not improvise ticket comments.
 
 ### 4. CI polling with a bounded fix loop
 
-Run `bash scripts/ci-poll.sh <pr-number>`:
+Run `bash scripts/chain check ci <pr-number>`:
 
-- Exit 0 (green) → `bash scripts/state.sh set <X> <theme> .pr.ci green`, continue.
+- Exit 0 (green) → `bash scripts/chain state set <X> <theme> .pr.ci green`, continue.
 - Exit 1 (red) → the script printed every currently failing check and its
   verbatim `--log-failed` output in one pass. Dispatch a fix task named
   `micro-fixer` per failing check immediately, concurrently (disjoint
@@ -114,15 +114,15 @@ The P8 seal changes the PR head, so the earlier green result no longer proves
 the final commit. Transition, commit, and push the seal, then poll CI again:
 
 ```bash
-bash scripts/state.sh set <X> <theme> .worktree.cleanup_status removed
-bash scripts/state.sh set <X> <theme> .worktree.cleanup_reason \
+bash scripts/chain state set <X> <theme> .worktree.cleanup_status removed
+bash scripts/chain state set <X> <theme> .worktree.cleanup_reason \
   '"removed after final CI, upstream-head, and clean-tree verification"'
-bash scripts/state.sh transition <X> <theme> P8 done
+bash scripts/chain state transition <X> <theme> P8 done
 git add specs/PROJ-<X>-<theme>/state.json
 git commit -m "chore(PROJ-<X>): seal P8 delivery"
 git push
 FINAL_CI_HEAD=$(git rev-parse HEAD)
-bash scripts/ci-poll.sh <pr-number> 1800 "$FINAL_CI_HEAD"
+bash scripts/chain check ci <pr-number> 1800 "$FINAL_CI_HEAD"
 [ "$(git rev-parse HEAD)" = "$FINAL_CI_HEAD" ]
 [ "$(gh pr view <pr-number> --json headRefOid --jq .headRefOid)" = "$FINAL_CI_HEAD" ]
 ```
@@ -154,7 +154,7 @@ requires `.pr.ci == "green"`, `P8:done`, authoritative `MERGED` PR state, the se
 upstream commit, and a clean tree. It removes only the registered worktree
 (including its reproducible ignored dependencies and managed env symlink) and
 keeps the branch. On any failed predicate it changes the retained worktree to
-`cleanup_status: "retained"` via `state.sh`, records the exact reason, moves a
+`cleanup_status: "retained"` via `chain state`, records the exact reason, moves a
 sealed P8 to `P8:blocked`, and prints the safe P8-resume action. Resume P8 so it
 reseals, pushes, and re-polls the new exact HEAD; a direct cleanup retry against
 the now-dirty retained state is intentionally impossible. Never substitute
@@ -188,7 +188,7 @@ orchestrator) to the PR comments, via
    immediately, concurrently for disjoint files (comment verbatim + file
    paths each), verify, commit. Do not push per comment.
 3. `debt` → `ponytail:` marker + ledger record
-   (`node scripts/ledger.mjs add <X> <theme>` with status `deferred`),
+   (`bash scripts/chain findings add <X> <theme>` with status `deferred`),
    reply on the comment with the finding id.
 4. `reject` → reply on the PR with the rationale — never silently ignore.
 5. Append each classification to `specs/PROJ-<X>-<theme>/decisions.md`
@@ -201,7 +201,7 @@ orchestrator) to the PR comments, via
 
 Repeat per review round until merge. `state.json` stays `P8:done`; the
 merge itself transitions nothing — after merge, `done:done` may be set
-for bookkeeping: `bash scripts/state.sh transition <X> <theme> done done`.
+for bookkeeping: `bash scripts/chain state transition <X> <theme> done done`.
 
 ## Completion Checklist
 

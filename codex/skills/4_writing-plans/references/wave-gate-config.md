@@ -1,7 +1,7 @@
 # wave-gate-config.json
 
-Feeds `wave-gate.sh` (Skill 5); its commands are the ones Ralph runs. Structure
-is enforced by `validate-wave-plan.mjs` — write from the example, run the
+Feeds `chain gate wave` (Skill 5); its commands are the ones Ralph runs. Structure
+is enforced by `chain check plan` — write from the example, run the
 validator, fix what it reports. This file covers only what it cannot check.
 
 ```json

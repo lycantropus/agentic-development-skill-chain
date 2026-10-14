@@ -26,7 +26,7 @@ forward. This is a collaborative session, not a batch job.
 | `docs/ARCHITECTURE.md` | the load-bearing architecture truths as current state, in the sections `Stack` · `System shape` · `Data ownership` · `Invariants` (`0c_bootstrap` § 3); details → `docs/architecture/` | ≤200 lines |
 | `docs/GUIDELINES.md` | conventions that ARE the rule (incl. Known Debt notes for losing patterns) | ≤120 lines |
 | `docs/DESIGN-SYSTEM.md` | design **rules** extracted from code — tokens, scales, patterns, do/don't — or a pointer to **frontend-design** (1c) if none exist; never invented. No component inventory (that's `components.md`) | ≤80 lines |
-| `docs/components.md` | component registry — **generated** by `scripts/gen-component-registry.mjs` from the doc block above each component export | — |
+| `docs/components.md` | component registry — **generated** by `scripts/chain render registry` from the doc block above each component export | — |
 | `docs/security-baseline.md` | auth model, secret handling, input validation floor | ≤60 lines |
 | `docs/test-conventions.md` | test runner, layout, naming, what must be tested | ≤60 lines |
 | `AGENTS.md` (root) | initial durable agent rules | ≤40 non-blank lines |
@@ -34,7 +34,7 @@ forward. This is a collaborative session, not a batch job.
 `docs/DESIGN-SYSTEM.md` and `docs/components.md` are only required to seal
 when the repo has a component directory (`src/components` or
 `src/features/*/components`); backend-only repos skip both (see
-`scripts/intake-seal-check.sh`).
+`scripts/chain check intake`).
 
 **Existing AGENTS.md (or other curated docs) are baseline truth, never
 overwritten.** If a file already exists, the draft is a MERGE: every
@@ -70,9 +70,9 @@ they locate, the prepare subagent judges):
   integrations → ARCHITECTURE draft (+ `docs/architecture/` for detail).
 - **QA Hat:** test setup, error-handling patterns, validation, auth →
   test-conventions + security-baseline drafts.
-- **component-scout:** run `node scripts/gen-component-registry.mjs` (it
+- **component-scout:** run `bash scripts/chain render registry` (it
   scans every outermost `components/` folder under `src/`; nested app root:
-  `node scripts/gen-component-registry.mjs <app> --out docs/components.md`), then
+  `bash scripts/chain render registry <app> --out docs/components.md`), then
   write the missing doc blocks into the components it reports as
   undocumented (purpose + "not for" are interview material, not
   extractable) and regenerate → components.md registry;

@@ -1,6 +1,6 @@
 ---
 name: documentation
-description: "Create and curate human-readable project documentation after QA passes. Produces README.md, docs/PROJECT.md, docs/TECHNICAL.md, conditionally merges approved AGENTS.md candidates, keeps CLAUDE.md pointer-only, and in framework runs curates the long-lived docs/ baseline behind the P7 gates (curation-caps.sh for form, cross-review for truth). Use when: (1) a feature has passed QA, (2) the user asks for app documentation, feature documentation, technical documentation, diagrams, data model notes, or data-flow explanation, (3) before handoff. Not for: writing PRDs, API reference generation, or first-run onboarding flows."
+description: "Create and curate human-readable project documentation after QA passes. Produces README.md, docs/PROJECT.md, docs/TECHNICAL.md, conditionally merges approved AGENTS.md candidates, keeps CLAUDE.md pointer-only, and in framework runs curates the long-lived docs/ baseline behind the P7 gates (chain check caps for form, cross-review for truth). Use when: (1) a feature has passed QA, (2) the user asks for app documentation, feature documentation, technical documentation, diagrams, data model notes, or data-flow explanation, (3) before handoff. Not for: writing PRDs, API reference generation, or first-run onboarding flows."
 ---
 
 # Documentation
@@ -59,7 +59,7 @@ Read in this priority order. Structured data first; raw reconstruction only as f
    - `## QA Results`: QA summary and residual risk
    - `## PROJ Retrospective`: implementation lessons and durable observations
    - `## AGENTS.md Candidates`: proposed durable agent rules awaiting approval
-   - Framework runs: QA's read-only finder wrote its `QA Results`, `PROJ Retrospective` and candidates to `5_progress/qa-finder-<ts>.md` (path: `state.sh get <X> <theme> .qa.finder_report`) instead of progress.md; read that file for those three sections.
+   - Framework runs: QA's read-only finder wrote its `QA Results`, `PROJ Retrospective` and candidates to `5_progress/qa-finder-<ts>.md` (path: `chain state get <X> <theme> .qa.finder_report`) instead of progress.md; read that file for those three sections.
 2. `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md`
    - app/feature purpose, target user, in-scope/out-of-scope boundaries
 3. `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md`
@@ -378,7 +378,7 @@ This is the curation step of CONCEPT.md §4 P7: the curated docs under
 created by the intake baseline) are injected into every future
 implementer. They are updated HERE, gated on form and truth, and nowhere
 else. If no intake baseline exists yet, curate only the files that do
-exist — `curation-caps.sh` warns on missing baseline files instead of
+exist — `chain check caps` warns on missing baseline files instead of
 failing.
 
 **7a. Curate the long-lived docs** (judgment first, gates after):
@@ -416,11 +416,11 @@ failing.
 **7b. Record authorship** — the truth gate must know who curated:
 
 ```bash
-bash scripts/state.sh set <X> <theme> '.authorship["docs-delta"]' \
+bash scripts/chain state set <X> <theme> '.authorship["docs-delta"]' \
   '{"author_provider":"<claude|codex>","author_model":"<model>"}'
 ```
 
-**7c. FORM gate:** `bash scripts/curation-caps.sh` — exit != 0 means a
+**7c. FORM gate:** `bash scripts/chain check caps` — exit != 0 means a
 cap is breached (PRODUCT <= 30 non-blank lines, ARCHITECTURE <= 200
 lines, GUIDELINES <= 120, security-baseline and test-conventions <= 60
 lines, each agent.md <= 100 lines, AGENTS.md <= 40 non-blank lines).
@@ -436,12 +436,12 @@ fixed subset. Anything skipped here enters future context bundles
 unchecked.
 
 ```bash
-BASE_SHA="$(bash scripts/state.sh get <X> <theme> .base_sha)"
+BASE_SHA="$(bash scripts/chain state get <X> <theme> .base_sha)"
 ARTIFACTS="$(git diff --name-only "$BASE_SHA"..HEAD -- \
   docs/ AGENTS.md README.md 'src/**/agent.md' | tr '\n' ' ')"
 # fallback when nothing doc-layer changed but curation ran anyway:
 [ -n "$ARTIFACTS" ] || ARTIFACTS="docs/ARCHITECTURE.md docs/PRODUCT.md docs/GUIDELINES.md docs/components.md"
-bash scripts/cross-review.sh docs <X> <theme> \
+bash scripts/chain review docs <X> <theme> \
   --artifacts $ARTIFACTS \
   --author-key docs-delta \
   --diff-base "$BASE_SHA" \
@@ -452,7 +452,7 @@ bash scripts/cross-review.sh docs <X> <theme> \
 
 - No findings and exit 0 → proceed to section 8.
 - Findings of any severity → fix the docs within approved scope, mark each fix
-  (`node scripts/ledger.mjs set-status <X> <theme> <id> fixed <commit>`
+  (`bash scripts/chain findings set-status <X> <theme> <id> fixed <commit>`
   — an unmarked fix keeps blocking; a false "fixed" is reopened on
   re-report), re-run 7c, then automatically run `--round 2` and, if findings
   remain, `--round 3`. Follow `cross-review`'s three-round automatic limit; exit 0 with
@@ -477,7 +477,7 @@ docs(PROJ-<X>): Update project documentation
 
 If `AGENTS.md` was merged or `CLAUDE.md` was normalized to the pointer, include those changes in the same commit. Curated `docs/` changes from section 7 belong in the same commit — they are part of the PR's "doc changes" section.
 
-Framework runs: seal the phase afterwards — `bash scripts/state.sh transition <X> <theme> P7 done`. Never seal while 7c or 7d is red.
+Framework runs: seal the phase afterwards — `bash scripts/chain state transition <X> <theme> P7 done`. Never seal while 7c or 7d is red.
 
 ## Content Ownership
 

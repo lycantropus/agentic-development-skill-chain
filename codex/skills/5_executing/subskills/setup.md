@@ -53,7 +53,7 @@ This subskill is aligned with the Claude variant. In Codex:
 <HARD-GATE>
 Read the state with the repo helper, or directly with the installed helper when
 the repo copy is not present yet:
-`bash ${STATE_SH:-~/.codex/skills/5_executing/scripts/state.sh} get <X> <theme> '.phase + ":" + .status'`.
+`bash ${CHAIN:-~/.codex/skills/5_executing/scripts/chain} state get <X> <theme> '.phase + ":" + .status'`.
 Do not copy a missing helper into the control checkout before `prepare`; that
 would correctly trip its clean-checkout gate.
 
@@ -68,12 +68,12 @@ Before changing state or creating a worktree, run the plan consistency gate:
 ```bash
 PLAN_DIR=specs/PROJ-<X>-<theme>/3-4_plan
 [ -d "$PLAN_DIR" ] || PLAN_DIR=specs/PROJ-<X>-<theme>/6_plan
-node ~/.codex/skills/5_executing/scripts/validate-wave-plan.mjs "$PLAN_DIR"
+bash ~/.codex/skills/5_executing/scripts/chain check plan "$PLAN_DIR"
 ```
 
 Any non-zero exit is a hard stop: route back to **writing-plans**. For a
 legacy PROJ, select the existing `6_plan/` directory as above; never create a
-parallel current-layout directory. `worktree.sh prepare` repeats this exact
+parallel current-layout directory. `chain worktree prepare` repeats this exact
 validation before it creates anything.
 </HARD-GATE>
 
@@ -82,18 +82,18 @@ validation before it creates anything.
 From the control checkout root, run:
 
 ```bash
-WORKTREE=$(~/.codex/skills/5_executing/scripts/worktree.sh prepare <X> <theme>)
+WORKTREE=$(~/.codex/skills/5_executing/scripts/chain worktree prepare <X> <theme>)
 cd "$WORKTREE"
-P0_STATE=$(bash ~/.codex/skills/5_executing/scripts/state.sh get <X> <theme> '.phase + ":" + .status')
+P0_STATE=$(bash ~/.codex/skills/5_executing/scripts/chain state get <X> <theme> '.phase + ":" + .status')
 case "$P0_STATE" in
-  CP1:approved|P0:blocked) bash ~/.codex/skills/5_executing/scripts/state.sh transition <X> <theme> P0 running ;;
+  CP1:approved|P0:blocked) bash ~/.codex/skills/5_executing/scripts/chain state transition <X> <theme> P0 running ;;
   P0:running) : ;; # interrupted P0 resumes without a duplicate transition
   P0:done) P0_ALREADY_DONE=1 ;; # refresh-only; never transition or reseal
   *) echo "unexpected P0 resume state: $P0_STATE" >&2; exit 1 ;;
 esac
 ```
 
-Use the installed absolute `state.sh` path until the synchronization below has installed the helper set; `scripts/state.sh` is not assumed to exist at CP1. The synchronized, committed repo helpers are then canonical for the run.
+Use the installed absolute `chain` path until the synchronization below has installed the helper set; `scripts/chain state` is not assumed to exist at CP1. The synchronized, committed repo helpers are then canonical for the run.
 
 When `P0_ALREADY_DONE=1`, synchronize and validate the helpers, then commit any refresh separately; skip all phase transitions and the P0 seal commit.
 
@@ -110,14 +110,14 @@ and Git ignores it. If only `.env.local.example` exists, stop and require the
 local secret file. Secret values are never printed or stored. Dependencies are
 installed reproducibly from the one supported lockfile inside the worktree;
 `node_modules` is never linked. The helper records `.worktree` metadata,
-`.base_sha`, and `.branch` through `state.sh`, including shared database mode,
+`.base_sha`, and `.branch` through `chain state`, including shared database mode,
 dev port (`SKILLCHAIN_DEV_PORT` or `frontend.dev_url`), and cleanup status.
 
 Database migrations and auth-consuming commands must run through the shared
 resource lock:
 
 ```bash
-scripts/worktree.sh with-shared-lock -- <command...>
+scripts/chain worktree with-shared-lock -- <command...>
 ```
 
 The default lock lives in the Git common directory and therefore serializes
@@ -144,7 +144,7 @@ and browser runs serialized when they share fixtures. Execution's
 Before running any repo preflight, synchronize from the installed skill tree:
 
 ```bash
-node ~/.codex/skills/5_executing/scripts/sync-framework.mjs
+bash ~/.codex/skills/5_executing/scripts/chain sync
 ```
 
 A non-zero exit blocks setup until the reported helper differences are reconciled. The command plans the whole inventory before copying anything; unrecognized or modified project copies are never overwritten. Compare each conflict with its installed source, merge the needed upstream changes while preserving project adaptations, test the result, then rerun with `--adopt scripts/<reviewed-file>` (repeat the option for multiple files). Do not adopt stale code to bypass an update. No separate user confirmation is required for an already-authorized helper refresh.
@@ -157,12 +157,10 @@ If `.coderabbit.yaml`/`.coderabbit.yml` is missing at repo root, copy
 
 ### 3. Tool + auth preflight
 
-Run `bash scripts/preflight.sh <X> <theme>` (if `scripts/` lacks it, copy
-the WHOLE 5_executing helper set first — `preflight.sh`, `ponytail-check.sh`,
-`compile-context-bundles.mjs`, `context-injector.mjs` (retired stub), `state.sh`,
-`worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh` from
-`~/.codex/skills/5_executing/scripts/` — preflight calls its siblings; a
-lone copy also works, it falls back to the installed skill tree). It checks
+Run `bash scripts/chain check preflight <X> <theme>` (before step 3 has synced
+`scripts/`, `~/.codex/skills/5_executing/scripts/chain check preflight <X> <theme>`
+runs the same gate from the installed skill tree — `chain` finds the sibling
+helpers there). It checks
 the CONCEPT.md §7 CLI list including auth states and a bounded live
 probe per provider (claude hard, codex degradable) and writes the
 `preflight` block into state.json:
@@ -172,17 +170,17 @@ probe per provider (claude hard, codex degradable) and writes the
   now set in state.json and every review falls back to MODEL-opposite.
   Never work around this flag and never unset it by hand.
 - Exit 1 → hard tool missing = **stop condition (§8)**: transition to
-  blocked (`bash scripts/state.sh transition <X> <theme> P0 blocked`),
+  blocked (`bash scripts/chain state transition <X> <theme> P0 blocked`),
   write the stop report, do not continue.
 
 For a repo with `supabase/migrations/`, preflight also runs
-`migration-drift-check.sh`: every git worktree of this repo shares ONE local
+`chain check migrations`: every git worktree of this repo shares ONE local
 Supabase Postgres instance, so another worktree may have applied migrations
 absent from this worktree's own `supabase/migrations/` folder — code and
 grants here would then silently run against a schema this branch never
 declared. That is a stop condition too (fix: `supabase db reset` from this
 worktree); a worktree merely having *pending* local migrations is normal and
-not flagged. `wave-gate.sh` re-runs the same check at the start of every
+not flagged. `chain gate wave` re-runs the same check at the start of every
 wave, since a wave can run long after P0 in a repo another worktree has
 since advanced.
 
@@ -210,14 +208,14 @@ migration without blocking.
 The synchronizer in step 1 installs this inventory and records source/project SHA-256 hashes in `.skillchain-helpers.json`. Verify it before sealing P0:
 
 ```bash
-node ~/.codex/skills/5_executing/scripts/sync-framework.mjs --check
+bash ~/.codex/skills/5_executing/scripts/chain sync --check
 ```
 
 Commit the manifest and changed helpers/templates with setup. Do not manually overwrite an older helper. Unmodified managed copies update automatically; reviewed adaptations survive until their installed source or local bytes change, at which point reconciliation is required. Run only at setup/resume boundaries, never during a gate or while workers are editing these files.
 
 | From (installed skill) | To |
 |---|---|
-| `5_executing/scripts/state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `context-injector.mjs` (retired stub), `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `context-injector.mjs` (retired stub), `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
@@ -239,7 +237,7 @@ versioned framework helpers available for the run.
 
 Before committing the copied files, run the target's existing lint command
 when it has one (`npm run lint --if-present`, or its configured equivalent)
-and `node scripts/gen-component-registry.mjs --check` when component folders
+and `bash scripts/chain render registry --check` when component folders
 exist. Exit 3 means a hand-written or safety-refused registry: report it and
 do not overwrite it; any other non-zero registry result must be fixed before
 P0 is sealed.
@@ -255,7 +253,7 @@ identity. After step 4 verifies the synchronized gate, run:
 CONTROL_WAVE=$(jq -r '.waves | keys | map(tonumber) | min' "$PLAN_DIR/wave-gate-config.json")
 EXPECTED_AUTH_RC=$(jq -r '.auth_budget.exhausted_exit_code // 75' "$PLAN_DIR/wave-gate-config.json")
 set +e
-bash scripts/wave-gate.sh --auth-budget-negative-control "$CONTROL_WAVE" <X> <theme>
+bash scripts/chain gate wave --auth-budget-negative-control "$CONTROL_WAVE" <X> <theme>
 CONTROL_RC=$?
 set -e
 [ "$CONTROL_RC" -eq "$EXPECTED_AUTH_RC" ]
@@ -291,7 +289,7 @@ taken (key left absent = silently skipped) under the defaulted decisions in
 **5a. Compile the worker files for every wave.**
 
 ```bash
-node scripts/compile-context-bundles.mjs compile <X> <theme>
+bash scripts/chain render context compile <X> <theme>
 ```
 
 Without `--wave` every wave compiles on its own (there is no merged
@@ -299,7 +297,7 @@ cross-wave view): `context/workers/wave-N/<US-ID>.md` per story (the role comes
 from the plan table's `Agent Type`; `Split: contract` gives `.backend.md` and
 `.frontend.md`) and `context/roles/wave-N/<role>.md` per role without a story
 (reviewer, Quality-Gate fix workers). Step 5 recompiles `--wave N` at each wave
-start. CP1 already ran `compile-context-bundles.mjs check`, so a failure here
+start. CP1 already ran `chain render context check`, so a failure here
 means the sources changed since CP1 (or the ground file below pushed a role
 over its budget).
 
@@ -307,7 +305,7 @@ over its budget).
   budget) before anything is written. Condense that role's sources, or raise
   only its manifest budget when its documented scope genuinely requires it.
   Story size is reported, not capped. Exit 2 = unresolvable plan folder or story.
-- Nothing is recorded in `state.json`: no lock, no hash bookkeeping, no `state.sh set` (each file's first line carries a shortened plan hash).
+- Nothing is recorded in `state.json`: no lock, no hash bookkeeping, no `chain state set` (each file's first line carries a shortened plan hash).
   `compile` is idempotent; an I/O error exits 1 — fix the cause and rerun it.
 - The compiler also rewrites `.claude/agents/skillchain-<role>.md` agent files
   for the Claude lanes the runner will start — only `skillchain-*` files are ever written, existing agents
@@ -323,19 +321,19 @@ recompile (5a) so the worker files carry it.
 
 **5c. Delivery — there is nothing to activate.** No hook and no injector:
 the lead (or the runner's lane prompt) names the worker file by path in each
-spawn prompt, and the worker reads it first. `preflight.sh` (step 3) installs
+spawn prompt, and the worker reads it first. `chain check preflight` (step 3) installs
 no hook any more; it removes a retired context-injector hook and
 `PONYTAIL_SUBAGENT_MATCHER` from `.claude/settings.json`, so Ponytail's native
 all-subagent path also covers generic implementation fallbacks.
 Never paste file contents into spawn prompts.
 
 *Running projects (migration):* `sync-framework` → `compile --wave N` in the
-same step, no worker in between and no new `preflight.sh`. `compile` writes the
+same step, no worker in between and no new `chain check preflight`. `compile` writes the
 worker and agent files and removes an old hook and `PONYTAIL_SUBAGENT_MATCHER`.
 Exit 0 does not prove the removal: an unparseable `.claude/settings.json` stays
 unchanged with a warning (`⚠ … is not valid JSON — left unchanged`). Read
 `compile`'s output, repair that file by hand if the warning appears, rerun
-`compile` (or `preflight.sh`), and check that
+`compile` (or `chain check preflight`), and check that
 `grep -c context-injector .claude/settings.json` prints 0 and
 `jq -e '.env.PONYTAIL_SUBAGENT_MATCHER // empty' .claude/settings.json` prints
 nothing. No worker between `sync` and `compile` is lead discipline: the retired
@@ -343,14 +341,14 @@ hook stub only tells a worker whose prompt names no path to abort, it delivers
 no context and does not catch a worker holding a path to an outdated file.
 
 **5d. Ponytail parity** is already gated inside step 3's preflight
-(`ponytail-check.sh`: absence or version/mode mismatch across active
+(`chain check ponytail`: absence or version/mode mismatch across active
 providers blocks P0). Never work around a red gate; `PONYTAIL_ENFORCE=0`
 is the loud, recorded escape hatch — it lands in state.json and the
 reports, never silent.
 
 ### 6. Seal P0
 
-1. `bash scripts/state.sh transition <X> <theme> P0 done`
+1. `bash scripts/chain state transition <X> <theme> P0 done`
 2. Commit everything from steps 1–5 on the PROJ branch:
    `chore(PROJ-<X>): P0 setup — branch, preflight, framework scripts, worker context files`
 

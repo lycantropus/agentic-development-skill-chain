@@ -21,8 +21,8 @@ All under `specs/PROJ-<X>-<theme>/`:
 Also read the feature's `agent.md` (e.g. `src/features/<feature>/agent.md`) if present and carry its gotchas into tasks. For any UI work (`frontend.routes` or frontend-implementer tasks), regenerate the component registry first — even on greenfield, where it writes an empty one:
 
 ```bash
-node scripts/gen-component-registry.mjs
-# nested app root: node scripts/gen-component-registry.mjs <app> --out docs/components.md
+bash scripts/chain render registry
+# nested app root: bash scripts/chain render registry <app> --out docs/components.md
 ```
 
 `docs/components.md` is generated from code; fix undocumented components in the code, never in the registry.
@@ -33,7 +33,7 @@ node scripts/gen-component-registry.mjs
 
 ### 1. Extract stories
 
-Extract every user story and AC verbatim. IDs: story `PROJ-<X>-PRD-<Y>-US-<Z>`, criterion `PROJ-<X>-PRD-<Y>-US-<Z>-AC-<N>` (globally unique; `<N>` is the AC number in the PRD, never a renumbering). The AC wording in the plan is an exact copy of the PRD entry, taken from the word after the checkbox and `AC-<N>:` prefix. `validate-wave-plan.mjs` compares it against `2_PRDs/` and fails on any deviation or missing PRD entry, provided `2_PRDs/` exists in the project (without the folder, i.e. a legacy project, it only prints a note and compares nothing); only line endings, trailing whitespace per line and blank lines at the end of the AC are ignored. A multi-line AC runs until the next AC line, a heading, `---` or a label line (`**Smoke Test:**` and the like); indented code blocks belong to the AC. Fix a wrong AC in the PRD (via `requirements-engineer`), never in the plan. Check the codebase for relevant files, patterns, and conventions.
+Extract every user story and AC verbatim. IDs: story `PROJ-<X>-PRD-<Y>-US-<Z>`, criterion `PROJ-<X>-PRD-<Y>-US-<Z>-AC-<N>` (globally unique; `<N>` is the AC number in the PRD, never a renumbering). The AC wording in the plan is an exact copy of the PRD entry, taken from the word after the checkbox and `AC-<N>:` prefix. `chain check plan` compares it against `2_PRDs/` and fails on any deviation or missing PRD entry, provided `2_PRDs/` exists in the project (without the folder, i.e. a legacy project, it only prints a note and compares nothing); only line endings, trailing whitespace per line and blank lines at the end of the AC are ignored. A multi-line AC runs until the next AC line, a heading, `---` or a label line (`**Smoke Test:**` and the like); indented code blocks belong to the AC. Fix a wrong AC in the PRD (via `requirements-engineer`), never in the plan. Check the codebase for relevant files, patterns, and conventions.
 
 ### 2. Build the dependency graph and waves
 
@@ -41,7 +41,7 @@ All stories from all PRDs go into one graph; cross-PRD edges are allowed. A wave
 
 - **Vertical stories.** Each story must yield one independently verifiable outcome through every layer it needs. Schema/API/UI are tasks within a story, not separate stories. Backend-only and enabling stories qualify when their contract is testable. A story with no standalone verifiable outcome goes back to `requirements-engineer` (plus its PRD cross-review, then re-check affected architecture). Never silently change PRD text.
 - **Wide migrations** without a useful vertical slice: `expand → migrate (bounded batches, explicit blocking edges) → contract`. Missing stories/ACs for those stages go back to `requirements-engineer`; never invent plan-only stories. Every wave must still pass its AC and regression gates — if intermediate waves can't stay green, return to `architecture` (and its cross-review); never waive the gate.
-- **The plans are the wave shape.** Step 5's lead reads each plan's `## User Stories in this Wave` table and `## Execution` block through `story-slice.mjs` (the table as JSON through `validate-wave-plan.mjs --stories <plan>`); never copy the shape into another file.
+- **The plans are the wave shape.** Step 5's lead reads each plan's `## User Stories in this Wave` table and `## Execution` block through `chain render slice` (the table as JSON through `chain check plan --stories <plan>`); never copy the shape into another file.
 - **`**PRDs involved:**` is machine-read.** The context compiler puts only the architecture decisions whose `Affects` names one of these PRDs into the wave's worker files, so list every PRD that owns a story in the wave.
 - Put the dependency analysis into the Wave 1 plan as a reference.
 
@@ -133,7 +133,7 @@ Each task = one testable, committable unit of behaviour, nested under its story,
 Field rules:
 - **Complexity** (Skill 5 picks the model from it): `sonnet` by default — CRUD, forms, straightforward components/routes/services, test-only refactors, polish. `opus` for architecture-sensitive work — state machines, concurrency, cross-feature contracts, DB migrations, auth/session, money, crypto. Name the reason when not obvious. No haiku.
 - **Execution mode:** `parallel` only with no dependency **and** no shared runtime hazard; `sequential` when stories contend on a dev server/port, hosted DB or other mutable service, browser profile, cache, or shared harness. Runtime constraints name the owner; file contact stays in the cross-US note. `Execution`, not `Can start when`, decides concurrent dispatch.
-- **DB/browser isolation:** state the real fixture namespace and lock layer, not just the tool. Prefer run/scenario/retry-scoped projects and row IDs over one shared mutable fixture where RLS, global state, and teardown allow. Remote browser fixtures are committed and cleaned up, never hidden in an outer rollback. Plan a small isolation proof before parallelizing an existing shared harness. Independent lifecycles may use `worktree.sh with-shared-lock --shared`; migrations/resets and overlapping fixtures stay exclusive on the same lock file. Budget lock wait separately from test time; measure browser startup before proposing session reuse. See executing's `references/worker-lifecycle.md`.
+- **DB/browser isolation:** state the real fixture namespace and lock layer, not just the tool. Prefer run/scenario/retry-scoped projects and row IDs over one shared mutable fixture where RLS, global state, and teardown allow. Remote browser fixtures are committed and cleaned up, never hidden in an outer rollback. Plan a small isolation proof before parallelizing an existing shared harness. Independent lifecycles may use `chain worktree with-shared-lock --shared`; migrations/resets and overlapping fixtures stay exclusive on the same lock file. Budget lock wait separately from test time; measure browser startup before proposing session reuse. See executing's `references/worker-lifecycle.md`.
 - **`Agent Type` decides the worker context.** Step 5 compiles one worker file per story, with the role rules and project context of the role named in this column; the lead spawns that role. Use the canonical names `implementer` (full-stack), `frontend-implementer`, `backend-implementer` — exactly one per story, no `A then B` or `A + B`: a story that needs both a backend and a frontend worker is `Split: contract` instead. One table row per story, and the row and the story section must agree: `Scope` (table vs `**Scope:**`), the `→ agent` in `**Scope:**`, and `Split` (`contract` contradicts a single-sided `frontend` or `backend` scope). A missing, duplicate, or unsupported entry stops `compile` and `check` with exit 2, naming the story and plan file.
 - **Split:** `contract` = full-stack story split into backend + frontend workers against the wave's section in `api-contracts.md`; `fan-out` = same-shaped units over disjoint files, parallelized after the first unit exists.
 - **`api-contracts.md`** (this skill writes it, at `specs/PROJ-<X>-<theme>/api-contracts.md`): required for every `contract` split and for parallel stories that share an interface. One `## Wave <N>: <interface>` section per wave — request/response shape, who implements and who consumes, error cases; no code. The bundle compiler injects only the sections whose heading names the running wave, so a contract outside such a heading reaches no worker.
@@ -151,7 +151,7 @@ Run the validator first — it checks plan/config structure, AC↔task↔command
 ```bash
 bash ~/.claude/skills/5_executing/scripts/chain check plan \
   specs/PROJ-<X>-<theme>/3-4_plan
-node ~/.claude/skills/5_executing/scripts/compile-context-bundles.mjs check <X> <theme>
+bash ~/.claude/skills/5_executing/scripts/chain render context check <X> <theme>
 ```
 
 The `check` compiles every wave's worker and role files in memory (writes nothing).
@@ -178,7 +178,7 @@ Fix plan-only issues inline and re-validate; return PRD or architecture defects 
 Right after the validator passes, in the same turn and without asking, review the **complete** set:
 
 ```bash
-bash scripts/cross-review.sh plan <X> <theme> \
+bash scripts/chain review plan <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md \
     specs/PROJ-<X>-<theme>/3-4_plan/wave-gate-config.json \
     specs/PROJ-<X>-<theme>/api-contracts.md \

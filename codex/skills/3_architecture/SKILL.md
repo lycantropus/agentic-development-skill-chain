@@ -144,7 +144,7 @@ The architecture names the decision and WHY in plain language and points there
 
 ## Implementer view (generated — never hand-written)
 
-`compile-context-bundles.mjs` builds what workers see from this file: Overview,
+`chain render context` builds what workers see from this file: Overview,
 Data Model, Cross-PROJ Dependencies, Dependencies and (frontend roles only) UI
 Implementation Constraints verbatim; PRDs Covered, System Boundaries and every
 diagram dropped; each decision and key flow reduced to
@@ -166,7 +166,7 @@ note when it `Changes baseline`, filtered to the PRDs of the running wave. So:
 Right after saving, without asking:
 
 ```bash
-bash scripts/cross-review.sh architecture <X> <theme> \
+bash scripts/chain review architecture <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md \
     specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-migration-design.md \
   --ground-truth specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md \

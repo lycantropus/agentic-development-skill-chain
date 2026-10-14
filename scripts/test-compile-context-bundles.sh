@@ -148,7 +148,7 @@ grep -qF 'UI_ONLY_CONSTRAINT' "$F" || die "UI constraints missing from the front
 W="$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.md"
 PLAN1="specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-1-plan.md"
 [ "$(head -1 "$W")" = "Generated from $PLAN1 @ $(sha256sum "$PLAN1" | cut -c1-12) · role backend-implementer · wave 1" ] || die "story file header wrong: $(head -1 "$W")"
-node "$SKILL/scripts/story-slice.mjs" "$PLAN1" PROJ-1-PRD-1-US-1 >"$CASE/slice.out"
+bash "$SKILL/scripts/chain" render slice "$PLAN1" PROJ-1-PRD-1-US-1 >"$CASE/slice.out"
 sed '1,/^## Deine Story$/d' "$W" | tail -n +2 | cmp - "$CASE/slice.out" || die "story part is not the slice byte for byte"
 [ "$(tail -n +3 "$W" | sed '/^## Deine Story$/,$d')" = "$(tail -n +3 "$B")" ] || die "story file role context differs from the role file"
 grep -qF 'STORY_ONE_AC' "$B" && die "story leaked into the role file"
@@ -228,7 +228,7 @@ sections "$W2S" "${CORE[@]}" "+$T_DS" "+$T_COMP" "-$T_SEC" "+$T_STORY"
 n=0
 for f in "$CTX"/workers/wave-*/*.md; do
   w="${f#*/workers/wave-}"; w="${w%%/*}"; id="$(basename "$f" .md)"; id="${id%.backend}"; id="${id%.frontend}"
-  node "$SKILL/scripts/story-slice.mjs" "specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-$w-plan.md" "$id" >"$CASE/slice.out"
+  bash "$SKILL/scripts/chain" render slice "specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-$w-plan.md" "$id" >"$CASE/slice.out"
   sed '1,/^## Deine Story$/d' "$f" | tail -n +2 | cmp - "$CASE/slice.out" || die "$f: story part is not the slice byte for byte"
   n=$((n+1))
 done
@@ -402,7 +402,7 @@ cp "$CASE/plan2.bak" "$PLAN2"
 printf '\n```md\n## not a story heading\n```\n' >>"$PLAN1"
 sed -i 's/$/\r/' "$PLAN1" "$P/3-4_plan/PROJ-1-architecture.md"
 run compile 1 demo --wave 1 >/dev/null || die "CRLF plan failed to compile"
-node "$SKILL/scripts/story-slice.mjs" "$PLAN1" PROJ-1-PRD-1-US-3 >"$CASE/slice.out"
+bash "$SKILL/scripts/chain" render slice "$PLAN1" PROJ-1-PRD-1-US-3 >"$CASE/slice.out"
 sed '1,/^## Deine Story$/d' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" | tail -n +2 | cmp - "$CASE/slice.out" || die "CRLF story part is not the slice byte for byte"
 grep -qF 'Decision 1: Server-side totals' "$B" || die "CRLF architecture lost its decisions"
 restore_plans; cp "$CASE/arch.keep" "$P/3-4_plan/PROJ-1-architecture.md"

@@ -191,7 +191,7 @@ for candidate in \
   "$BASE/1c_design/design-language.md"; do
   [ ! -f "$candidate" ] || GROUND_TRUTH+=("$candidate")
 done
-bash scripts/cross-review.sh requirements <X> <theme> \
+bash scripts/chain review requirements <X> <theme> \
   --artifacts "$BASE"/2_PRDs/PROJ-<X>-PRD-*.md \
   --ground-truth "${GROUND_TRUTH[@]}" \
   --author-provider <current-writer> --round 1

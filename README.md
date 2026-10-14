@@ -73,7 +73,7 @@ runner, detached, which drives the execution phases:
 ```bash
 runner/run-phase.sh auto <proj-x> <theme>     # P0 → P5 → P6 → P7 → P8
 # morning: read the run's one-line summary and the PR body, then review the PR (CP2)
-# optional cross-PROJ overview: node runner/render-report.mjs morning specs
+# optional cross-PROJ overview: bash ~/.claude/skills/5_executing/scripts/chain render report morning specs
 ```
 
 What makes an overnight run trustworthy, in short: dual Claude + Codex lanes
@@ -143,7 +143,7 @@ CONCEPT.md       The agent workflow framework specification
 `AGENTS.md` is the only curated durable-context file. `CLAUDE.md` is
 pointer-only and tells Claude to read `AGENTS.md`.
 
-Framework helper scripts (`state.sh`, `ledger.mjs`, the context compiler and its retired injector stub,
+Framework helper scripts (`chain state`, `chain findings`, the context compiler and its retired injector stub,
 gates, adapters) are byte-identical across their skill copies — `validate.sh`
 enforces it.
 

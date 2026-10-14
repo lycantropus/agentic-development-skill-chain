@@ -127,7 +127,7 @@ Commands: `pnpm dev` · `pnpm build` · `pnpm test` · `pnpm lint`
 ```
 
 This file is part of the curated baseline, is injected into every context
-bundle, and is **capped at 200 lines** (`curation-caps.sh`). The Stack table
+bundle, and is **capped at 200 lines** (`chain check caps`). The Stack table
 is the part that must never be duplicated elsewhere. The four sections
 describe the system as it is NOW — only P7 curation fills and edits them,
 by rewriting the affected section; never with per-PROJ sections. PROJ
@@ -140,7 +140,7 @@ and leave everything else alone.
 ### 4. Write the agent files
 
 **Root `AGENTS.md`** — durable agent rules, **≤40 non-blank lines**
-(`curation-caps.sh`). Only what is true today; this is not a place for
+(`chain check caps`). Only what is true today; this is not a place for
 aspirations:
 
 ```markdown
@@ -162,8 +162,8 @@ that is not listed there; never add one without an architecture decision.
   migrations or auth-consuming gates through the configured lock. The lock
   only prevents concurrent collisions — it does not stop one worktree's
   migrations from silently changing the schema another worktree still trusts.
-  If this project uses Supabase, `preflight.sh` and `wave-gate.sh` guard
-  against that automatically (`scripts/migration-drift-check.sh`); see the
+  If this project uses Supabase, `chain check preflight` and `chain gate wave` guard
+  against that automatically (`scripts/chain check migrations`); see the
   `supabase-local-dev` skill for the manual check outside that flow.
 
 ## Curated context
@@ -192,7 +192,7 @@ that drift are worse than one.
 ### 5. Seal
 
 1. `git init` if the workspace is not a repo yet.
-2. Run `bash scripts/curation-caps.sh` if it is already in the repo;
+2. Run `bash scripts/chain check caps` if it is already in the repo;
    otherwise count: `AGENTS.md` ≤40 non-blank lines,
    `docs/ARCHITECTURE.md` ≤200 lines.
 3. Commit: `chore: project bootstrap — <framework> + <database or "no backend">`

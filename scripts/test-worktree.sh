@@ -6,6 +6,7 @@ export SKILLCHAIN_POLL_SECONDS=0.1 # stubs return instantly; production default 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HELPER="$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 STATE_SOURCE="$ROOT/codex/skills/5_executing/scripts/state.sh"
+CHAIN_SOURCE="$ROOT/codex/skills/5_executing/scripts/chain"
 PLAN_FIXTURES="$ROOT/scripts/fixtures/wave-plan-validator"
 TMP_ROOT="$(mktemp -d)"
 cleanup_tmp() { rm -rf "$TMP_ROOT"; }
@@ -19,9 +20,10 @@ init_repo() { # path proj theme env-mode [remote]
   local repo="$1" proj="$2" theme="$3" env_mode="$4" remote="${5:-}"
   mkdir -p "$repo/specs/PROJ-${proj}-${theme}/3-4_plan" "$repo/scripts"
   cp "$STATE_SOURCE" "$repo/scripts/state.sh"
+  cp "$CHAIN_SOURCE" "$repo/scripts/chain"
   cp "$PLAN_FIXTURES/plan-valid.md" "$repo/specs/PROJ-${proj}-${theme}/3-4_plan/PROJ-${proj}-wave-1-plan.md"
   cp "$PLAN_FIXTURES/config-valid.json" "$repo/specs/PROJ-${proj}-${theme}/3-4_plan/wave-gate-config.json"
-  chmod +x "$repo/scripts/state.sh"
+  chmod +x "$repo/scripts/state.sh" "$repo/scripts/chain"
   git -C "$repo" init -q -b main
   git -C "$repo" config user.name Test
   git -C "$repo" config user.email test@example.invalid
@@ -39,9 +41,9 @@ init_repo() { # path proj theme env-mode [remote]
     *) fail "unknown env mode $env_mode" ;;
   esac
   printf '.state.lock\n' >>"$repo/.gitignore"
-  (cd "$repo" && bash scripts/state.sh init "$proj" "$theme" >/dev/null)
-  (cd "$repo" && bash scripts/state.sh transition "$proj" "$theme" CP1 running >/dev/null)
-  (cd "$repo" && bash scripts/state.sh transition "$proj" "$theme" CP1 approved >/dev/null)
+  (cd "$repo" && bash scripts/chain state init "$proj" "$theme" >/dev/null)
+  (cd "$repo" && bash scripts/chain state transition "$proj" "$theme" CP1 running >/dev/null)
+  (cd "$repo" && bash scripts/chain state transition "$proj" "$theme" CP1 approved >/dev/null)
   git -C "$repo" add -A
   git -C "$repo" commit -qm "CP1 approved"
   if [ -n "$remote" ]; then
@@ -54,13 +56,13 @@ init_repo() { # path proj theme env-mode [remote]
 advance_to_p8_done() { # worktree proj theme
   local wt="$1" proj="$2" theme="$3" phase
   for phase in P0 P5 P6 P7 P8; do
-    (cd "$wt" && bash scripts/state.sh transition "$proj" "$theme" "$phase" running >/dev/null)
+    (cd "$wt" && bash scripts/chain state transition "$proj" "$theme" "$phase" running >/dev/null)
     if [ "$phase" = P8 ]; then
-      (cd "$wt" && bash scripts/state.sh set "$proj" "$theme" .pr '{"number":1,"url":"https://example.invalid/pr/1","ci":"green"}' >/dev/null)
-      (cd "$wt" && bash scripts/state.sh set "$proj" "$theme" .worktree.cleanup_status '"removed"' >/dev/null)
-      (cd "$wt" && bash scripts/state.sh set "$proj" "$theme" .worktree.cleanup_reason '"removed after final CI, upstream-head, and clean-tree verification"' >/dev/null)
+      (cd "$wt" && bash scripts/chain state set "$proj" "$theme" .pr '{"number":1,"url":"https://example.invalid/pr/1","ci":"green"}' >/dev/null)
+      (cd "$wt" && bash scripts/chain state set "$proj" "$theme" .worktree.cleanup_status '"removed"' >/dev/null)
+      (cd "$wt" && bash scripts/chain state set "$proj" "$theme" .worktree.cleanup_reason '"removed after final CI, upstream-head, and clean-tree verification"' >/dev/null)
     fi
-    (cd "$wt" && bash scripts/state.sh transition "$proj" "$theme" "$phase" done >/dev/null)
+    (cd "$wt" && bash scripts/chain state transition "$proj" "$theme" "$phase" done >/dev/null)
   done
   git -C "$wt" add -A
   git -C "$wt" commit -qm "P8 seal"
@@ -98,7 +100,7 @@ resume_output="$(cd "$repo" && PATH="$fake_bin:$PATH" "$HELPER" prepare 3 alpha 
 wt_again="$(tail -n 1 <<<"$resume_output")"
 [ "$wt_again" = "$wt" ] || fail "resume did not return the same path"
 if grep -F 'SECRET=not-logged' <<<"$resume_output" >/dev/null; then fail "secret value leaked in prepare output"; fi
-if (cd "$wt" && bash scripts/state.sh set 3 alpha .worktree.dev_port '"bad"' >/dev/null 2>&1); then fail "state.sh accepted invalid worktree metadata"; fi
+if (cd "$wt" && bash scripts/chain state set 3 alpha .worktree.dev_port '"bad"' >/dev/null 2>&1); then fail "state.sh accepted invalid worktree metadata"; fi
 [ "$(jq -r .worktree.dev_port "$wt/specs/PROJ-3-alpha/state.json")" = null ] || fail "invalid state mutation changed worktree metadata"
 ok "prepare creates and idempotently resumes an isolated persistent worktree"
 
@@ -152,7 +154,7 @@ ok "prepare runs the wave-plan validator before creating anything"
 repo="$TMP_ROOT/not-approved/control"
 mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 21 rho absent
-(cd "$repo" && bash scripts/state.sh transition 21 rho P0 running >/dev/null)
+(cd "$repo" && bash scripts/chain state transition 21 rho P0 running >/dev/null)
 git -C "$repo" add specs/PROJ-21-rho/state.json && git -C "$repo" commit -qm "state already advanced"
 if (cd "$repo" && "$HELPER" prepare 21 rho >/dev/null 2>&1); then fail "non-CP1-approved state was accepted"; fi
 git -C "$repo" show-ref --verify --quiet refs/heads/proj/PROJ-21 && fail "state failure created the PROJ branch"
@@ -275,7 +277,7 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 10 theta absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 10 theta)"
 advance_to_p8_done "$wt" 10 theta
-(cd "$wt" && bash scripts/state.sh set 10 theta .pr.ci '"red"' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 10 theta .pr.ci '"red"' >/dev/null)
 git -C "$wt" add specs/PROJ-10-theta/state.json
 git -C "$wt" commit -qm "record red CI"
 git -C "$wt" push -q
@@ -293,8 +295,8 @@ remote="$TMP_ROOT/not-p8/remote.git"
 mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 13 iota absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 13 iota)"
-(cd "$wt" && bash scripts/state.sh set 13 iota .pr '{"number":1,"url":"https://example.invalid/pr/1","ci":"green"}' >/dev/null)
-(cd "$wt" && bash scripts/state.sh set 13 iota .worktree.cleanup_status '"removed"' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 13 iota .pr '{"number":1,"url":"https://example.invalid/pr/1","ci":"green"}' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 13 iota .worktree.cleanup_status '"removed"' >/dev/null)
 head="$(git -C "$wt" rev-parse HEAD)"
 if (cd "$repo" && "$HELPER" cleanup 13 iota --ci-verified-head "$head" >/dev/null 2>&1); then fail "non-P8 state was cleaned"; fi
 [ "$(jq -r .worktree.cleanup_reason "$wt/specs/PROJ-13-iota/state.json")" = "state is not P8:done" ] || fail "non-P8 reason missing"
@@ -306,7 +308,7 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 14 kappa absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 14 kappa)"
 advance_to_p8_done "$wt" 14 kappa
-(cd "$wt" && bash scripts/state.sh set 14 kappa .worktree.cleanup_status '"pending"' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 14 kappa .worktree.cleanup_status '"pending"' >/dev/null)
 git -C "$wt" add specs/PROJ-14-kappa/state.json && git -C "$wt" commit -qm "remove cleanup intent" && git -C "$wt" push -q
 head="$(git -C "$wt" rev-parse HEAD)"
 if (cd "$repo" && "$HELPER" cleanup 14 kappa --ci-verified-head "$head" >/dev/null 2>&1); then fail "pending cleanup intent was accepted"; fi
@@ -382,7 +384,7 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 18 xi absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 18 xi)"
 advance_to_p8_done "$wt" 18 xi
-(cd "$wt" && bash scripts/state.sh set 18 xi .worktree.path '"/definitely/not/the/registered/path"' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 18 xi .worktree.path '"/definitely/not/the/registered/path"' >/dev/null)
 git -C "$wt" add specs/PROJ-18-xi/state.json && git -C "$wt" commit -qm "corrupt topology" && git -C "$wt" push -q
 head="$(git -C "$wt" rev-parse HEAD)"
 if (cd "$repo" && "$HELPER" cleanup 18 xi --ci-verified-head "$head" >/dev/null 2>&1); then fail "mismatched recorded path was accepted"; fi
@@ -395,7 +397,7 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 19 omicron absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 19 omicron)"
 advance_to_p8_done "$wt" 19 omicron
-(cd "$wt" && bash scripts/state.sh set 19 omicron .worktree.branch '"proj/PROJ-999"' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 19 omicron .worktree.branch '"proj/PROJ-999"' >/dev/null)
 git -C "$wt" add specs/PROJ-19-omicron/state.json && git -C "$wt" commit -qm "corrupt branch metadata" && git -C "$wt" push -q
 head="$(git -C "$wt" rev-parse HEAD)"
 if (cd "$repo" && "$HELPER" cleanup 19 omicron --ci-verified-head "$head" >/dev/null 2>&1); then fail "mismatched recorded branch was accepted"; fi
@@ -440,10 +442,10 @@ ok "late P0 resume cannot erase retained cleanup evidence"
 
 # Simulated final git-remove refusal must also flip the durable local state.
 rm -f "$wt/untracked.txt"
-(cd "$wt" && bash scripts/state.sh transition 9 eta P8 running >/dev/null)
-(cd "$wt" && bash scripts/state.sh set 9 eta .worktree.cleanup_status '"removed"' >/dev/null)
-(cd "$wt" && bash scripts/state.sh set 9 eta .worktree.cleanup_reason '"removed after final CI, upstream-head, and clean-tree verification"' >/dev/null)
-(cd "$wt" && bash scripts/state.sh transition 9 eta P8 done >/dev/null)
+(cd "$wt" && bash scripts/chain state transition 9 eta P8 running >/dev/null)
+(cd "$wt" && bash scripts/chain state set 9 eta .worktree.cleanup_status '"removed"' >/dev/null)
+(cd "$wt" && bash scripts/chain state set 9 eta .worktree.cleanup_reason '"removed after final CI, upstream-head, and clean-tree verification"' >/dev/null)
+(cd "$wt" && bash scripts/chain state transition 9 eta P8 done >/dev/null)
 if [ -n "$(git -C "$wt" status --porcelain)" ]; then
   git -C "$wt" add specs/PROJ-9-eta/state.json
   git -C "$wt" commit -qm "reseal cleanup"
@@ -469,7 +471,7 @@ init_repo "$repo" 12 runner absent
 runner_bin="$TMP_ROOT/runner-bin"
 mkdir -p "$runner_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$runner_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nwt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\ncp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\ncp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\nchmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs"\n(cd "$wt" && bash scripts/state.sh transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n(cd "$wt" && bash scripts/state.sh transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\ngit -C "$wt" add -A\ngit -C "$wt" commit -qm "seal P0"\n' >"$runner_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nwt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\ncp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\ncp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\nchmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs"\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\ngit -C "$wt" add -A\ngit -C "$wt" commit -qm "seal P0"\n' >"$runner_bin/claude"
 chmod +x "$runner_bin/codex" "$runner_bin/claude"
 runner_out="$TMP_ROOT/runner.out"
 (cd "$repo" && \
@@ -477,7 +479,7 @@ runner_out="$TMP_ROOT/runner.out"
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
   RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
-  "$ROOT/runner/run-phase.sh" P0 12 runner --timeout 30 >"$runner_out" 2>&1)
+  "$ROOT/runner/run-phase.sh" P0 12 runner --timeout 30 >"$runner_out" 2>&1) || { cat "$runner_out" >&2; fail "runner P0 exited non-zero"; }
 [ "$(grep -c 're-entering persistent PROJ worktree exactly once' "$runner_out")" -eq 1 ] || { cat "$runner_out" >&2; fail "runner did not re-exec exactly once"; }
 wt="$TMP_ROOT/runner/control-proj12"
 [ "$(jq -r '.phase + ":" + .status' "$wt/specs/PROJ-12-runner/state.json")" = P0:done ] || fail "runner worktree state is not P0:done"
@@ -503,7 +505,7 @@ init_repo "$repo" 27 omega absent
 auto_bin="$TMP_ROOT/runner-auto-bin"
 mkdir -p "$auto_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$auto_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\n  printf "#!/usr/bin/env bash\\nexit 0\\n" >"$wt/scripts/quality-gate-proof.sh"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs" "$wt/scripts/quality-gate-proof.sh"\n  (cd "$wt" && bash scripts/state.sh transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/state.sh transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/state.sh get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/state.sh transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/state.sh transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\n  printf "#!/usr/bin/env bash\\nexit 0\\n" >"$wt/scripts/quality-gate-proof.sh"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs" "$wt/scripts/quality-gate-proof.sh"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
 chmod +x "$auto_bin/codex" "$auto_bin/claude"
 set +e
 (cd "$repo" && \

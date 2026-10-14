@@ -77,7 +77,7 @@ fix-controller loop.
 This Claude skill uses the Codex QA skill as the behavioral source of truth. Keep the gates, persona roles, severity rules, durable-context candidate behavior, and handoff behavior aligned with the Codex copy. Claude-specific differences are limited to tool invocation:
 
 - Use Playwright or the current agent browser/browser automation tools when available; otherwise run the repo's test commands and clearly report the E2E gap.
-- The persona panel runs through `cross-review.sh`; the finder itself spawns no review subagents. Explore-type spawns for locating code are fine. If subagents are unavailable, run QA locally and keep artifacts summarized.
+- The persona panel runs through `chain review`; the finder itself spawns no review subagents. Explore-type spawns for locating code are fine. If subagents are unavailable, run QA locally and keep artifacts summarized.
 - Collect durable-context candidates for project-root `AGENTS.md`; `CLAUDE.md` must stay a pointer-only file that tells Claude to read `AGENTS.md`.
 - Keep long screenshots, transcripts, logs, and persona reviews out of the main final answer; summarize findings with file/line, reproduction, severity, and evidence path.
 
@@ -111,14 +111,14 @@ QA's persona review is the opposite-provider panel below; there is no in-session
 
 ```bash
 BASE="specs/PROJ-<X>-<theme>"
-BASE_SHA="$(bash scripts/state.sh get <X> <theme> .base_sha)"
+BASE_SHA="$(bash scripts/chain state get <X> <theme> .base_sha)"
 # The QA report is the QA summary sections only — never the whole progress.md.
 QA_REPORT="$(mktemp)"
 # Framework run: write the summary you will print as your final output into "$QA_REPORT"
 # (the runner stores that output as 5_progress/qa-finder-<ts>.md only after you finish).
 # Interactive run: export the QA Results section of progress.md:
 # awk '/^## /{p=($0=="## QA Results")} p' "$BASE/5_progress/PROJ-<X>-progress.md" >"$QA_REPORT"
-bash scripts/cross-review.sh qa <X> <theme> \
+bash scripts/chain review qa <X> <theme> \
   --artifacts "$QA_REPORT" \
   --ground-truth "$BASE/3-4_plan/PROJ-<X>-architecture.md" "$BASE"/2_PRDs/PROJ-<X>-PRD-*.md \
   --author-provider claude --persist --personas \
@@ -128,7 +128,7 @@ bash scripts/cross-review.sh qa <X> <theme> \
   --round 1
 ```
 
-The workers are Chen (security), Weber (architecture), Sharma (performance), Mueller (reliability), Rodriguez (cross-wave architecture), and Takahashi (minimalism). Codex is preferred. If it is missing or unauthenticated, the script prints a visible degraded-mode notice, records `degraded_fallback: true`, and runs the same six personas as six separate Claude workers on the strongest Claude model (rank `fable opus sonnet`, override `CLAUDE_REVIEW_MODEL`) — even when that is the author model; tell the user that independent-provider review was unavailable and which model substituted. In framework runs the QA finder itself already runs on the opposite provider (the runner's peer lane); interactively, run this skill in a session on the other provider or model where possible and treat the persona cross-review as the minimum opposite review. Critical/High findings enter `findings.json` through `ledger.mjs` and block the release decision. Rodriguez and Takahashi also emit one `low` finding with category `retrospective` (their retrospective); it is not a defect and does not keep the loop running. Fix/review orchestration stays with the P6 controller: follow `cross-review`'s automatic loop through round 3 while defect findings of any severity remain, stopping early when clean. QA reports findings; the controller delegates fixes and refreshes evidence before re-review. After round 3, escalate remaining Critical/High findings and report or defer Medium/Low.
+The workers are Chen (security), Weber (architecture), Sharma (performance), Mueller (reliability), Rodriguez (cross-wave architecture), and Takahashi (minimalism). Codex is preferred. If it is missing or unauthenticated, the script prints a visible degraded-mode notice, records `degraded_fallback: true`, and runs the same six personas as six separate Claude workers on the strongest Claude model (rank `fable opus sonnet`, override `CLAUDE_REVIEW_MODEL`) — even when that is the author model; tell the user that independent-provider review was unavailable and which model substituted. In framework runs the QA finder itself already runs on the opposite provider (the runner's peer lane); interactively, run this skill in a session on the other provider or model where possible and treat the persona cross-review as the minimum opposite review. Critical/High findings enter `findings.json` through `chain findings` and block the release decision. Rodriguez and Takahashi also emit one `low` finding with category `retrospective` (their retrospective); it is not a defect and does not keep the loop running. Fix/review orchestration stays with the P6 controller: follow `cross-review`'s automatic loop through round 3 while defect findings of any severity remain, stopping early when clean. QA reports findings; the controller delegates fixes and refreshes evidence before re-review. After round 3, escalate remaining Critical/High findings and report or defer Medium/Low.
 
 ### 0. Start Dev Server
 
@@ -220,7 +220,7 @@ Scale checks to the feature — not every feature needs all of these:
 ### 5. UI Consistency Check
 
 **Component Registry hard check:**
-- Run `node scripts/gen-component-registry.mjs --check` (nested app root: `<app> --check --out docs/components.md`). Non-zero exit → file a Critical bug: either a component lacks its doc block or `docs/components.md` was not regenerated (registry desynced is a process failure). Do not fix it — report it.
+- Run `bash scripts/chain render registry --check` (nested app root: `<app> --check --out docs/components.md`). Non-zero exit → file a Critical bug: either a component lacks its doc block or `docs/components.md` was not regenerated (registry desynced is a process failure). Do not fix it — report it.
 - For every new component, search the registry for semantically similar existing components (Button/PrimaryButton, Card/Panel, Badge/Chip/Tag). Flag any that should have been reused instead.
 - Visit `/dev/components` showcase route via Playwright or the active agent browser: does every registered component render, in **both** light and dark mode? Does every `## Patterns` entry of `docs/DESIGN-SYSTEM.md` have its `#pattern-<name>` section? Any new component not registered?
 
@@ -309,9 +309,9 @@ Also document `### Sonar Quality Input`:
 - Any Sonar findings promoted to QA bugs, with BUG-IDs
 - Explicit statement when Sonar was skipped and therefore not considered release-blocking
 
-**Findings ledger (framework runs):** when `scripts/ledger.mjs` exists,
+**Findings ledger (framework runs):** when `scripts/chain findings` exists,
 additionally emit every bug as a ledger record — one JSON line per bug
-piped to `node scripts/ledger.mjs add <X> <theme>` with
+piped to `bash scripts/chain findings add <X> <theme>` with
 `source: "qa"`, the normalized severity, the file plus symbol **anchor**
 (not a line number), and the BUG-ID in the summary. The ledger is the
 single fix queue the P6 controller works from; markdown bug entries
@@ -368,7 +368,7 @@ Then ask: **"Which bugs should be fixed first?"**
 question AND the fixing. This skill ends after documenting findings and
 emitting ledger records; the P6 phase controller (separate lane, or the in-session driver's lead) owns
 verification, fix dispatch, opposite re-verification, and
-`ledger.mjs auto-defer` for Medium/Low. Do not fix, do not transition
+`chain findings auto-defer` for Medium/Low. Do not fix, do not transition
 state — report findings in the final output and stop.
 
 

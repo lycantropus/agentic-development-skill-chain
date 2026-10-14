@@ -1,6 +1,6 @@
 ---
 name: executing-large-model
-description: "Default Step 5 of the chain: run Checkpoint 1 and P0 setup through 5_executing's checkpoint and setup subskills (each in a subagent, the user dialogue in the lead), then execute the waves with the same state.sh, wave-gate, ledger, Quality Gate and QA-handoff contracts as 5_executing — step-by-step TDD choreography and persona reviews replaced by intent and invariants; the strongest model leads, workers stay tiered by Complexity, reviews go to the strongest opposite model. Use when: (1) wave plans exist and need CP1 approval, P0 setup, and execution, (2) an approved plan is ready for execution or a run must resume. Not for: writer lanes on weaker models (use 5_executing), planning, architecture, requirements, or a repo without 5_executing installed."
+description: "Default Step 5 of the chain: run Checkpoint 1 and P0 setup through 5_executing's checkpoint and setup subskills (each in a subagent, the user dialogue in the lead), then execute the waves with the same chain state, wave-gate, ledger, Quality Gate and QA-handoff contracts as 5_executing — step-by-step TDD choreography and persona reviews replaced by intent and invariants; the strongest model leads, workers stay tiered by Complexity, reviews go to the strongest opposite model. Use when: (1) wave plans exist and need CP1 approval, P0 setup, and execution, (2) an approved plan is ready for execution or a run must resume. Not for: writer lanes on weaker models (use 5_executing), planning, architecture, requirements, or a repo without 5_executing installed."
 ---
 
 # Executing — large-model variant (default Step 5)
@@ -31,10 +31,10 @@ These are the parts that do not depend on model quality. They are unchanged
 from `5_executing` and the same scripts enforce them.
 
 1. **CP1 + P0.** Read the phase with the installed helper (the repo copy
-   arrives with P0): `bash ~/.claude/skills/5_executing/scripts/state.sh get <X> <theme> '.phase + ":" + .status'`
+   arrives with P0): `bash ~/.claude/skills/5_executing/scripts/chain state get <X> <theme> '.phase + ":" + .status'`
    (Codex: the `.codex/skills` copy). The subskills run in subagents; only
    verdicts and the review point list enter this context.
-   - No `state.json` → ask the user once: framework run (`state.sh init <X> <theme>`
+   - No `state.json` → ask the user once: framework run (`chain state init <X> <theme>`
      with the same helper, then route below) or standalone run (preflights from
      `5_executing` § FIRST ACTION step 2). Never implement past an unsealed CP1.
    - `CP1:pending` / `running` / `blocked` → `5_executing/subskills/checkpoint.md`,
@@ -58,29 +58,29 @@ from `5_executing` and the same scripts enforce them.
    In framework runs preflights belong to setup — never re-run them here — and
    work happens only inside `.worktree.path` from state; a standalone run works
    in the current checkout after its own preflights. On every
-   start or resume run `node ~/.claude/skills/5_executing/scripts/sync-framework.mjs`
+   start or resume run `bash ~/.claude/skills/5_executing/scripts/chain sync`
    (Codex: the installed `.codex/skills` copy), reconcile any reported
    difference, commit, and in the same step run only the `compile` of item 3
    (no worker between `sync` and `compile`; lead discipline, the retired hook stub catches only workers without a path), then
-   `bash scripts/state.sh transition <X> <theme> P5 running` if the phase was `P0:done`.
+   `bash scripts/chain state transition <X> <theme> P5 running` if the phase was `P0:done`.
 2. **Records before work.** `BASE_SHA` comes from `state.json` (standalone:
    `git rev-parse HEAD`). Create
    `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md` from the skeleton
    below before the first dispatch; if P0 already wrote it (negative controls,
    defaulted decisions), add the missing sections and keep its content. A
    legacy PROJ (`7_progress/`, `6_plan/`) keeps writing where its files already
-   are — never a second folder (`0_chain-guide/references/legacy-layout.md`). `wave-gate.sh` and `quality-gate-proof.sh`
+   are — never a second folder (`0_chain-guide/references/legacy-layout.md`). `chain gate wave` and `chain quality seal`
    parse it; keep their headings verbatim.
 3. **Wave start.** Read lazily: at PROJ start only the wave shape — each
    plan's `## User Stories in this Wave` and `## Execution` sections via
-   `scripts/story-slice.mjs` (`5_executing` § Input) — and the wave 1 plan; at
+   `scripts/chain render slice` (`5_executing` § Input) — and the wave 1 plan; at
    each wave start only that wave's plan, never earlier ones — what previous
    waves built comes from the wave shape plus `progress.md`. Before dispatching wave N:
    `git tag "wave-${WAVE}-start-PROJ-${PROJ}"` unless it exists (keep it on a
    resume; recreate only after a reset restart). The gate scopes CodeRabbit to this tag and fails hard without it.
    Before any worker starts, compile the wave's worker files (this wave's
-   architecture decisions and API contracts; no lock, no hash bookkeeping, no `state.sh`; the file header carries the plan hash):
-   `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>`.
+   architecture decisions and API contracts; no lock, no hash bookkeeping, no `chain state`; the file header carries the plan hash):
+   `bash scripts/chain render context compile <X> <theme> --wave <N>`.
    Exit ≠ 0 → no worker until a rerun exits 0; read the warnings before dispatch
    (e.g. `settings.json is not valid JSON — left unchanged`: repair, rerun; see
    `5_executing/subskills/setup.md`).
@@ -91,7 +91,7 @@ from `5_executing` and the same scripts enforce them.
 5. **Ownership and shared resources.** Each worker gets disjoint file
    ownership. Honor the plan's `## Execution` block: `sequential` means one
    story at a time. Every migration and every `auth_consuming` command, also
-   inside a worker, runs as `scripts/worktree.sh with-shared-lock -- <command>`.
+   inside a worker, runs as `scripts/chain worktree with-shared-lock -- <command>`.
    In a frontend wave the lead owns the dev server; workers never start or stop one.
    In a parallel wave the lead also owns `progress.md`, staging, and commits;
    workers report and do not commit.
@@ -104,7 +104,7 @@ from `5_executing` and the same scripts enforce them.
    named browser owner (after DB workers release the shared resource) and are
    integrated and committed with their command/route mappings. A route load
    alone does not prove an interaction. Then
-   `bash scripts/wave-gate.sh --ac-only <N> <X> <theme>`. Recovery has exactly
+   `bash scripts/chain gate wave --ac-only <N> <X> <theme>`. Recovery has exactly
    four stages: normal fix round, normal fix round with fresh workers, one
    read-only diagnostic worker, one different implementer applying the
    diagnosis. Static-check failures (`complexity_cmd`, `arch_rules_cmd`) follow
@@ -114,25 +114,25 @@ from `5_executing` and the same scripts enforce them.
    same committed `HEAD` and gate-config fingerprint; every correction commit
    invalidates it, and cached Ralph evidence is removed after any dependency,
    runtime, or environment change. Exit 76 (`blocked_external`) is a
-   missing prerequisite, not a defect: park via `state.sh`, no repair rounds.
+   missing prerequisite, not a defect: park via `chain state`, no repair rounds.
    Still red after stage four → the existing blocked path.
-7. **Wave gate.** `bash scripts/wave-gate.sh <N> <X> <theme>` must exit 0
+7. **Wave gate.** `bash scripts/chain gate wave <N> <X> <theme>` must exit 0
    before any worker for wave N+1 is dispatched. On success the script appends
    `### Wave N Gate — PASSED` (listing the static checks it ran or skipped); that
    block is the only proof of completion.
-   Then `bash scripts/state.sh set <X> <theme> .waves '{…}'` with current,
+   Then `bash scripts/chain state set <X> <theme> .waves '{…}'` with current,
    total, and per-story status. Do not stop between waves and do not ask the
    user; the gate is the signal.
 8. **Quality Gate.** After the last wave, follow
    `5_executing/references/quality-gate.md`: declared quality-phase commands,
    an integration-focused review of `BASE_SHA..HEAD`, mutation hardening
-   (Gate 0b, when `mutation_cmd` is set), build via `quality-evidence.mjs`,
+   (Gate 0b, when `mutation_cmd` is set), build via `chain quality`,
    coverage, Sonar once per PROJ with at most three fix rounds,
    combined recovery rounds; triage findings before fixing
    (`quality-gate.md` § Handling findings). Zero P0/P1 review findings to
-   pass. Fill the `## Quality Gate — PROJ-X` section, then `bash scripts/quality-gate-proof.sh <X> <theme>`
+   pass. Fill the `## Quality Gate — PROJ-X` section, then `bash scripts/chain quality seal <X> <theme>`
    must exit 0.
-9. **Handoff.** Framework run: `bash scripts/state.sh transition <X> <theme> P5 done`
+9. **Handoff.** Framework run: `bash scripts/chain state transition <X> <theme> P5 done`
    and stop; the runner starts P6 as fresh lanes. In-session driver run: go on
    with `5_executing/references/in-session-driver.md`. Interactive run: flush
    context — tell the user to run `/compact` (or open a fresh session, ideally
@@ -167,7 +167,7 @@ expected to choose the concrete steps.
   external state, polling, shared-lock caveat):
   `5_executing/references/writing-tests.md` § Evidence Rules.
 - **Worker briefs.** A story worker's role is the `Agent Type` column of the
-  wave plan (binding; read it with `node scripts/validate-wave-plan.mjs --stories
+  wave plan (binding; read it with `bash scripts/chain check plan --stories
   <wave-plan>`; spawn exactly the role in the file header and the JSON (plans without
   the column: `implementer`, or the two side roles under `Split: contract`);
   only fix workers choose the type, with that type's role file). Its whole brief is ONE file,
@@ -201,7 +201,7 @@ expected to choose the concrete steps.
   tiered from the wave plan's `Complexity` column: `sonnet` by default, `opus`
   where the plan says so; a missing column means `sonnet` plus one line in
   `progress.md`. Reviews go to the strongest opposite-provider model, with the
-  in-family fallback handled by `cross-review.sh`. Configure reviewer models no
+  in-family fallback handled by `chain review`. Configure reviewer models no
   weaker than the writer: the runner only refuses identical writer and review
   models, so a weaker reviewer is an operator choice to avoid, and any degraded
   fallback must be reported.
@@ -231,7 +231,7 @@ Lead, führe die AC-Commands nicht aus; nenne im Report je AC die Testdatei
 Execution: <parallel|sequential>, <runtime constraints>.
 You own: <files/dirs>. Touch nothing else; escalate if you must.
 Shared resources: wrap every migration and auth-consuming command as
-  scripts/worktree.sh with-shared-lock -- <cmd>. Do not start or stop a dev server.
+  scripts/chain worktree with-shared-lock -- <cmd>. Do not start or stop a dev server.
 Prior waves: <one paragraph>. Notes: <path>/agent.md (read first, append walls).
 UI (if any): the handoff sections the slice points to
   (1d_prototypes/implementation-handoff.md); component mockups do not replace
@@ -247,7 +247,7 @@ Parallel wave: do not stage or commit; the lead integrates and commits.
 
 ## progress.md skeleton
 
-Headings under `## Quality Gate` are parsed by `quality-gate-proof.sh`; keep
+Headings under `## Quality Gate` are parsed by `chain quality seal`; keep
 them and their `Status:` lines verbatim.
 
 ```markdown
@@ -311,7 +311,7 @@ Escalate or park the run, never improvise past these: Outer Ralph exhausted
 all four stages; the root cause is in the spec or architecture; a declared
 external prerequisite is missing (exit 76); a required tool is absent (install
 it, do not bypass the gate); requirements contradict each other. In framework
-runs use `state.sh` for the blocked phase and reason and render the stop report.
+runs use `chain state` for the blocked phase and reason and render the stop report.
 
 ## Provider notes
 
@@ -324,4 +324,4 @@ runs use `state.sh` for the blocked phase and reason and render the stop report.
   workers.
 - **Codex:** use `spawn_agent` worker roles with explicit file ownership; no
   `/compact`, so item 9 becomes: suggest a different model, then invoke
-  `/6_qa`; skill assets live under `.codex/skills`; the installed synchronizer is `~/.codex/skills/5_executing/scripts/sync-framework.mjs`.
+  `/6_qa`; skill assets live under `.codex/skills`; the installed synchronizer is `~/.codex/skills/5_executing/scripts/chain sync`.

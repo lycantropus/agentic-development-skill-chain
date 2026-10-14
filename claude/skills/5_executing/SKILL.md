@@ -49,10 +49,10 @@ Before doing ANYTHING else — before reading plans, before spawning any agent:
    `subskills/checkpoint.md` and `subskills/setup.md` and run in spawned
    subagents so this context keeps only verdicts. If
    `specs/PROJ-<X>-<theme>/state.json` is missing, ask the user once:
-   framework run (create it with `bash ~/.claude/skills/5_executing/scripts/state.sh init <X> <theme>`, then route
+   framework run (create it with `bash ~/.claude/skills/5_executing/scripts/chain state init <X> <theme>`, then route
    as below — never implement past an unsealed CP1) or standalone run
    (step 2). If it exists, route on
-   `bash ~/.claude/skills/5_executing/scripts/state.sh get <X> <theme> '.phase + ":" + .status'`
+   `bash ~/.claude/skills/5_executing/scripts/chain state get <X> <theme> '.phase + ":" + .status'`
    (the installed helper — the repo copy may not exist before P0):
    - `CP1:pending` / `CP1:running` / `CP1:blocked` → **checkpoint** (`subskills/checkpoint.md`,
      CP1 roles): spawn the prepare subagent and wait for it. `sealed` → go on.
@@ -68,16 +68,16 @@ Before doing ANYTHING else — before reading plans, before spawning any agent:
    - `P0:done` (fresh PROJ) or `P5:*` (resume) → continue below. The phase
      runner arrives here directly; its P0 lane already ran setup.
    - All preflights (permissions, `.coderabbit.yaml`, Supabase/browser/CLI +
-     auth) belong to setup's `preflight.sh`; do NOT re-run them here.
+     auth) belong to setup's `chain check preflight`; do NOT re-run them here.
    - Verify the current directory is `.worktree.path` from state. P0 owns the
      persistent PROJ worktree and the runner re-executes there; do not implement
      from the control checkout. Dependencies are isolated, while `.env.local`,
      development data, and hosted-auth limits are deliberately shared.
    - **Unattended handoff, once, on `P0:done`:** follow `references/unattended-handoff.md`
      in `.worktree.path` (one probe, at most one question: unattended, in this session, or interactive).
-   - **On every implementation start or resume**, after verifying the worktree path and before launching workers, run `node ~/.claude/skills/5_executing/scripts/sync-framework.mjs`. Use the installed command, not a potentially stale project copy. A non-zero result blocks implementation: reconcile reported differences against installed sources, test adaptations, and rerun with `--adopt <reviewed-path>` for each resolved file. Never overwrite or blindly adopt project customizations.
-   - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If the refresh changed any helper, template or role manifest, run `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>` (N = the wave about to start) in the same step as `sync-framework` — it rewrites the worker and agent files and removes a retired context-injector hook. Start no worker between `sync` and `compile`, and none after a non-zero `compile` until a rerun exits 0 (lead discipline: the retired hook stub only tells a worker whose prompt names no path to abort and delivers no context; it does not catch a worker holding a path to an outdated file). Read `compile`'s output: a `⚠ … is not valid JSON — left unchanged` for `.claude/settings.json` means the old hook is still there; repair the file by hand and rerun `compile` (`grep -c context-injector .claude/settings.json` must print 0). This new commit invalidates old gate evidence; never refresh during workers or a gate.
-   - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/state.sh transition <X> <theme> P5 running`.
+   - **On every implementation start or resume**, after verifying the worktree path and before launching workers, run `bash ~/.claude/skills/5_executing/scripts/chain sync`. Use the installed command, not a potentially stale project copy. A non-zero result blocks implementation: reconcile reported differences against installed sources, test adaptations, and rerun with `--adopt <reviewed-path>` for each resolved file. Never overwrite or blindly adopt project customizations.
+   - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If the refresh changed any helper, template or role manifest, run `bash scripts/chain render context compile <X> <theme> --wave <N>` (N = the wave about to start) in the same step as `sync-framework` — it rewrites the worker and agent files and removes a retired context-injector hook. Start no worker between `sync` and `compile`, and none after a non-zero `compile` until a rerun exits 0 (lead discipline: the retired hook stub only tells a worker whose prompt names no path to abort and delivers no context; it does not catch a worker holding a path to an outdated file). Read `compile`'s output: a `⚠ … is not valid JSON — left unchanged` for `.claude/settings.json` means the old hook is still there; repair the file by hand and rerun `compile` (`grep -c context-injector .claude/settings.json` must print 0). This new commit invalidates old gate evidence; never refresh during workers or a gate.
+   - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/chain state transition <X> <theme> P5 running`.
 2. **Standalone fallback (no state.json — manual run without the framework):**
    run the legacy preflights inline before wave 1: (a) permission preflight —
    `claude --dangerously-skip-permissions` or `bash scripts/merge-project-settings.sh`
@@ -105,7 +105,7 @@ Before spawning ANY teammate for a new wave N+1, you MUST run the Wave Gate scri
 Doc-input collection is owned by Skill 7. Do not fill documentation summaries or Post-Wave-Notes blocks during Skill 5. Keep `progress.md`, commit messages, and `agent.md` accurate; Skill 7 harvests those sources after QA.
 
 ```bash
-bash scripts/wave-gate.sh <N> <PROJ-X> <theme>
+bash scripts/chain gate wave <N> <PROJ-X> <theme>
 ```
 
 Exit code ≠ 0 → STOP. For `blocked_external` / exit 76, retain the AC and
@@ -115,13 +115,13 @@ spawn the next wave's teammates.
 
 For a provider signature only (`over_request_rate_limit`, `Request rate limit reached`, or HTTP/status 429), the gate pauses and retries that AC once. For auth-consuming browser commands, `auth_budget.rate_limit_evidence_cmd` may establish the same fact from server/provider evidence outside the Playwright stream; its output is retained. A second occurrence is red infrastructure, not a reason to widen limits. Other failures — including a test name containing “rate limit” — are ordinary red ACs.
 
-Before P0 seals an auth-budget project, `bash scripts/wave-gate.sh --auth-budget-negative-control 1 <PROJ-X> <theme>` must return the configured exhausted exit code and persist `infrastructure_failed`. It exercises the configured hooks with `SKILLCHAIN_AUTH_BUDGET_NEGATIVE_CONTROL=1` and never drains a real hosted bucket.
+Before P0 seals an auth-budget project, `bash scripts/chain gate wave --auth-budget-negative-control 1 <PROJ-X> <theme>` must return the configured exhausted exit code and persist `infrastructure_failed`. It exercises the configured hooks with `SKILLCHAIN_AUTH_BUDGET_NEGATIVE_CONTROL=1` and never drains a real hosted bucket.
 
 The script validates:
 1. **Current wave ACs** — every structured `ac_commands` entry exits 0 and reports a non-empty selected-test count. A cached pass requires the same command, test files, auth classification, gate-config fingerprint, positive selection, and committed `verified_head`; equivalent commands may share execution across AC IDs, with evidence recorded for each ID. Changed or uncommitted code cannot be certified.
 2. **Declared targeted regressions** — every `regression_commands` entry covers shared behavior affected by this wave and runs after the current ACs and before smoke; selection-aware entries must prove that they selected tests. Broad hosted-auth/browser suites belong in `phase_commands`, not every wave.
 3. **Smoke Test** — the configured dev server is reused or started by the gate. Anonymous routes must match URL and characteristic content; redirects are failures. Protected routes require auth state or authenticated E2E coverage.
-4. **Component registry** — `gen-component-registry.mjs --check` passes where applicable.
+4. **Component registry** — `chain render registry --check` passes where applicable.
 5. **Static checks (optional)** — `complexity_cmd` and `arch_rules_cmd`, run last in the AC pass (`--ac-only` and the full gate) once the ACs are green; contract in `4_writing-plans/references/wave-gate-config.md`. Absent keys are skipped and noted in the PASSED block.
 6. **Build** — `build_cmd` from config exits 0; runs in parallel with CodeRabbit as the last phase.
 7. **CodeRabbit** — every attempt archives raw and normalized evidence, validates the finding count, ingests it, and then requires zero cumulative open blocking findings in the ledger.
@@ -133,9 +133,9 @@ regression suite. It does not claim that every earlier AC command was rerun.
 
 On success the script appends a `### Wave N Gate — PASSED` block with timestamp to `progress.md`. This is the canonical proof that the wave is done — no manual checkbox editing.
 
-**Framework runs (state.json exists):** after every green gate, update the machine state too — `bash scripts/state.sh set <X> <theme> .waves '{"current": <N>, "total": <M>, "stories": {…per-US status…}}'` (merge with the existing block). The gate pipes its normalized CodeRabbit findings into the ledger when `scripts/ledger.mjs` is present; Sonar evidence remains in the configured system — never re-enter either by hand.
+**Framework runs (state.json exists):** after every green gate, update the machine state too — `bash scripts/chain state set <X> <theme> .waves '{"current": <N>, "total": <M>, "stories": {…per-US status…}}'` (merge with the existing block). The gate pipes its normalized CodeRabbit findings into the ledger when `scripts/chain findings` is present; Sonar evidence remains in the configured system — never re-enter either by hand.
 
-**If a framework helper is missing:** run `node ~/.claude/skills/5_executing/scripts/sync-framework.mjs` to restore the managed inventory, resolve any reported conflicts, and commit before running the gate. Standalone runs use the same synchronization before their first wave.
+**If a framework helper is missing:** run `bash ~/.claude/skills/5_executing/scripts/chain sync` to restore the managed inventory, resolve any reported conflicts, and commit before running the gate. Standalone runs use the same synchronization before their first wave.
 
 **If jq, coderabbit, or agent-browser are missing:** the script prints a clear error and exits non-zero. Install them, do not work around the gate.
 
@@ -280,7 +280,7 @@ Read lazily — the lead's context has to last the whole PROJ, and nothing below
 **At PROJ start** — only the wave shape, sliced from the plans themselves (each plan's `## User Stories in this Wave` table and `## Execution` block — stories, agent type, complexity, dependencies, mode), and the wave 1 plan:
 
 ```bash
-for p in specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md; do node scripts/story-slice.mjs "$p" "User Stories in this Wave"; node scripts/story-slice.mjs "$p" Execution; done
+for p in specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md; do bash scripts/chain render slice "$p" "User Stories in this Wave"; bash scripts/chain render slice "$p" Execution; done
 ```
 
 **At each wave start** — only that wave's plan, `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md`. Its lead-facing header (`## User Stories in this Wave`, `## Execution`) drives dispatch. Each `## <US-ID>` section is that worker's slice — ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints, gotchas — and is compiled verbatim into the worker's file under `## Deine Story` (Step 2). Never re-read earlier waves' plans: what previous waves implemented comes from the wave shape plus `5_progress/PROJ-<X>-progress.md`.
@@ -346,10 +346,10 @@ Include relevant sections in the teammate prompt so they don't repeat known dead
 (Implementers additionally follow the agent.md read/write protocol in `references/implementer.md`;
 entries are rendered with `templates/agent-md-entry.md.tmpl`.)
 
-Compile wave N's worker files: one per story (`context/workers/wave-<N>/<US-ID>.md`) and one per role without a story (`context/roles/wave-<N>/<role>.md`, for reviewers and fix workers). The architecture view carries only this wave's decisions and `api-contracts-own-wave` only its contracts. `compile` also rewrites the `skillchain-*` agent files; it keeps no lock, no hash bookkeeping and no `state.sh` entry (each file's first line carries the plan hash):
+Compile wave N's worker files: one per story (`context/workers/wave-<N>/<US-ID>.md`) and one per role without a story (`context/roles/wave-<N>/<role>.md`, for reviewers and fix workers). The architecture view carries only this wave's decisions and `api-contracts-own-wave` only its contracts. `compile` also rewrites the `skillchain-*` agent files; it keeps no lock, no hash bookkeeping and no `chain state` entry (each file's first line carries the plan hash):
 
 ```bash
-node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>
+bash scripts/chain render context compile <X> <theme> --wave <N>
 ```
 
 Exit ≠ 0 (budget breach, unassignable story, outdated local manifest, write error): start no worker until a rerun exits 0. Exit 0 is not enough: read the warnings too (e.g. `.claude/settings.json is not valid JSON — left unchanged`: repair, rerun; see `subskills/setup.md`). The file's first line carries the plan hash; after a plan change, rerun `compile`.
@@ -357,7 +357,7 @@ Exit ≠ 0 (budget breach, unassignable story, outdated local manifest, write er
 ### 2a. Mark wave start with a git tag
 
 <HARD-GATE>
-Before spawning any teammate for wave N, tag the current HEAD as the wave base. `wave-gate.sh` resolves this tag to scope the CodeRabbit diff. Without `WAVE_BASE_SHA` or this tag, the gate fails hard. This prevents accidentally reviewing broad branch history.
+Before spawning any teammate for wave N, tag the current HEAD as the wave base. `chain gate wave` resolves this tag to scope the CodeRabbit diff. Without `WAVE_BASE_SHA` or this tag, the gate fails hard. This prevents accidentally reviewing broad branch history.
 </HARD-GATE>
 
 ```bash
@@ -365,7 +365,7 @@ git rev-parse -q --verify "refs/tags/wave-${WAVE}-start-PROJ-${PROJ}" >/dev/null
   || git tag "wave-${WAVE}-start-PROJ-${PROJ}"
 ```
 
-One tag per (wave, PROJ) pair. Tags are local-only; do not push. If neither `WAVE_BASE_SHA` nor `wave-${WAVE}-start-PROJ-${PROJ}` exists, `wave-gate.sh` fails hard. There is no `HEAD~20`, commit-message, or root-commit fallback. An existing tag stays: `wave-gate.sh` sets the next wave's tag when a gate passes, and on a resume the tag must keep marking the wave base, otherwise workers' commits fall out of the CodeRabbit diff. Delete and re-create it (`git tag -d "wave-${WAVE}-start-PROJ-${PROJ}"`) only when the wave restarts from a reset checkout.
+One tag per (wave, PROJ) pair. Tags are local-only; do not push. If neither `WAVE_BASE_SHA` nor `wave-${WAVE}-start-PROJ-${PROJ}` exists, `chain gate wave` fails hard. There is no `HEAD~20`, commit-message, or root-commit fallback. An existing tag stays: `chain gate wave` sets the next wave's tag when a gate passes, and on a resume the tag must keep marking the wave base, otherwise workers' commits fall out of the CodeRabbit diff. Delete and re-create it (`git tag -d "wave-${WAVE}-start-PROJ-${PROJ}"`) only when the wave restarts from a reset checkout.
 
 ### 3. Create team and spawn teammates for the wave
 
@@ -390,15 +390,15 @@ constraints, and these ownership rules in every spawn prompt.
 The development database and hosted-auth budget are shared across the PROJ
 worktrees. Every database migration command—including one delegated to a story
 agent—and every other explicitly `auth_consuming` command must therefore be
-wrapped as `scripts/worktree.sh with-shared-lock -- <command>`. Put that exact
+wrapped as `scripts/chain worktree with-shared-lock -- <command>`. Put that exact
 constraint in the agent prompt; never let parallel agents run migrations
 outside the project lock. That lock only stops concurrent collisions;
-`wave-gate.sh` separately re-checks at the start of every wave that this
+`chain gate wave` separately re-checks at the start of every wave that this
 worktree's own `supabase/migrations/` still matches what the shared DB has
-actually applied (`scripts/migration-drift-check.sh`), since a sibling
+actually applied (`scripts/chain check migrations`), since a sibling
 worktree can advance the schema between waves with no lock involved at all.
 
-**The story worker's role comes from the plan, not from your judgment.** The `Agent Type` column of `## User Stories in this Wave` is binding. Read it with `node scripts/validate-wave-plan.mjs --stories specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (JSON per story: `role`, `split`, `complexity`, `fallback`) and spawn that role (`implementer`, `frontend-implementer`, `backend-implementer`; `skillchain-<role>` where the session can spawn P0's agent types). `Split: contract` is one backend and one frontend worker, each with its own file; `Split: fan-out` is one story file shared by all fan-out workers. For every worker file spawn exactly the role named in the file's first line (`role <role>`) and in the `--stories` JSON. Old plans without an `Agent Type` column (`fallback: true`; `compile` warns) get `implementer` for a story without split and the two side roles (`backend-implementer`, `frontend-implementer`) for `Split: contract`. Only fix workers choose the type themselves, and they take the role file of the type they chose:
+**The story worker's role comes from the plan, not from your judgment.** The `Agent Type` column of `## User Stories in this Wave` is binding. Read it with `bash scripts/chain check plan --stories specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (JSON per story: `role`, `split`, `complexity`, `fallback`) and spawn that role (`implementer`, `frontend-implementer`, `backend-implementer`; `skillchain-<role>` where the session can spawn P0's agent types). `Split: contract` is one backend and one frontend worker, each with its own file; `Split: fan-out` is one story file shared by all fan-out workers. For every worker file spawn exactly the role named in the file's first line (`role <role>`) and in the `--stories` JSON. Old plans without an `Agent Type` column (`fallback: true`; `compile` warns) get `implementer` for a story without split and the two side roles (`backend-implementer`, `frontend-implementer`) for `Split: contract`. Only fix workers choose the type themselves, and they take the role file of the type they chose:
 - fix touches only UI (components, pages, styling) → `frontend-implementer`
 - fix touches only server-side (API, DB, server actions) → `backend-implementer`
 - both, or unclear → `implementer` (generic)
@@ -481,13 +481,13 @@ After ALL workers in the wave report back and their changes are integrated, run 
 The lead starts the pass through the gate's AC-only mode so evidence is written in the canonical cache schema:
 
 ```bash
-bash scripts/wave-gate.sh --ac-only <N> <X> <theme>
+bash scripts/chain gate wave --ac-only <N> <X> <theme>
 ```
 
 It runs each uncached AC sequentially under the gate's timeout, auth-budget, pacing, and rate-limit controls. Ordinary AC failures are all evidenced before the pass exits non-zero so disjoint repairs can be batched; infrastructure and exhausted auth budgets still stop immediately. Each evidence record binds the canonical AC ID, task, exact command, test files, positive selected-test count, and committed `HEAD`.
 
 ```
-run bash scripts/wave-gate.sh --ac-only <N> <X> <theme>
+run bash scripts/chain gate wave --ac-only <N> <X> <theme>
 for normal_fix_round in 1..2:
   cluster failures by disjoint ownership
   dispatch correction workers concurrently where safe
@@ -509,7 +509,7 @@ if failures still remain: use the existing blocked-run evidence path
 - If diagnosis finds an invalid or contradictory AC, record the evidence and use the existing blocked/escalation path.
 - Exit 76 with `blocked_external` is a missing declared prerequisite, not a
   code defect and not a green AC. Keep the test and plan scope; no repair rounds,
-  invented approval, PASSED block or next-wave unlock. Use `state.sh` for the
+  invented approval, PASSED block or next-wave unlock. Use `chain state` for the
   blocked phase/stop reason and render the stop report. Rerun the unchanged gate
   when the prerequisite arrives: readiness is rechecked and its AC is not cached.
   PR, stop and morning renderers include declared prerequisites; final summaries
@@ -518,10 +518,10 @@ if failures still remain: use the existing blocked-run evidence path
 
 Update `progress.md` after the initial pass, each recovery stage, each reuse or invalidation decision, and the final result.
 
-### 5. Build check — handled by `wave-gate.sh`
+### 5. Build check — handled by `chain gate wave`
 
 Do not run an extra build between Ralph and the wave gate. Build is intentionally centralized:
-- **Wave-end build:** `wave-gate.sh` runs `build_cmd` once per wave. After ACs, regressions, browser smoke and the component registry check pass, build and CodeRabbit run concurrently on the same committed HEAD as the last gate phase, so an environmental smoke failure costs no review. The coordinator retains separate logs, waits for both results, then checks findings; either failure blocks. Interruption stops both command groups. Database and browser tests remain sequential.
+- **Wave-end build:** `chain gate wave` runs `build_cmd` once per wave. After ACs, regressions, browser smoke and the component registry check pass, build and CodeRabbit run concurrently on the same committed HEAD as the last gate phase, so an environmental smoke failure costs no review. The coordinator retains separate logs, waits for both results, then checks findings; either failure blocks. Interruption stops both command groups. Database and browser tests remain sequential.
 - **PROJ-end build:** the Quality Gate verifies the assembled PROJ before QA, reusing matching final-wave build evidence only when declared artifacts and inputs remain valid.
 
 If the wave gate finds a build failure, dispatch a fix worker with the verbatim compiler output, then rerun the gate.
@@ -537,7 +537,7 @@ After a wave worker completes or a recovery stage exposes a durable learning, wr
 ### 7. Wave review with CodeRabbit CLI
 
 <HARD-GATE>
-CodeRabbit is MANDATORY, but it is run by `wave-gate.sh`, not as a separate pre-gate command. Do NOT run a second per-wave review outside the gate.
+CodeRabbit is MANDATORY, but it is run by `chain gate wave`, not as a separate pre-gate command. Do NOT run a second per-wave review outside the gate.
 If CodeRabbit fails to execute (e.g., not installed, auth error), the gate exits non-zero. Fix the tool/auth problem and rerun the gate.
 </HARD-GATE>
 
@@ -568,7 +568,7 @@ This step verifies coverage; it does not create missing scenarios.
 
 **Skip this step if the wave only contained backend-implementer teammates.**
 
-Browser smoke testing is owned by `wave-gate.sh`. It reuses a matching reachable server or starts `frontend.dev_cmd`, waits for readiness, logs its output, and stops only the process it started. It then runs `agent-browser` to verify URL and characteristic content. Redirects are failures; protected routes require `auth_state` or authenticated E2E coverage.
+Browser smoke testing is owned by `chain gate wave`. It reuses a matching reachable server or starts `frontend.dev_cmd`, waits for readiness, logs its output, and stops only the process it started. It then runs `agent-browser` to verify URL and characteristic content. Redirects are failures; protected routes require `auth_state` or authenticated E2E coverage.
 
 ```bash
 # The lead owns this server for the wave; do not start or stop another one.
@@ -605,7 +605,7 @@ Do not invoke Ken from Skill 5. Do not create Ken wave BUG IDs or Ken wave backl
 Run the Wave Gate script once (including the Step 7 review and browser smoke):
 
 ```bash
-bash scripts/wave-gate.sh <N> <PROJ-X> <theme>
+bash scripts/chain gate wave <N> <PROJ-X> <theme>
 ```
 
 - Exit 0 → script appended `### Wave N Gate — PASSED` block to `progress.md`. Commit the wave. **Immediately proceed to next wave — do NOT pause, do NOT ask the user, do NOT announce "ready for next wave".** The gate already proved the wave is done; the next wave's Step 1 (read dependency map) is the next action.
@@ -626,7 +626,7 @@ See `references/quality-gate.md` for full instructions.
 **Order: mutation (when configured) → coverage → Sonar; the integration reviewer runs alongside build and coverage where safe.** Use the command/evidence sequence in `references/quality-gate.md`; keep DB/browser work serialized. Collect every stream before dispatching a combined fix round.
 
 Sonar runs here at PROJ end, with bounded fix/rescans — no wave gate runs it. Skip is allowed
-only when the tooling genuinely is not available; `scripts/quality-gate-proof.sh`
+only when the tooling genuinely is not available; `scripts/chain quality seal`
 rejects a skip when both CLIs and `sonar-project.properties` are present, so
 treat this as required whenever the project is Sonar-configured.
 
@@ -646,13 +646,13 @@ Spawn teammates:
 - "reviewer" using the `skillchain-reviewer` agent type (tier 2, read-only) with prompt:
   "Your assignment is in `specs/PROJ-<X>-<theme>/context/roles/wave-<last>/reviewer.md` (the last wave's reviewer file; its content is wave-neutral). Read it completely first. Review criteria: cross-wave contracts, shared state, authorization boundaries and unresolved wave findings; use references/code-reviewer.md only for relevant integration risks. Diff scope: the feature diff from BASE_SHA=$BASE_SHA (`git diff $BASE_SHA..HEAD`). Return findings without starting fixes."
 - "sonar" only if `sonar` and `sonar-scanner` are installed, a `general-purpose` spawn (no worker file) using the sonar-cli skill with prompt:
-  "Wait for successful current-revision coverage, then run the PROJ Sonar scan through quality-evidence.mjs run sonar, which executes the top-level sonar_cmd from wave-gate-config.json from the persistent PROJ worktree, then use sonar CLI/API for quality gate, issue, coverage, and duplication data. Verify a fresh .scannerwork/report-task.txt after sonar_cmd exits 0 so a silent no-op doesn't read as green. If project Sonar config is absent, record an allowed skip. Return findings to the lead; do not start an independent fix loop."
+  "Wait for successful current-revision coverage, then run the PROJ Sonar scan through `chain quality <X> <theme> run sonar`, which executes the top-level sonar_cmd from wave-gate-config.json from the persistent PROJ worktree, then use sonar CLI/API for quality gate, issue, coverage, and duplication data. Verify a fresh .scannerwork/report-task.txt after sonar_cmd exits 0 so a silent no-op doesn't read as green. If project Sonar config is absent, record an allowed skip. Return findings to the lead; do not start an independent fix loop."
 ```
 
-The lead uses `quality-evidence.mjs` to verify build (reusing valid final-wave artifacts), coverage, lint and every `phase_commands` entry marked
+The lead uses `chain quality` to verify build (reusing valid final-wave artifacts), coverage, lint and every `phase_commands` entry marked
 `quality` from `wave-gate-config.json` once for the assembled PROJ. CI/nightly
 entries are verified as wired to their named workflows, not replayed locally. The lead
-consolidates reviewer, build, integration/quality-phase, and Sonar results. Do not rerun `ac_commands`; their canonical proof belongs to wave-scoped Ralph and `wave-gate.sh`.
+consolidates reviewer, build, integration/quality-phase, and Sonar results. Do not rerun `ac_commands`; their canonical proof belongs to wave-scoped Ralph and `chain gate wave`.
 
 **After the reviewer and Sonar report:** triage per `references/quality-gate.md` § Handling findings, then clean up the team.
 
@@ -673,15 +673,15 @@ Update `progress.md` with Quality Gate results.
 Skill 5 stops after implementation, wave gates, and the integration-focused PROJ Quality Gate. **Skill 6 is the mandatory comprehensive QA** with the opposite-provider persona review (Chen/Weber/Sharma/Mueller/Rodriguez/Takahashi) + PROJ Retrospective + AGENTS.md candidate collection.
 
 **Framework runs (state.json exists):** seal the phase first —
-`bash scripts/quality-gate-proof.sh <X> <theme>` MUST exit 0 first, then run
-`bash scripts/state.sh transition <X> <theme> P5 done`. The phase runner
+`bash scripts/chain quality seal <X> <theme>` MUST exit 0 first, then run
+`bash scripts/chain state transition <X> <theme> P5 done`. The phase runner
 then starts P6 as fresh lanes (read-only QA finder + P6 controller);
 do NOT continue into Skill 6 inside this session, unless the user chose the in-session
 driver: then follow `references/in-session-driver.md` (it runs QA as a read-only finder in a subagent and the controller itself).
 
 Before Skill 6 (interactive runs):
 
-1. Run `bash scripts/quality-gate-proof.sh <X> <theme>`; it rejects a missing
+1. Run `bash scripts/chain quality seal <X> <theme>`; it rejects a missing
    section, build evidence, or Sonar disposition, and rejects a Sonar skip when
    the configured scanner was available.
 2. Hand off with a context flush: wave plans, agent chatter, Ralph recovery evidence and Quality-Gate output are all on disk in `progress.md`. Tell the user to run `/compact` (or open a fresh session, ideally on a different model than the one that implemented — GPT reviewing Claude-built work or vice versa) and then `/6_qa`, and end the turn. A model cannot compact its own context. Skill 6 follows its own release gate and hands passing or Medium/Low-only work directly to Skill 7.
