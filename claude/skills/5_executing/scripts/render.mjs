@@ -111,7 +111,7 @@ function pr([projX, theme, templateArg]) {
   ].join("\n");
 
   const gaps = [
-    ...stories.filter(([, metadata]) => storyStatus(metadata) === "gap").map(([us]) => `- ${us}: Ralph cap hit — shipped as known gap`),
+    ...stories.filter(([, metadata]) => storyStatus(metadata) === "gap").map(([us]) => `- ${us}: shipped as known gap`),
     ...externalPrerequisites(base),
   ];
   const knownGaps = gaps.length ? gaps.join("\n") : "none";

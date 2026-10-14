@@ -17,7 +17,7 @@ Branch `proj/PROJ-1` from `—`.
 
 ### Known gaps
 
-- PROJ-1-PRD-1-US-2: Ralph cap hit — shipped as known gap
+- PROJ-1-PRD-1-US-2: shipped as known gap
 - External prerequisite (declaration, not a pass): AC-1 / wave 1 — needs sso; decided by me at 2026. Readiness: `curl x`; evidence: 5_progress/ralph-wave-1.json.
 
 ### Deferred debt — decide at Checkpoint 2
