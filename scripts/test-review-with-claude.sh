@@ -68,10 +68,13 @@ stub "echo unreachable"
 ! out="$(bash "$SCRIPT" --prompt "$CASE/over-limit.md" --timeout 10 2>&1)" && grep -q 'stdin is limited to 10 MB' <<<"$out" \
   || { echo "FAIL: adapter must name the 10 MB stdin ceiling" >&2; exit 1; }
 
-# Timeout kills the whole process group: no orphan survives the adapter.
-stub "sleep 7919 & sleep 7919"
+# Timeout kills the whole process group: neither the stub nor its child survives the adapter.
+stub "echo \$\$ >\"$CASE/pids\"; sleep 300 & echo \$! >>\"$CASE/pids\"; wait"
 if run --timeout 3 >/dev/null 2>&1; then echo "FAIL: timed-out adapter exited 0" >&2; exit 1; fi
 sleep 1
-! pgrep -f 'sleep 7919' >/dev/null || { pkill -f 'sleep 7919'; echo "FAIL: adapter timeout left orphaned processes" >&2; exit 1; }
+[ "$(wc -l <"$CASE/pids")" -eq 2 ] || { echo "FAIL: the timeout stub did not start" >&2; exit 1; }
+while read -r pid; do
+  ! kill -0 "$pid" 2>/dev/null || { kill "$pid"; echo "FAIL: adapter timeout left process $pid alive" >&2; exit 1; }
+done <"$CASE/pids"
 
 echo "review-with-claude max-turns and protocol tests passed"

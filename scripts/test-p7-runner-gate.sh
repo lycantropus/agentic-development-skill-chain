@@ -90,17 +90,20 @@ rc="$(run_p7 "$CASE/b.out")"
 [ "$rc" -eq 1 ] && [ "$(state)" = "P7:blocked" ] && grep -q "NO docs cross-review" "$CASE/b.out" \
   || die "evidence gate: rc=$rc state=$(state)"
 
-# gate 3: evidence present, open Critical/High cross-review finding -> parked
+# gate 3: evidence present, an open Critical OR High cross-review finding -> parked (distinct
+# findings: the ledger merges identical ones, which would hide the second severity)
 write_stub_writer 1
-printf '{"source":"cross-review","severity":"critical","category":"stale-claim","file":"docs/ARCHITECTURE.md","line":2,"provider":"codex","summary":"blocking finding"}\n' \
-  | chain findings add 96 stage2 >/dev/null
-chain state transition 96 stage2 P7 running >/dev/null
-rc="$(run_p7 "$CASE/c.out")"
-[ "$rc" -eq 1 ] && [ "$(state)" = "P7:blocked" ] && grep -q "cross-review finding" "$CASE/c.out" \
-  || die "truth gate: rc=$rc state=$(state)"
+for severity in critical high; do
+  printf '{"source":"cross-review","severity":"%s","category":"stale-claim-%s","file":"docs/ARCHITECTURE.md","line":2,"provider":"codex","summary":"%s blocking finding"}\n' "$severity" "$severity" "$severity" \
+    | chain findings add 96 stage2 >/dev/null
+  chain state transition 96 stage2 P7 running >/dev/null
+  rc="$(run_p7 "$CASE/c-$severity.out")"
+  [ "$rc" -eq 1 ] && [ "$(state)" = "P7:blocked" ] && grep -q "cross-review finding" "$CASE/c-$severity.out" \
+    || die "truth gate ($severity): rc=$rc state=$(state)"
+  mark_open_xr_fixed
+done
 
 # gate 4: evidence + clean ledger + caps green -> phase completes
-mark_open_xr_fixed
 chain state transition 96 stage2 P7 running >/dev/null
 rc="$(run_p7 "$CASE/d.out")"
 [ "$rc" -eq 0 ] && [ "$(state)" = "P7:done" ] || die "green path: rc=$rc state=$(state)"

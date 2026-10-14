@@ -118,7 +118,8 @@ EOS
 
 # Before P0 there is no state.json: an explicit author routes the review and findings go to stdout only.
 OUT="$(review concept 97 pre-p0 --artifacts docs/ARCHITECTURE.md --author-provider claude 2>/dev/null)" || die 'pre-P0 review failed'
-printf '%s\n' "$OUT" | jq -e 'select(.provider == "codex" and .source == "cross-review")' >/dev/null && [ ! -e specs/PROJ-97-pre-p0/findings.json ] \
+printf '%s\n' "$OUT" | jq -e 'select(.provider == "codex" and .source == "cross-review")' >/dev/null \
+  && [ ! -e specs/PROJ-97-pre-p0/findings.json ] && [ ! -e specs/PROJ-97-pre-p0/state.json ] \
   || die 'pre-P0 review must report to stdout without state.json or ledger'
 
 # Requirements mode: a prompt above the former 128 KiB default streams to Claude; an explicit cap still bites.
