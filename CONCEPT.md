@@ -981,7 +981,7 @@ not the source of workflow semantics.
 | Agent role | `.claude/agents/*.md` | Codex skill/agent metadata | role, tools, write scope, budget |
 | Minimalism | Ponytail Claude plugin | Ponytail Codex plugin | same Ponytail mode and rule version |
 | Cross-review | OpenAI `codex-plugin-cc` pattern | Codex-facing `claude` skill pattern | provider opposite to `author_provider` |
-| Wave-gate enforcement | PreToolUse hook (`wave-gate-enforcer.js`) as defense-in-depth | prompt contract (no verified hook equivalent) | RUNNER-owned: the next wave/lane is not started until `wave-gate.sh` exits 0; hooks only harden this, they don't carry it |
+| Wave-gate enforcement | PreToolUse hook (`wave-gate-enforcer.js`) as defense-in-depth | prompt contract (no verified hook equivalent) | RUNNER-owned: the next wave/lane is not started until `chain gate wave` exits 0; hooks only harden this, they don't carry it |
 | Gotcha broadcast | agent-team messaging within one process | agent-team messaging within one process | across processes: runner-owned shared JSONL file (§6) |
 | Worktrees / rescue / conflict probe | plain git | plain git | runner owns all git lifecycle |
 | PR + CI polling | `gh` | `gh` | deterministic P8 scripts |
@@ -1014,7 +1014,7 @@ port allocation. Mode 3 stays disabled until this passes.
 | `gh` | create PR, `gh pr checks` polling (P8) | ✅ hard |
 | `claude` | Claude phase lane + provider-opposite review via `claude -p` | ✅ hard |
 | `node` | hooks (ponytail, wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
-| `jq` | wave-gate.sh, ledger scripts, state.json helpers | ✅ hard |
+| `jq` | `chain gate wave`, `chain findings`, `chain state` | ✅ hard |
 | `coderabbit` | wave review (`--agent --base-commit`) | ✅ hard (gate component) |
 | `codex` | Codex phase lane + provider-opposite review via `codex exec` | 🟡 preferred, degradable — missing/unauthenticated → single-provider run with model-opposite review, flagged in report + PR body, never silent |
 | `agent-browser` | smoke tests in the wave gate, browser E2E in P6 | ✅ hard for frontend waves; backend-only: unused |
