@@ -191,7 +191,9 @@ Stage 2 adds the bootstrap and the full context system:
   The PROJ architecture reaches implementers as a compiled view of the one
   `PROJ-<X>-architecture.md`: each decision's and key flow's Summary line
   (plus an override note when it `Changes baseline`), filtered to the PRDs of
-  the running wave; the files are recompiled at every wave start
+  the running wave (projects planned before Summary lines existed get
+  `architecture-delta.md`, else the whole file unfiltered — fallback, no
+  migration required); the files are recompiled at every wave start
   (`compile --wave N`). `compile-context-bundles.mjs check` runs in
   writing-plans and at CP1, so a role over budget or a story without a role
   surfaces before approval. `compile` also removes the retired context-injector

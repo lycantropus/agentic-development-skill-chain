@@ -352,7 +352,7 @@ Compile wave N's worker files: one per story (`context/workers/wave-<N>/<US-ID>.
 node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>
 ```
 
-Exit ≠ 0 (budget breach, unassignable story, outdated local manifest, write error): start no worker until a rerun exits 0. The file's first line carries the plan hash; after a plan change, rerun `compile`.
+Exit ≠ 0 (budget breach, unassignable story, outdated local manifest, write error): start no worker until a rerun exits 0. Exit 0 is not enough: read the warnings too (e.g. `.claude/settings.json is not valid JSON — left unchanged`: repair, rerun; see `subskills/setup.md`). The file's first line carries the plan hash; after a plan change, rerun `compile`.
 
 ### 2a. Mark wave start with a git tag
 
@@ -397,7 +397,7 @@ worktree's own `supabase/migrations/` still matches what the shared DB has
 actually applied (`scripts/migration-drift-check.sh`), since a sibling
 worktree can advance the schema between waves with no lock involved at all.
 
-**The story worker's role comes from the plan, not from your judgment.** The `Agent Type` column of `## User Stories in this Wave` is binding. Read it with `node scripts/validate-wave-plan.mjs --stories specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (JSON per story: `role`, `split`, `complexity`, `fallback`) and spawn that role (`implementer`, `frontend-implementer`, `backend-implementer`; `skillchain-<role>` where the session can spawn P0's agent types). `Split: contract` is one backend and one frontend worker, each with its own file; `Split: fan-out` is one story file shared by all fan-out workers. Only fix workers and old plans without an `Agent Type` column (`fallback: true`; `compile` warns) choose the type themselves, fallback `implementer`:
+**The story worker's role comes from the plan, not from your judgment.** The `Agent Type` column of `## User Stories in this Wave` is binding. Read it with `node scripts/validate-wave-plan.mjs --stories specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (JSON per story: `role`, `split`, `complexity`, `fallback`) and spawn that role (`implementer`, `frontend-implementer`, `backend-implementer`; `skillchain-<role>` where the session can spawn P0's agent types). `Split: contract` is one backend and one frontend worker, each with its own file; `Split: fan-out` is one story file shared by all fan-out workers. For every worker file spawn exactly the role named in the file's first line (`role <role>`) and in the `--stories` JSON. Old plans without an `Agent Type` column (`fallback: true`; `compile` warns) get `implementer` for a story without split and the two side roles (`backend-implementer`, `frontend-implementer`) for `Split: contract`. Only fix workers choose the type themselves, and they take the role file of the type they chose:
 - fix touches only UI (components, pages, styling) → `frontend-implementer`
 - fix touches only server-side (API, DB, server actions) → `backend-implementer`
 - both, or unclear → `implementer` (generic)

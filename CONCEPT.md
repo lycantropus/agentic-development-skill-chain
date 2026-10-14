@@ -907,7 +907,9 @@ context a role receives.
   file.
 - The PROJ architecture references the baseline, never repeats it; its
   implementer view is compiled (decision and key-flow Summaries filtered to
-  the wave's PRDs), never hand-written as a second file.
+  the wave's PRDs), never hand-written as a second file. Projects planned
+  before Summary lines existed fall back to `architecture-delta.md`, else the
+  whole file unfiltered (no migration required).
 - `api-contracts` are scoped per wave/US, not injected as a whole-PROJ
   file.
 

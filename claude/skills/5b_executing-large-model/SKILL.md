@@ -81,7 +81,9 @@ from `5_executing` and the same scripts enforce them.
    Before any worker starts, compile the wave's worker files (this wave's
    architecture decisions and API contracts; no lock, no hash bookkeeping, no `state.sh`; the file header carries the plan hash):
    `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>`.
-   Exit ≠ 0 → no worker until a rerun exits 0.
+   Exit ≠ 0 → no worker until a rerun exits 0; read the warnings before dispatch
+   (e.g. `settings.json is not valid JSON — left unchanged`: repair, rerun; see
+   `5_executing/subskills/setup.md`).
 4. **Workers own edits.** Every code, test, and fix edit is worker-owned when
    delegation is available. The lead owns decomposition, dispatch, integration,
    deterministic verification, gates, commits, and records. Editing locally is a
@@ -166,8 +168,9 @@ expected to choose the concrete steps.
   `5_executing/references/writing-tests.md` § Evidence Rules.
 - **Worker briefs.** A story worker's role is the `Agent Type` column of the
   wave plan (binding; read it with `node scripts/validate-wave-plan.mjs --stories
-  <wave-plan>`; only fix workers and plans without the column choose it,
-  fallback `implementer`). Its whole brief is ONE file,
+  <wave-plan>`; spawn exactly the role in the file header and the JSON (plans without
+  the column: `implementer`, or the two side roles under `Split: contract`);
+  only fix workers choose the type, with that type's role file). Its whole brief is ONE file,
   `context/workers/wave-N/<US-ID>[.backend|.frontend].md`: role rules, project
   context (DESIGN-SYSTEM.md rules for frontend and full-stack, `docs/components.md` as a read-by-path reference), the wave's
   architecture and contracts, and the story slice verbatim. A fix worker gets

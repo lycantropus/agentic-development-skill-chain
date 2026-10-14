@@ -330,8 +330,11 @@ const storyTargets = (s) => s.split === "contract"
 function planStories(wave) {
   const path = planPath(wave);
   const text = readFileSync(path, "utf8");
-  try { return { path, text, stories: resolveStories(text, path) }; }
+  let stories;
+  try { stories = resolveStories(text, path); }
   catch (error) { fail(error.message, 2); }
+  if (stories.length === 0) fail(`${path}: no story — a wave plan needs at least one story section`, 2);
+  return { path, text, stories };
 }
 
 // Every story of every wave plan, each ID in exactly one plan — otherwise the
@@ -445,7 +448,7 @@ if (cmd === "compile") {
   const waves = waveArg === null || waveArg === "all" ? PLAN_WAVES : [Number(waveArg)];
   const manifests = loadManifests();
   checkManifests(manifests);
-  allStories();
+  const storiesByWave = allStories();
   const rendered = waves.map((w) => renderWave(w, manifests));
   const breaches = rendered.flatMap((r) => r.breaches);
   if (breaches.length) fail(`budget breach — nothing written:\n  ${breaches.join("\n  ")}\n  Condense the sources or raise that role's manifest budget when its scope genuinely requires it.`);
@@ -455,14 +458,29 @@ if (cmd === "compile") {
   try {
     for (const f of existsSync(OUT_DIR) ? readdirSync(OUT_DIR) : [])
       if (/^bundle-.*\.md$/.test(f) || f === "bundles.lock.json" || f === "blocked-roles.json") rmSync(join(OUT_DIR, f), { force: true });
-    const compiledIds = new Set(rendered.flatMap((r) => r.stories.map((s) => s.id)));
     for (const dir of [...waveDirs("workers"), ...waveDirs("roles")]) {
       const w = Number(dir.match(/wave-(\d+)$/)[1]);
       if (waves.includes(w) || !PLAN_WAVES.includes(w)) rmSync(dir, { recursive: true, force: true });
     }
-    // a story now compiled into another wave leaves no stale file behind
-    for (const dir of waveDirs("workers")) for (const f of readdirSync(dir))
-      if (compiledIds.has(f.replace(/(\.backend|\.frontend)?\.md$/, ""))) rmSync(join(dir, f), { force: true });
+    // Waves not compiled now keep their valid files untouched; a file of a
+    // story deleted, moved or re-split in that wave's plan, a story file whose
+    // header names another role than the plan now resolves (or no parseable
+    // header), and a role file without manifest/inject list are removed. The
+    // plan hash is deliberately not compared: post-wave notes change a plan
+    // after its wave, and finished waves keep their files.
+    const roleFiles = new Map(manifests.filter((m) => m.inject.length).map((m) => [`${m.name}.md`, null]));
+    for (const dir of [...waveDirs("workers"), ...waveDirs("roles")]) {
+      const w = Number(dir.match(/wave-(\d+)$/)[1]);
+      const keep = dir.startsWith(join(OUT_DIR, "workers"))
+        ? new Map(storiesByWave.get(w).flatMap(storyTargets).map((t) => [`${t.name}.md`, t.role]))
+        : roleFiles;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, entry.name);
+        const valid = entry.isFile() && keep.has(entry.name) && (keep.get(entry.name) === null ||
+          readFileSync(p, "utf8").split("\n", 1)[0].match(/^Generated from .+ · role (\S+) · wave \d+$/)?.[1] === keep.get(entry.name));
+        if (!valid) rmSync(p, { recursive: true, force: true });
+      }
+    }
     for (const r of rendered) for (const [path, content] of r.files) atomicWrite(path, content);
     // ONLY skillchain-<role>.md files are ever written — other agents in
     // .claude/agents/ are never touched.

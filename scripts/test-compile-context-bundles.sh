@@ -329,6 +329,40 @@ mv "$CASE/wave2.bak" specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-2-plan.md
 restore_plans() { cp "$CASE/plan1.bak" "$PLAN1"; printf '# Wave 2\n\n**PRDs involved:** PROJ-1-PRD-2\n\n## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n| PROJ-1-PRD-2-US-1 | frontend | frontend-implementer | sonnet | immediately |\n\n## PROJ-1-PRD-2-US-1: Export invoices\n**Scope:** frontend\n' >specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-2-plan.md; }
 restore_plans
 
+# compile --wave 1 also drops files of stories deleted from plan 2 (and of unknown roles there);
+# valid wave-2 files stay untouched (same bytes, same mtime, not regenerated)
+PLAN2="specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-2-plan.md"
+sed -i 's/^| PROJ-1-PRD-2-US-1 .*/&\n| PROJ-1-PRD-2-US-2 | frontend | frontend-implementer | sonnet | immediately |/' "$PLAN2"
+printf '\n## PROJ-1-PRD-2-US-2: Print invoices\n**Scope:** frontend\n' >>"$PLAN2"
+run compile 1 demo >/dev/null
+[ -e "$CTX/workers/wave-2/PROJ-1-PRD-2-US-2.md" ] || die "second wave-2 story not compiled"
+echo stale >"$CTX/roles/wave-2/retired-role.md"
+wave2() { find "$CTX/workers/wave-2" "$CTX/roles/wave-2" -type f ! -name 'PROJ-1-PRD-2-US-2.md' ! -name 'retired-role.md' -printf '%p %T@ ' -exec sha256sum {} \; | sort; }
+wave2 >"$CASE/wave2.before"
+restore_plans
+run compile 1 demo --wave 1 >/dev/null
+[ -e "$CTX/workers/wave-2/PROJ-1-PRD-2-US-2.md" ] && die "story deleted from plan 2 kept its file after compile --wave 1"
+[ -e "$CTX/roles/wave-2/retired-role.md" ] && die "role file without manifest survived in a non-compiled wave"
+wave2 | cmp - "$CASE/wave2.before" || die "valid wave-2 files changed during compile --wave 1"
+# a role change in plan 2 drops that story's wave-2 file on compile --wave 1; a plan-hash change alone does not
+sed -i 's/^| PROJ-1-PRD-2-US-1 .*/&\n| PROJ-1-PRD-2-US-3 | backend | backend-implementer | sonnet | immediately |/' "$PLAN2"
+printf '\n## PROJ-1-PRD-2-US-3: Archive invoices\n**Scope:** backend\n' >>"$PLAN2"
+run compile 1 demo >/dev/null
+wave2() { find "$CTX/workers/wave-2" "$CTX/roles/wave-2" -type f ! -name 'PROJ-1-PRD-2-US-3.md' -printf '%p %T@ ' -exec sha256sum {} \; | sort; }
+wave2 >"$CASE/wave2.before"
+printf '\n## Post-Wave Notes\nWave 2 shipped.\n' >>"$PLAN2"
+run compile 1 demo --wave 1 >/dev/null
+[ -e "$CTX/workers/wave-2/PROJ-1-PRD-2-US-3.md" ] || die "a plan-hash change alone removed a wave-2 file"
+wave2 | cmp - "$CASE/wave2.before" || die "a plan-hash change alone touched wave-2 files"
+sed -i 's/^| PROJ-1-PRD-2-US-3 | backend | backend-implementer/| PROJ-1-PRD-2-US-3 | full-stack | implementer/; s/^\*\*Scope:\*\* backend$/**Scope:** full-stack/' "$PLAN2"
+run compile 1 demo --wave 1 >/dev/null
+[ -e "$CTX/workers/wave-2/PROJ-1-PRD-2-US-3.md" ] && die "role change in a non-compiled wave left the old-role file"
+wave2 | cmp - "$CASE/wave2.before" || die "role change touched the other wave-2 files"
+printf 'no header\n' >"$CTX/workers/wave-2/PROJ-1-PRD-2-US-3.md"
+run compile 1 demo --wave 1 >/dev/null
+[ -e "$CTX/workers/wave-2/PROJ-1-PRD-2-US-3.md" ] && die "worker file without a parseable header survived"
+restore_plans
+
 # role change and a new split rewrite the story's files and leave no stale ones; the story size is no budget
 run compile 1 demo >/dev/null
 workers() { (cd "$CTX/workers" && find . -type f | sort | tr '\n' ' '); }
@@ -383,6 +417,16 @@ sed -i 's|^name: reviewer$|name: ../reviewer|' "$CASE/badname/reviewer.md"
 [ "$(rc run compile 1 demo --wave 9)" -eq 2 ] || die "unknown wave must exit 2"
 printf '# Wave 3\n\n**PRDs involved:** PROJ-1-PRD-1\n' >specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-3-plan.md
 [ "$(rc run compile 1 demo)" -eq 2 ] || die "plan without a story must exit 2"
+rm specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-3-plan.md
+# Agent Type table with head and separator but no rows, and no story section: exit 2, nothing written
+run compile 1 demo >/dev/null
+snap >"$CASE/empty.snap"
+printf '# Wave 3\n\n**PRDs involved:** PROJ-1-PRD-1\n\n## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n' >specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-3-plan.md
+for args in "compile 1 demo" "compile 1 demo --wave 1" "check 1 demo"; do
+  [ "$(rc run $args)" -eq 2 ] && grep -qF 'PROJ-1-wave-3-plan.md' "$CASE/err" && grep -qiF 'no story' "$CASE/err" \
+    || die "$args: empty story table must exit 2 naming the plan"
+done
+snap | cmp - "$CASE/empty.snap" || die "empty story table changed files"
 rm specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-3-plan.md
 mkdir -p specs/PROJ-2-legacy/6_plan
 cp specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-2-plan.md specs/PROJ-2-legacy/6_plan/PROJ-2-wave-1-plan.md
