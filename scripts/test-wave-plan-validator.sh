@@ -10,7 +10,7 @@ trap 'rm -rf "$CASE"' EXIT
 prepare_case() {
   local plan_fixture="$1"
   local config_fixture="$2"
-  rm -rf "$CASE/plan"
+  rm -rf "$CASE/plan" "$CASE/2_PRDs"
   mkdir -p "$CASE/plan"
   cp "$FIXTURES/$plan_fixture" "$CASE/plan/PROJ-1-wave-1-plan.md"
   cp "$FIXTURES/$config_fixture" "$CASE/plan/wave-gate-config.json"
@@ -218,6 +218,13 @@ node "$VALIDATOR" --stories "$FIXTURES/stories-aliases.md" | jq -e '
 node "$VALIDATOR" --stories "$FIXTURES/stories-legacy.md" | jq -e '
   map([.id, .role, .split, .fallback]) == [["PROJ-1-PRD-1-US-1", "implementer", "none", true], ["PROJ-1-PRD-1-US-2", "implementer", "contract", true]]' >/dev/null \
   || { echo "--stories legacy fallback wrong" >&2; exit 1; }
+stories_fail stories-empty-table.md "story section has no row" # Agent Type header, no rows: not legacy
+stories_fail stories-short-row.md "unsupported Agent Type '(missing cell)'"
+node "$VALIDATOR" --stories "$FIXTURES/stories-legacy-table.md" | jq -e '
+  map([.id, .role, .complexity, .canStart, .fallback]) == [
+    ["PROJ-1-PRD-1-US-1", "implementer", "sonnet", "immediately", true],
+    ["PROJ-1-PRD-1-US-2", "implementer", null, null, true]]' >/dev/null \
+  || { echo "--stories legacy table must keep Complexity/Can start when" >&2; exit 1; }
 stories_fail stories-ascii-arrow.md "contradicts the section's **Scope:** agent 'frontend-implementer'"
 node --input-type=module -e '
 import assert from "node:assert/strict";
@@ -230,6 +237,86 @@ node "$VALIDATOR" --stories "$FIXTURES/stories-agent-trailing.md" | jq -e 'map(.
   || { echo "--stories: prose after the section agent (or no role token) must not be compared" >&2; exit 1; }
 node "$VALIDATOR" --stories "$FIXTURES/stories-valid.md" | jq -e 'map(.role) == ["backend-implementer", "implementer"] and .[1].split == "fan-out"' >/dev/null \
   || { echo "--stories valid fixture wrong" >&2; exit 1; }
+
+# AC wording, plan against ../2_PRDs (byte-exact after the checkbox/ID prefix)
+PLAN="$CASE/plan/PROJ-1-wave-1-plan.md"
+PRD="$CASE/2_PRDs/PROJ-1-PRD-1-wording.md"
+prepare_prd() { prepare_case plan-valid.md config-valid.json; mkdir -p "$CASE/2_PRDs"; cp "$FIXTURES/prd-wording.md" "$PRD"; }
+expect_output() { for text in "$@"; do grep -F -- "$text" "$CASE/output" >/dev/null || { echo "missing in output: $text" >&2; cat "$CASE/output" >&2; exit 1; }; done; }
+
+prepare_prd # same wording; PRD checkbox [x] vs plan [ ] is prefix, not wording
+run_validator >"$CASE/output" 2>&1
+expect_output "1 wave(s), 1 AC(s)"
+if grep -F "note:" "$CASE/output" >/dev/null; then echo "2_PRDs present but wording check skipped" >&2; exit 1; fi
+
+prepare_prd # changed wording: ID, both texts, both paths
+sed -i 's/AC-1: The plan is validated\./AC-1: The plan is checked./' "$PRD"
+expect_failure "PROJ-1-PRD-1-US-1-AC-1: plan wording differs from the PRD"
+expect_output "plan $PLAN:6: \"The plan is validated.\"" "PRD  $PRD:13: \"The plan is checked.\""
+
+prepare_prd # AC without PRD entry; the QA section's AC-1 does not count
+sed -i '0,/AC-1:/s//AC-3:/' "$PRD"
+expect_failure "PROJ-1-PRD-1-US-1-AC-1: no PRD entry (AC-1 under US-1)"
+expect_output "PRD  $PRD: (missing)"
+rm "$PRD"
+expect_failure "no PRD entry, expected one $CASE/2_PRDs/PROJ-1-PRD-1-*.md (titled # PROJ-1-PRD-1 if several), found 0"
+
+prepare_prd # multi-line AC: continuation up to the next heading/bold line, wrapping is wording
+sed -i 's/AC-1: The plan is validated\./AC-1: The plan\n  is validated./' "$PLAN" "$PRD"
+run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
+sed -i 's/^- \[x\] AC-1: The plan$/- [x] AC-1: The plan is/; s/^  is validated\.$/  validated./' "$PRD"
+expect_failure "plan wording differs"
+expect_output '"The plan\n  is validated."' '"The plan is\n  validated."'
+
+continue_ac() { # snippet-file files...: insert the snippet after the AC-1 line
+  local snippet="$1"; shift
+  sed -i "/AC-1: The plan is validated\.\$/r $snippet" "$@"
+}
+printf '**Fett** stays part of the AC\n  and so does this line.\n' >"$CASE/bold.txt"
+prepare_prd # a bold (non-label) line continues the AC: a change after it is wording
+continue_ac "$CASE/bold.txt" "$PLAN" "$PRD"
+run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
+sed -i 's/and so does this line\./and so does that line./' "$PRD"
+expect_failure "plan wording differs"
+printf '  ```\n  code line\n  ```\n' >"$CASE/indented-fence.txt"
+prepare_prd # a fence indented into the list item is AC text
+continue_ac "$CASE/indented-fence.txt" "$PLAN" "$PRD"
+run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
+sed -i 's/^  code line$/  other line/' "$PRD"
+expect_failure "plan wording differs"
+printf '**Smoke Test:** not AC text\n' >"$CASE/label.txt"
+printf '```\nnot AC text\n```\n' >"$CASE/fence.txt"
+for snippet in label fence; do # a **Label:** line and an unindented fence still end the AC
+  prepare_prd
+  continue_ac "$CASE/$snippet.txt" "$PRD"
+  run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null || { echo "$snippet must end the AC" >&2; exit 1; }
+done
+
+prepare_prd # trailing whitespace on the first AC line is not wording
+sed -i 's/AC-1: The plan is validated\.$/&  /' "$PLAN"
+run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
+
+prepare_prd # PRD file choice: 2c's review-decisions never counts, several candidates resolve by first H1
+printf '# PROJ-1-PRD-1 Review Decisions\n\n### US-1: x\n- [ ] AC-1: Other.\n' >"$CASE/2_PRDs/PROJ-1-PRD-1-wording-review-decisions.md"
+printf '# Notes\n\n# PROJ-1-PRD-1: not the first H1\n' >"$CASE/2_PRDs/PROJ-1-PRD-1-notes.md"
+run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
+sed 's/^# PROJ-1-PRD-1:/# PROJ-1 PRD-1 —/' "$PRD" >"$CASE/2_PRDs/PROJ-1-PRD-1-copy.md"
+expect_failure "no PRD entry, expected one $CASE/2_PRDs/PROJ-1-PRD-1-*.md (titled # PROJ-1-PRD-1 if several), found 2"
+
+prepare_prd # AC IDs with a hyphenated suffix map like the parsers read them
+sed -i 's/US-1-AC-1/US-1-AC-1-a/g' "$PLAN" "$CASE/plan/wave-gate-config.json"
+expect_failure "PROJ-1-PRD-1-US-1-AC-1-a: no PRD entry (AC-1-a under US-1)"
+sed -i 's/AC-1: The plan/AC-1-a: The plan/' "$PRD"
+run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
+
+prepare_case plan-valid.md config-valid.json # 2_PRDs as a file: note like a missing directory
+touch "$CASE/2_PRDs"
+run_validator >"$CASE/output" 2>&1
+expect_output "1 wave(s), 1 AC(s)" "note: AC wording not compared against PRDs: $CASE/2_PRDs is not a directory"
+
+prepare_case plan-valid.md config-valid.json # no 2_PRDs/ (legacy): note, exit 0
+run_validator >"$CASE/output" 2>&1
+expect_output "1 wave(s), 1 AC(s)" "note: AC wording not compared against PRDs: $CASE/2_PRDs is not a directory"
 
 for copy in \
   "$ROOT/claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs" \

@@ -15,14 +15,15 @@ const EMBEDDED_SQL_PATTERN =
   /\bRAISE EXCEPTION\b|\bCREATE (TABLE|TRIGGER|FUNCTION)\b|\bALTER TABLE\b|\bBEFORE (INSERT|UPDATE|DELETE)\b|\bUPDATE\s+\w+\s+SET\b|\bINSERT INTO\b/i;
 
 // CommonMark fences: a fence closes only on the same char, at least as long, bare.
-// Returns one boolean per line: true for fence lines and everything between them.
+// Returns one entry per line: false outside fences, and for fence lines and everything between
+// them the opening fence's indentation as `{ indent }` (truthy).
 function fenceMask(lines) {
   let fence = null;
   return lines.map((line) => {
-    const [, marker, info] = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/) ?? [];
-    if (marker && !fence) { fence = marker; return true; }
-    if (marker && marker[0] === fence?.[0] && marker.length >= fence.length && !info.trim()) { fence = null; return true; }
-    return fence !== null;
+    const [, indent, marker, info] = line.match(/^( {0,3})(`{3,}|~{3,})(.*)$/) ?? [];
+    if (marker && !fence) { fence = { marker, indent: indent.length }; return fence; }
+    if (marker && marker[0] === fence?.marker[0] && marker.length >= fence.marker.length && !info.trim()) { const closed = fence; fence = null; return closed; }
+    return fence ?? false;
   });
 }
 
@@ -30,6 +31,7 @@ const cells = (line) => line.trim().replace(/^\||\|$/g, "").split("|").map((cell
 
 // Rows of the `## User Stories in this Wave` table with raw (trimmed) cells, or null
 // without such a table. Columns resolve by header name; a missing column is undefined.
+// The lower-cased header names are on the (non-enumerable) `columns` property.
 export function parseStoryTable(text) {
   const lines = text.split(/\r?\n/);
   const fenced = fenceMask(lines);
@@ -42,7 +44,7 @@ export function parseStoryTable(text) {
   const names = cells(lines[head]).map((name) => name.toLowerCase().replace(/\s+/g, " "));
   const column = (name) => names.indexOf(name);
   const col = { id: column("us id"), scope: column("scope"), agentType: column("agent type"), complexity: column("complexity"), canStart: column("can start when") };
-  const rows = [];
+  const rows = Object.defineProperty([], "columns", { value: names });
   for (let i = head + 2; i < lines.length && live(i) && lines[i].startsWith("|"); i++) {
     const row = cells(lines[i]);
     const pick = (index) => (index < 0 ? undefined : row[index]);
@@ -51,8 +53,21 @@ export function parseStoryTable(text) {
   return rows;
 }
 
-// Story sections (`## PROJ-<X>-PRD-<Y>-US-<Z>`) with Scope/Agent, Split and ACs, raw and in file order.
-export function parseStories(text) {
+const PLAN_FORMAT = {
+  story: /^## (PROJ-[A-Za-z0-9-]+-PRD-\d+-US-\d+)(?::|\s|$)/,
+  ac: /^- \[.\] ([A-Za-z0-9][A-Za-z0-9._-]*AC-[A-Za-z0-9._-]+):\s*(.*)$/,
+};
+// PRDs (2_requirements-engineer template): `### US-<Z>: …` (or `## US-<Z> — …`), `- [ ] AC-<N>: …`.
+export const PRD_FORMAT = {
+  story: /^#+ (US-\d+)(?!\d)/,
+  ac: /^- \[.\] (AC-[A-Za-z0-9._-]+):\s*(.*)$/,
+};
+
+// Story sections (default: `## PROJ-<X>-PRD-<Y>-US-<Z>`) with Scope/Agent, Split and ACs, raw and in
+// file order. A section ends at the next heading of the same or a higher level; an AC runs until the
+// next AC line, heading, `**Label:**` line, `---` rule or unindented code fence. A fence indented by
+// two or more spaces belongs to the list item and stays part of the AC text.
+export function parseStories(text, format = PLAN_FORMAT) {
   const lines = text.split(/\r?\n/);
   const fenced = fenceMask(lines);
   const stories = [];
@@ -62,23 +77,28 @@ export function parseStories(text) {
     ac = null;
   };
   lines.forEach((line, i) => {
-    if (fenced[i]) { closeAc(); return; }
-    if (line.startsWith("## ")) {
+    if (fenced[i]) {
+      if (ac && fenced[i].indent >= 2) ac.text += `\n${line.replace(/\s+$/, "")}`;
+      else closeAc();
+      return;
+    }
+    const level = line.match(/^(#+)\s/)?.[1].length;
+    const id = level && line.match(format.story)?.[1];
+    if (id || (story && level <= story.level)) {
       closeAc();
-      const id = line.match(/^## (PROJ-[A-Za-z0-9-]+-PRD-\d+-US-\d+)(?::|\s|$)/)?.[1];
-      story = id ? { id, heading: line.slice(3).trim(), line: i + 1, scope: null, agent: null, split: null, acs: [] } : null;
+      story = id ? { id, heading: line.replace(/^#+\s*/, "").trim(), line: i + 1, level, scope: null, agent: null, split: null, acs: [] } : null;
       if (story) stories.push(story);
       return;
     }
     if (!story) return;
-    const acMatch = line.match(/^- \[.\] ([A-Za-z0-9][A-Za-z0-9._-]*AC-[A-Za-z0-9._-]+):\s*(.*)$/);
+    const acMatch = line.match(format.ac);
     if (acMatch) {
       closeAc();
-      ac = { id: acMatch[1], text: acMatch[2], line: i + 1 };
+      ac = { id: acMatch[1], text: acMatch[2].replace(/\s+$/, ""), line: i + 1 };
       story.acs.push(ac);
       return;
     }
-    const boundary = /^#|^\*\*|^---+\s*$/.test(line);
+    const boundary = /^#|^\*\*[^*]+:\*\*|^---+\s*$/.test(line);
     if (boundary) closeAc();
     const scope = line.match(/^\*\*Scope:\*\*\s*(.*)$/);
     if (scope && story.scope === null) {
@@ -121,9 +141,12 @@ export function resolveStories(text, planFile) {
     return split;
   };
   const rows = parseStoryTable(text);
-  if (!rows?.some((row) => row.agentType !== undefined)) {
+  if (!rows?.columns.includes("agent type")) {
     if (stories.length === 0) fail("-", "no story table with an Agent Type column and no story section");
-    return stories.map((story) => ({ id: story.id, scope: story.scope, role: "implementer", agentType: null, complexity: null, canStart: null, split: splitOf(story), fallback: true }));
+    return stories.map((story) => {
+      const row = rows?.find((entry) => clean(entry.id ?? "") === story.id);
+      return { id: story.id, scope: story.scope, role: "implementer", agentType: null, complexity: row?.complexity ?? null, canStart: row?.canStart ?? null, split: splitOf(story), fallback: true };
+    });
   }
   const resolved = new Map();
   for (const row of rows) {
@@ -132,7 +155,7 @@ export function resolveStories(text, planFile) {
     const section = sections.get(id);
     if (!section) fail(id, `story table row (line ${row.line}) has no story section`);
     const role = normalizeRole(row.agentType ?? "");
-    if (!ROLES.includes(role)) fail(id, `unsupported Agent Type '${row.agentType}' (one of ${ROLES.join(", ")}, optional skillchain- prefix)`);
+    if (!ROLES.includes(role)) fail(id, `unsupported Agent Type '${row.agentType ?? "(missing cell)"}' (one of ${ROLES.join(", ")}, optional skillchain- prefix)`);
     // Only the first token after the arrow is the agent; trailing prose
     // ("→ implementer. Backend scope shipped in Wave 2.") is not compared.
     const sectionRole = section.agent === null ? null : normalizeRole(section.agent.split(/[\s.(,;]/)[0]);
@@ -198,6 +221,7 @@ function main() {
 
   const plans = new Map();
   const allPlanAcs = new Map();
+  const wordedAcs = [];
 
   for (const file of planFiles) {
     const wave = file.match(/-wave-(\d+)-plan\.md$/)?.[1];
@@ -213,7 +237,9 @@ function main() {
     let inFiles = false;
     let inGateCommands = false;
 
-    for (const line of fs.readFileSync(path.join(planDir, file), "utf8").split(/\r?\n/)) {
+    const planText = fs.readFileSync(path.join(planDir, file), "utf8");
+    for (const story of parseStories(planText)) wordedAcs.push(...story.acs.map((ac) => ({ ...ac, file: path.join(planDir, file) })));
+    for (const line of planText.split(/\r?\n/)) {
       const taskMatch = line.match(/^### Task ([^:]+):/);
       if (taskMatch) {
         const task = `Task ${taskMatch[1].trim()}`;
@@ -308,6 +334,34 @@ function main() {
       }
     }
     plans.set(wave, { acceptanceCriteria, tasks });
+  }
+
+  // AC wording, byte-exact after the checkbox/ID prefix except for line endings (CRLF = LF), the
+  // trailing whitespace of each line, trailing blank lines and the leading spaces of the first
+  // line (all dropped by parseStories on both sides): plan PROJ-X-PRD-Y-US-Z-AC-N against
+  // AC-N under US-Z in ../2_PRDs/PROJ-X-PRD-Y-*.md (first entry wins). Several such files (e.g. a
+  // stray copy): the one whose first H1 is `# PROJ-X-PRD-Y` (or `# PROJ-X PRD-Y`) wins; 2c's
+  // `<prd-stem>-review-decisions.md` never counts. No 2_PRDs/ directory: legacy, note only.
+  const prdDir = path.join(planDir, "..", "2_PRDs");
+  if (!fs.statSync(prdDir, { throwIfNoEntry: false })?.isDirectory()) {
+    if (wordedAcs.length) console.error(`note: AC wording not compared against PRDs: ${prdDir} is not a directory (legacy project)`);
+  } else {
+    const prdNames = fs.readdirSync(prdDir).filter((name) => name.endsWith(".md") && !name.endsWith("-review-decisions.md"));
+    const titleOf = (name) => fs.readFileSync(path.join(prdDir, name), "utf8").match(/^# .*$/m)?.[0].match(/^# PROJ-(.+?)[- ]PRD-(\d+)(?!\d)/)?.slice(1).join("/");
+    const prdStories = new Map();
+    for (const ac of wordedAcs) {
+      const plan = `${ac.file}:${ac.line}: ${JSON.stringify(ac.text)}`;
+      const [, x, y, us, acId] = ac.id.match(/^PROJ-(.+)-PRD-(\d+)-US-(\d+)-(AC-[A-Za-z0-9._-]+)$/) ?? [];
+      if (!acId) { fail(`${ac.id}: no PRD entry, the ID does not follow PROJ-<X>-PRD-<Y>-US-<Z>-AC-<N>\n    plan ${plan}`); continue; }
+      let names = prdNames.filter((name) => name.startsWith(`PROJ-${x}-PRD-${y}-`));
+      if (names.length > 1) names = names.filter((name) => titleOf(name) === `${x}/${y}`);
+      if (names.length !== 1) { fail(`${ac.id}: no PRD entry, expected one ${path.join(prdDir, `PROJ-${x}-PRD-${y}-*.md`)} (titled # PROJ-${x}-PRD-${y} if several), found ${names.length}\n    plan ${plan}`); continue; }
+      const prdFile = path.join(prdDir, names[0]);
+      if (!prdStories.has(prdFile)) prdStories.set(prdFile, parseStories(fs.readFileSync(prdFile, "utf8"), PRD_FORMAT));
+      const prdAc = prdStories.get(prdFile).find((story) => story.id === `US-${us}`)?.acs.find((entry) => entry.id === acId);
+      if (!prdAc) fail(`${ac.id}: no PRD entry (${acId} under US-${us})\n    plan ${plan}\n    PRD  ${prdFile}: (missing)`);
+      else if (prdAc.text !== ac.text) fail(`${ac.id}: plan wording differs from the PRD\n    plan ${plan}\n    PRD  ${prdFile}:${prdAc.line}: ${JSON.stringify(prdAc.text)}`);
+    }
   }
 
   if (!config || typeof config !== "object" || Array.isArray(config)) {
