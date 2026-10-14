@@ -15,7 +15,7 @@ files on disk. No conversation history crosses a phase boundary.
 |---|---|
 | `run-phase.sh` | run one phase (`P0 P5 P6 P7 P8`) or `auto` (all remaining phases → one-line summary; the morning report renders only when P8 neither left an open PR nor removed the worktree); P5 loads `5b_executing-large-model` by default; `SKILLCHAIN_P5_SKILL="executing (5_executing)"` swaps in the full-procedure skill for weaker writer models |
 | `spike-dual-lane.sh` | Stage 1 release gate: concurrent lanes, read-only enforcement, JSONL capture, attribution, kill-tree cancellation |
-| `spike-stage2.sh` | Stage 2 release gate: worker-file determinism and budgets, tier matrix over the file contents, symmetric authenticated cross-review (including six-persona QA, structured Claude output, and 10 MB transport failure), P7 runner gate |
+| `spike-stage2.sh` | Stage 2 release gate: live smoke of the Claude and Codex review adapters against a planted factual error (real CLI calls; the deterministic checks run in `scripts/test-*.sh` under `validate.sh`) |
 | `prompts/lane-prompt.md.tmpl` | generic lane prompt (role rules, state discipline) |
 | `prompts/p6-controller.md` | the P6 phase-controller contract (ledger triage, fix dispatch, opposite re-verification) |
 | `schemas/state.schema.json`, `schemas/findings.schema.json` | documented contracts for the two machine files (validation is embedded in `chain state` / `chain findings`) |

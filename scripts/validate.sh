@@ -210,6 +210,7 @@ harness shared-lock         bash "$ROOT/scripts/test-shared-lock.sh"
 harness wave-gate           bash "$ROOT/scripts/test-wave-gate.sh"
 harness quality             node "$ROOT/scripts/test-quality.mjs"
 harness cross-review        bash "$ROOT/scripts/test-cross-review.sh"
+harness cross-review-routing bash "$ROOT/scripts/test-cross-review-routing.sh"
 harness review-with-claude  bash "$ROOT/scripts/test-review-with-claude.sh"
 harness review-with-codex   bash "$ROOT/scripts/test-review-with-codex.sh"
 harness component-registry  node "$ROOT/codex/skills/5_executing/scripts/gen-component-registry.mjs" --selftest
