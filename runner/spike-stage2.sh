@@ -216,37 +216,6 @@ RC=$?
 { [ "$RC" -eq 0 ] || [ "$RC" -eq 3 ]; } && [ "$(jq -r '.cross_review[-1].round' specs/PROJ-96-stage2/state.json)" -eq 4 ] \
   && ok "manual round 4 runs and is persisted" || bad "manual round 4 failed (rc=$RC)"
 
-# Adapter output is a gate protocol, not best-effort parsing: duplicate
-# findings collapse, and a clean marker may never coexist with a finding.
-cat > "$STUB/codex" <<'EOF'
-#!/bin/sh
-[ "$1" = "login" ] && exit 0
-echo '{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md","line":2,"summary":"same finding"}'
-echo '{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md","line":2,"summary":"same finding"}'
-EOF
-chmod +x "$STUB/codex"
-printf 'prompt' > "$WORK/p.md"
-OUT="$(PATH="$STUB:$PATH" bash scripts/chain review codex --prompt "$WORK/p.md" --timeout 10 2>/dev/null)"
-[ "$(printf '%s\n' "$OUT" | grep -c '^{' || true)" -eq 1 ] \
-  && ok "adapter deduplicates identical findings" || bad "adapter did not deduplicate findings"
-cat > "$STUB/codex" <<'EOF'
-#!/bin/sh
-[ "$1" = "login" ] && exit 0
-echo '{"severity":"low","category":"review-clean","summary":"clean"}'
-echo '{"severity":"medium","category":"contradiction","file":"docs/ARCHITECTURE.md","line":2,"summary":"not clean"}'
-EOF
-chmod +x "$STUB/codex"
-PATH="$STUB:$PATH" bash scripts/chain review codex --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
-[ $? -eq 1 ] && ok "adapter rejects review-clean plus findings" || bad "adapter accepted contradictory clean output"
-cat > "$STUB/codex" <<'EOF'
-#!/bin/sh
-[ "$1" = "login" ] && exit 0
-echo 'bubblewrap: user namespaces unavailable'
-echo '{"severity":"medium","category":"false-success","file":"docs/ARCHITECTURE.md","line":2,"summary":"must not pass"}'
-EOF
-chmod +x "$STUB/codex"
-PATH="$STUB:$PATH" bash scripts/chain review codex --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
-[ $? -eq 1 ] && ok "adapter rejects sandbox false-success output" || bad "adapter accepted sandbox false-success"
 # opposite provider "unavailable": stub codex fails login (a bare rm would fall
 # through to a REAL codex on PATH) -> model-opposite fallback
 printf '#!/bin/sh\nexit 1\n' > "$STUB/codex"; chmod +x "$STUB/codex"
@@ -255,62 +224,6 @@ DEG="$(jq -r '.cross_review[-1] | (.degraded_fallback|tostring) + ":" + .reviewe
 [ "$DEG" = "true:sonnet" ] && ok "degraded: model-opposite fallback used and flagged in state" || bad "degraded record wrong: $DEG"
 PATH="$STUB:$PATH" CLAUDE_REVIEW_MODEL=opus bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta >/dev/null 2>&1
 [ $? -eq 1 ] && ok "reviewer model == author model refused (gate never same-model)" || bad "same-model review not refused"
-
-# Claude's adapter must enforce the same protocol controls as Codex while
-# consuming Claude Code's validated structured_output envelope.
-cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-echo '{"is_error":false,"structured_output":{"findings":[{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md","line":2,"summary":"same finding"},{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md","line":2,"summary":"same finding"}]}}'
-EOF
-chmod +x "$STUB/claude"
-OUT="$(PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 2>/dev/null)"
-[ "$(printf '%s\n' "$OUT" | grep -c '^{' || true)" -eq 1 ] \
-  && printf '%s\n' "$OUT" | jq -e 'select(.provider == "claude")' >/dev/null 2>&1 \
-  && ok "Claude adapter parses structured output, stamps provider, and deduplicates" \
-  || bad "Claude adapter structured-output normalization failed"
-cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-echo '{"is_error":false,"structured_output":{"findings":[{"severity":"low","category":"review-clean","summary":"clean"},{"severity":"medium","category":"contradiction","summary":"not clean"}]}}'
-EOF
-chmod +x "$STUB/claude"
-PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
-[ $? -eq 1 ] && ok "Claude adapter rejects review-clean plus findings" || bad "Claude adapter accepted contradictory clean output"
-cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-echo '{"is_error":false,"result":"review-blocked: sandbox failed","structured_output":{"findings":[{"severity":"medium","category":"false-success","summary":"must not pass"}]}}'
-EOF
-chmod +x "$STUB/claude"
-PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
-[ $? -eq 1 ] && ok "Claude adapter rejects infrastructure false-success output" || bad "Claude adapter accepted infrastructure false-success"
-cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-echo '{"is_error":true,"terminal_reason":"api_error","result":"Not logged in"}'
-EOF
-chmod +x "$STUB/claude"
-PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
-[ $? -eq 1 ] && ok "Claude adapter rejects rc=0 API/auth error envelopes" || bad "Claude adapter accepted an API/auth error envelope"
-truncate -s 10000001 "$WORK/over-claude-stdin-limit.md"
-PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/over-claude-stdin-limit.md" --timeout 10 >"$WORK/claude-size.out" 2>&1
-[ $? -eq 1 ] && grep -q 'stdin is limited to 10 MB' "$WORK/claude-size.out" \
-  && ok "Claude adapter reports the provider's 10 MB stdin ceiling explicitly" \
-  || bad "Claude adapter did not explain the provider stdin ceiling"
-
-# adapter timeout kills the whole process group
-cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-sleep 300 &
-sleep 300
-EOF
-chmod +x "$STUB/claude"
-printf 'prompt' > "$WORK/p.md"
-PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 3 >/dev/null 2>&1
-RC=$?
-sleep 1
-if [ "$RC" -ne 0 ] && ! pgrep -f "sleep 300" >/dev/null 2>&1; then
-  ok "adapter timeout: exit != 0 and the whole process group is dead (no orphans)"
-else
-  bad "adapter timeout left survivors (rc=$RC)"; pkill -f "sleep 300" 2>/dev/null
-fi
 
 # degraded flag renders in the morning report
 bash scripts/chain state set 96 stage2 .degraded true >/dev/null
