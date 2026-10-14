@@ -13,7 +13,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const [proj, theme, action = 'check', kind, ...args] = argv[0] === 'seal' ? [argv[1], argv[2], 'seal'] : argv;
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+// Leading whitespace belongs to filenames in NUL-delimited output.
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).replace(/\n$/, '');
 const hash = value => createHash('sha256').update(value).digest('hex');
 const base = `specs/PROJ-${proj}-${theme}`;
 const progress = `${base}/5_progress`;

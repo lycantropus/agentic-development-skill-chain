@@ -182,8 +182,8 @@ try {
     assert.match(bad('check'), /sonar-issues: stale or failed evidence/); assert.notEqual(seal().status, 0);
     ok('sonar-issues', issuesFile([0, 4, 5])); // MINOR, CLOSED and RESOLVED are not blocking: still zero carried
     assert.match(ok('check'), /✓/); assert.match(block(), /\| SonarCloud \| ran \|/); assert.equal(seal().status, 0, seal().stderr);
-    // Paths git would quote (non-ASCII, quotes) still count as changed.
-    const odd = 'größe "x".txt'; write(odd, 'x'); commit(); ok('run', 'build'); ok('run', 'lint'); ok('review', `${progress}/review.md`); ok('run', 'sonar');
+    // Paths with leading whitespace or characters git would quote still count as changed.
+    const odd = ' größe "x".txt'; write(odd, 'x'); commit(); ok('run', 'build'); ok('run', 'lint'); ok('review', `${progress}/review.md`); ok('run', 'sonar');
     ok('sonar-issues', issuesFile([], data => { data.issues[1].component = `${data.issues[1].project}:${odd}`; return data; }));
     assert.deepEqual(JSON.parse(fs.readFileSync(issuesPath, 'utf8')).open.map(issue => issue.file), [odd]);
     // Open BLOCKER/CRITICAL/MAJOR in changed files: three of the six real issues.
