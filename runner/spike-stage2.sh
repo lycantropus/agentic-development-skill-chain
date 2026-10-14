@@ -2,16 +2,14 @@
 # spike-stage2.sh — Stage 2 verification spike / release gate (CONCEPT.md §10.2).
 #
 # Proves, on disposable fixtures (the context compiler moved to
-# scripts/test-compile-context-bundles.sh):
+# scripts/test-compile-context-bundles.sh, the P7 runner gate to
+# scripts/test-p7-runner-gate.sh):
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
 #                        (opposite provider, six-persona parity, auth preflight,
 #                        structured output, ledger attribution, protocol controls,
 #                        manual rounds, same-model refusal), process-group timeout,
 #                        LIVE adapter smoke per available direction (+ degraded
 #                        model-opposite fallback), degraded flag in the morning report
-#   P7 runner gate     — stubbed lanes seal P7:done; failing caps park the run,
-#                        an open Critical/High cross-review finding parks the run,
-#                        green gates let it pass
 #
 # Usage: spike-stage2.sh [--skip-live]   (--skip-live: no real LLM calls)
 # Exit:  0 all assertions passed · 1 any assertion failed
@@ -322,91 +320,6 @@ grep -rq "cross-review: model-opposite fallback" specs/morning-report-*.md 2>/de
   && ok "degradation rendered in the morning report (cross-review: model-opposite fallback)" \
   || bad "morning report missing the degradation flag"
 bash scripts/chain state set 96 stage2 .degraded false >/dev/null
-
-# =============================================================================
-step "P7 runner gate (stubbed lanes seal P7:done)"
-# =============================================================================
-# advance the fixture state to P6:done so P7 is the legal next phase
-for t in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running" "P5 done" "P6 running" "P6 done"; do
-  bash scripts/chain state transition 96 stage2 $t >/dev/null
-done
-# two writer stubs: one seals WITHOUT any cross-review evidence, one records
-# a docs cross-review round (as the real documentation skill would) first
-write_stub_writer() { # <with-evidence: 0|1>
-  if [ "$1" -eq 1 ]; then
-    cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-bash scripts/chain state transition 96 stage2 P7 running >/dev/null 2>&1
-CUR="$(bash scripts/chain state get 96 stage2 '.cross_review // []')"
-UPD="$(printf '%s' "$CUR" | jq -c --arg at "$(date -Iseconds)" '. + [{mode:"docs",round:1,reviewer_provider:"codex",reviewer_model:"codex-default",degraded_fallback:false,findings_added:0,at:$at}]')"
-bash scripts/chain state set 96 stage2 .cross_review "$UPD" >/dev/null 2>&1
-bash scripts/chain state transition 96 stage2 P7 done >/dev/null 2>&1
-exit 0
-EOF
-  else
-    cat > "$STUB/claude" <<'EOF'
-#!/bin/sh
-# stub P7 writer: seals the phase without running any curation gate
-bash scripts/chain state transition 96 stage2 P7 running >/dev/null 2>&1
-bash scripts/chain state transition 96 stage2 P7 done >/dev/null 2>&1
-exit 0
-EOF
-  fi
-  chmod +x "$STUB/claude"
-}
-cat > "$STUB/codex" <<'EOF'
-#!/bin/sh
-case "$1" in login) exit 0 ;; esac
-echo '{"source":"review","severity":"low","category":"note","summary":"stub peer note"}'
-EOF
-chmod +x "$STUB/codex"
-mark_open_xr_fixed() {
-  for id in $(jq -r '.findings[] | select(.status=="open" and (.source=="cross-review" or ((.sources // []) | index("cross-review")))) | .id' specs/PROJ-96-stage2/findings.json); do
-    bash scripts/chain findings set-status 96 stage2 "$id" fixed deadbeef >/dev/null 2>&1
-  done
-}
-
-# gate 1: caps red -> parked (checked before evidence and findings)
-write_stub_writer 0
-seq 1 31 > docs/PRODUCT.md
-mark_open_xr_fixed
-PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7a.out" 2>&1
-RC=$?
-ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
-{ [ "$RC" -eq 1 ] && [ "$ST" = "P7:blocked" ] && grep -q "curation caps FAIL" "$WORK/p7a.out"; } \
-  && ok "P7 sealed with failing caps -> runner parks the run (P7:blocked, form gate)" \
-  || bad "caps gate: rc=$RC state=$ST"
-git checkout -q docs/PRODUCT.md
-
-# gate 2: caps green but NO cross-review ever ran -> parked (a skipped review
-# must not look like a clean one)
-bash scripts/chain state transition 96 stage2 P7 running >/dev/null
-PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7b.out" 2>&1
-RC=$?
-ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
-{ [ "$RC" -eq 1 ] && [ "$ST" = "P7:blocked" ] && grep -q "NO docs cross-review" "$WORK/p7b.out"; } \
-  && ok "P7 sealed with zero findings but NO review evidence -> runner parks (evidence gate)" \
-  || bad "evidence gate: rc=$RC state=$ST"
-
-# gate 3: evidence present, open Critical/High cross-review finding -> parked
-write_stub_writer 1
-printf '{"source":"cross-review","severity":"critical","category":"stale-claim","file":"docs/ARCHITECTURE.md","line":2,"provider":"codex","summary":"spike blocking finding"}\n' \
-  | bash scripts/chain findings add 96 stage2 >/dev/null 2>&1
-bash scripts/chain state transition 96 stage2 P7 running >/dev/null
-PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7c.out" 2>&1
-RC=$?
-ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
-{ [ "$RC" -eq 1 ] && [ "$ST" = "P7:blocked" ] && grep -q "cross-review finding" "$WORK/p7c.out"; } \
-  && ok "P7 sealed with an open Critical/High cross-review finding -> runner parks (truth gate)" \
-  || bad "truth gate: rc=$RC state=$ST"
-
-# gate 4: evidence + clean ledger + caps green -> phase completes
-mark_open_xr_fixed
-bash scripts/chain state transition 96 stage2 P7 running >/dev/null
-PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7d.out" 2>&1
-RC=$?
-ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
-[ "$RC" -eq 0 ] && [ "$ST" = "P7:done" ] && ok "green gates + evidence -> P7 completes normally" || bad "green path: rc=$RC state=$ST"
 
 # =============================================================================
 if [ "$SKIP_LIVE" -eq 1 ]; then
