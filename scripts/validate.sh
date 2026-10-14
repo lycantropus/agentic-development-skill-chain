@@ -126,6 +126,21 @@ while IFS= read -r bugfix_file; do
 done < <(find "$ROOT/codex/skills/bugfixing" -type f | sort)
 check_identical "$ROOT/claude/skills/5b_executing-large-model/SKILL.md" \
   "$ROOT/codex/skills/5b_executing-large-model/SKILL.md"
+# 5b stays lean: shared rules live in 5_executing/references/, not in 5b
+for platform in claude codex; do
+  [ "$(wc -l <"$ROOT/$platform/skills/5b_executing-large-model/SKILL.md")" -le 350 ] || \
+    fail "5b exceeds 350 lines: move procedure to 5_executing/references/ or drop it (every line is an invariant or a lead-only decision)"
+done
+
+# Every 5_executing reference must be cited somewhere (catches orphans); templates
+# that scripts copy or read by path are cited by those scripts, so no allow-list.
+for platform in claude codex; do
+  for ref in "$ROOT/$platform/skills/5_executing/references/"*; do
+    name="$(basename "$ref")"
+    grep -rqF --exclude="$name" -- "$name" "$ROOT/$platform/skills" "$ROOT/runner" || \
+      fail "orphan reference, cited by nothing: $platform/skills/5_executing/references/$name"
+  done
+done
 check_identical "$ROOT/claude/skills/update-chain/SKILL.md" \
   "$ROOT/codex/skills/update-chain/SKILL.md"
 check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
