@@ -177,7 +177,8 @@ function act(config, fingerprint) {
     if (!fs.existsSync(evidencePath('sonar-skip'))) {
       const open = valid('sonar-issues', config, fingerprint).open;
       if (open.length && rounds().length < 4) throw new Error(`Sonar: ${open.length} issue(s) open but ${rounds().length} scan(s) recorded; carrying forward needs the initial scan plus three fix rounds`);
-      const missing = open.filter(issue => !carriedForward(text, 'Sonar')?.includes(issue.key));
+      const notes = carriedForward(text, 'Sonar') ?? '';
+      const missing = open.filter(issue => !new RegExp(`(?<![\\w-])${issue.key.replace(/[^\w-]/g, '\\$&')}(?![\\w-])`).test(notes)); // whole key, not a prefix of a longer one
       if (missing.length) throw new Error(`Sonar issues missing from "### Carried Forward (Sonar": ${missing.map(issue => issue.key).join(', ')}`);
     }
     if (config.mutation_cmd && valid('mutation', config, fingerprint).rc === 1 && !/^\s*[-*] /m.test(carriedForward(text, 'Mutation') ?? '')) throw new Error('Mutation survivors need a bullet under "### Carried Forward (Mutation"');
@@ -191,7 +192,7 @@ function act(config, fingerprint) {
     const data = JSON.parse(fs.readFileSync(kind, 'utf8'));
     if (!Array.isArray(data.issues) || !Number.isInteger(data.paging?.total)) throw new Error('not the output of sonar list issues');
     if (data.issues.length !== data.paging.total) throw new Error(`sonar issues incomplete (${data.issues.length} of ${data.paging.total}); fetch every page`);
-    const baseSha = mutationBase(), changed = new Set(git('diff', '--name-only', `${baseSha}..HEAD`).split('\n').filter(Boolean));
+    const baseSha = mutationBase(), changed = new Set(git('diff', '-z', '--name-only', `${baseSha}..HEAD`).split('\0').filter(Boolean));
     const open = data.issues.filter(issue => SONAR_OPEN.includes(issue.status) && SONAR_BLOCKING.includes(issue.severity))
       .map(issue => ({ key: issue.key, severity: issue.severity, file: String(issue.component).replace(/^[^:]*:/, ''), line: issue.line ?? null, rule: issue.rule }))
       .filter(issue => changed.has(issue.file));
