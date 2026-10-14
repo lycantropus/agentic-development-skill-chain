@@ -12,7 +12,7 @@ const inventory = [
   ...["decisions", "morning-report", "stop-report"].map(name => [`5_executing/templates/${name}.md.tmpl`, `templates/${name}.md.tmpl`]),
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),
   ["cross-review/templates/cross-review-prompt.md.tmpl", "templates/cross-review-prompt.md.tmpl"],
-  ...["ledger.mjs", "harvest-debt.sh"].map(name => [`6_qa/scripts/${name}`, `scripts/${name}`]),
+  ["6_qa/scripts/findings.mjs", "scripts/findings.mjs"],
   ["7_documentation/scripts/curation-caps.sh", "scripts/curation-caps.sh"],
   ["0b_intake/scripts/intake-seal-check.sh", "scripts/intake-seal-check.sh"],
   ["5_executing/templates/agent-md-entry.md.tmpl", "templates/agent-md-entry.md.tmpl"],

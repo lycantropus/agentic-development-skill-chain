@@ -47,8 +47,8 @@ for provider in claude codex; do
   rc=0; STUB_EXIT=7 bash "$stub/chain" state get </dev/null >/dev/null || rc=$?
   [ "$rc" = 7 ] || fail "$provider exit code not passed through (got $rc)"
   # a sub only matches in first position: a PROJ named like a sub must not be swallowed
-  got="$(bash "$stub/chain" findings add harvest </dev/null)"
-  [ "$got" = "ledger.mjs|add harvest|" ] || fail "$provider sub matched outside the first position: $got"
+  got="$(bash "$stub/chain" review add claude </dev/null)"
+  [ "$got" = "cross-review.sh|add claude|" ] || fail "$provider sub matched outside the first position: $got"
 
   # 4. errors: unknown verb and a missing script are distinct, non-zero exits
   rc=0; bash "$stub/chain" nope >/dev/null 2>&1 || rc=$?; [ "$rc" = 64 ] || fail "$provider unknown verb should exit 64, got $rc"
@@ -58,9 +58,9 @@ for provider in claude codex; do
 done
 
 # 5. CHAIN_SCRIPTS_DIR: a project's own (customized) copy wins over the installed one; others still resolve from the tree
-proj="$TMP/project"; mkdir -p "$proj/scripts"; printf 'echo custom-ledger "$@"\n' >"$proj/scripts/ledger.mjs"
+proj="$TMP/project"; mkdir -p "$proj/scripts"; printf 'echo custom-ledger "$@"\n' >"$proj/scripts/findings.mjs"
 rc=0; got="$(cd "$proj" && CHAIN_SCRIPTS_DIR="$proj/scripts" bash "$ROOT/claude/skills/5_executing/scripts/chain" --where findings)"
-[ "$got" = "$proj/scripts/ledger.mjs" ] || fail "CHAIN_SCRIPTS_DIR copy not preferred: $got"
+[ "$got" = "$proj/scripts/findings.mjs" ] || fail "CHAIN_SCRIPTS_DIR copy not preferred: $got"
 got="$(cd "$proj" && CHAIN_SCRIPTS_DIR="$proj/scripts" bash "$ROOT/claude/skills/5_executing/scripts/chain" --where state)"
 case "$got" in */5_executing/scripts/state.sh) ;; *) fail "helper missing in CHAIN_SCRIPTS_DIR must fall back to the tree: $got" ;; esac
 # the phase runner passes its project's scripts/ dir: a customized helper in a repo WITHOUT scripts/chain stays selected

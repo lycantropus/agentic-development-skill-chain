@@ -115,7 +115,8 @@ check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
 # Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
 for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
          5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/story-slice.mjs 5_executing/scripts/compile-context-bundles.mjs \
-         8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh; do
+         8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh \
+         6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh; do
   for platform in claude codex; do
     [ ! -e "$ROOT/$platform/skills/$dup" ] || fail "duplicate helper copy must stay deleted: $platform/skills/$dup"
   done
@@ -158,7 +159,7 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
          cross-review/scripts/review-with-codex.sh cross-review/templates/cross-review-prompt.md.tmpl \
          5_executing/templates/agent-md-entry.md.tmpl \
          5_executing/scripts/gen-component-registry.mjs 5_executing/scripts/quality-gate-proof.sh 5_executing/scripts/quality-evidence.mjs \
-         6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh \
+         6_qa/scripts/findings.mjs \
          8_delivery/scripts/delivery.sh 5_executing/scripts/render.mjs \
          5_executing/templates/morning-report.md.tmpl 5_executing/templates/stop-report.md.tmpl \
          8_delivery/templates/pr-body.md.tmpl; do
@@ -200,7 +201,7 @@ harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
 harness unattended-handoff  bash "$ROOT/scripts/test-unattended-handoff.sh"
 harness in-session-driver   bash "$ROOT/scripts/test-in-session-driver.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
-harness ledger              bash "$ROOT/scripts/test-ledger.sh"
+harness findings            bash "$ROOT/scripts/test-findings.sh"
 harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"
 harness migration-drift     bash "$ROOT/scripts/test-migration-drift-check.sh"
 harness worktree            bash "$ROOT/scripts/test-worktree.sh"

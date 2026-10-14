@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deterministic behavior tests for ledger ingestion, dedupe, and reopen.
+# Deterministic behavior tests for findings ingestion, dedupe, reopen and the ponytail: debt harvest.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -64,11 +64,37 @@ run_suite() {
   jq -e --arg id "$id" '.findings[] | select(.id == $id) | .status == "open" and .severity == "critical"' \
     "$work/specs/PROJ-1-test/findings.json" >/dev/null || fail "$label: fixed finding was not reopened/escalated"
   grep -q 'REOPENED' "$work/reopen.out" || fail "$label: reopen was not reported"
+
+  # harvest: ponytail: markers become deferred debt findings; idempotent; quiet when there is nothing to do
+  local hv="$TMP/$label-harvest"
+  mkdir -p "$hv/specs/PROJ-1-test" "$hv/src/deep" "$hv/node_modules/x" "$hv/specs/PROJ-1-test/notes"
+  printf 'a\n// ponytail: global lock, per-account locks if throughput matters\nb\n' >"$hv/src/a.ts"
+  printf '# ponytail:no space note\n' >"$hv/src/deep/b.py"
+  printf '// ponytail: ignored, vendored\n' >"$hv/node_modules/x/c.js"
+  printf 'ponytail: ignored, a spec note\n' >"$hv/specs/PROJ-1-test/notes/n.md"
+  (cd "$hv" && node "$ledger" harvest 1 test) >"$hv/out" || fail "$label: harvest failed"
+  [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json") -eq 2 ]] || fail "$label: harvest should find exactly the two src markers"
+  jq -e '[.findings[] | select(.file == "src/a.ts")] | length == 1 and .[0].line == 2 and .[0].status == "deferred" and .[0].severity == "low" and .[0].source == "debt"
+         and .[0].summary == "ponytail: global lock, per-account locks if throughput matters"
+         and .[0].debt_marker == "global lock, per-account locks if throughput matters"' \
+    "$hv/specs/PROJ-1-test/findings.json" >/dev/null || fail "$label: harvested finding has the wrong shape"
+  jq -e '[.findings[] | select(.file == "src/deep/b.py")][0].summary == "ponytail: no space note"' "$hv/specs/PROJ-1-test/findings.json" >/dev/null \
+    || fail "$label: marker without a space after the colon"
+  (cd "$hv" && node "$ledger" harvest 1 test) >/dev/null
+  [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json") -eq 2 ]] || fail "$label: harvest is not idempotent"
+  (cd "$hv" && node "$ledger" harvest 1 test nowhere) | grep -q 'does not exist' || fail "$label: a missing search root should be reported, not fatal"
+  mkdir "$hv/empty"; (cd "$hv" && node "$ledger" harvest 1 test empty) | grep -q 'no ponytail: markers' || fail "$label: no markers should be reported, not fatal"
+  [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json") -eq 2 ]] || fail "$label: an empty harvest changed the ledger"
+  (cd "$hv" && node "$ledger" harvest 1 test .) >/dev/null
+  [[ $(jq '[.findings[] | select(.file | startswith("node_modules") or startswith("specs"))] | length' "$hv/specs/PROJ-1-test/findings.json") -eq 0 ]] \
+    || fail "$label: harvest of the repo root must still skip node_modules and specs"
+  set +e; (cd "$hv" && node "$ledger" harvest 1) >/dev/null 2>&1; rc=$?; set -e
+  [[ "$rc" -eq 64 ]] || fail "$label: harvest without a theme returned $rc, expected 64"
 }
 
-run_suite "$ROOT/codex/skills/6_qa/scripts/ledger.mjs" codex
-run_suite "$ROOT/claude/skills/6_qa/scripts/ledger.mjs" claude
-cmp -s "$ROOT/codex/skills/6_qa/scripts/ledger.mjs" "$ROOT/claude/skills/6_qa/scripts/ledger.mjs" \
-  || fail "ledger copies are not byte-identical"
+run_suite "$ROOT/codex/skills/6_qa/scripts/findings.mjs" codex
+run_suite "$ROOT/claude/skills/6_qa/scripts/findings.mjs" claude
+cmp -s "$ROOT/codex/skills/6_qa/scripts/findings.mjs" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" \
+  || fail "findings copies are not byte-identical"
 
-echo 'ledger behavior tests: PASS'
+echo 'findings behavior tests: PASS'

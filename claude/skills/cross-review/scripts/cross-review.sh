@@ -56,7 +56,7 @@ case "$REQUIRED_PROVIDER" in ""|claude|codex) ;; *) echo "cross-review.sh: --req
 
 resolve() { if [ -f "$1" ]; then echo "$1"; else echo "$SCRIPT_DIR/$2"; fi; }
 STATE_SH="$(resolve scripts/state.sh ../../5_executing/scripts/state.sh)"
-LEDGER="$(resolve scripts/ledger.mjs ../../6_qa/scripts/ledger.mjs)"
+LEDGER="$(resolve scripts/findings.mjs ../../6_qa/scripts/findings.mjs)"
 TMPL="$(resolve templates/cross-review-prompt.md.tmpl ../templates/cross-review-prompt.md.tmpl)"
 [ -f "$TMPL" ] || { echo "cross-review.sh: prompt template not found" >&2; exit 1; }
 BASE="specs/PROJ-${PROJ}-${THEME}"
@@ -65,7 +65,7 @@ BASE="specs/PROJ-${PROJ}-${THEME}"
 # human instead of creating phase state or ledger data.
 PERSIST=0
 if { [ "$EXPLICIT_AUTHOR" -eq 0 ] || [ "$PERSIST_REQUESTED" -eq 1 ]; } && [ -f "$BASE/state.json" ]; then
-  [ -f "$STATE_SH" ] && [ -f "$LEDGER" ] || { echo "cross-review.sh: state exists but state.sh or ledger.mjs is unavailable" >&2; exit 1; }
+  [ -f "$STATE_SH" ] && [ -f "$LEDGER" ] || { echo "cross-review.sh: state exists but state.sh or findings.mjs is unavailable" >&2; exit 1; }
   PERSIST=1
 fi
 [ "$PERSIST_REQUESTED" -eq 0 ] || [ "$PERSIST" -eq 1 ] || { echo "cross-review.sh: --persist requires $BASE/state.json" >&2; exit 1; }

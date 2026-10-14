@@ -548,7 +548,7 @@ subsequent PROJ. Hence BLOCKING, not advisory.
 template (mode + file list), reads `author_provider` from `state.json`,
 and routes to `review-with-codex.sh` or `review-with-claude.sh`. Each
 adapter normalizes its provider output into the same findings JSON-lines
-contract → `ledger.mjs`. The Claude route verifies `claude auth status`
+contract → `findings.mjs`. The Claude route verifies `claude auth status`
 before launch, requests validated structured output, rejects API/auth error
 envelopes even when the CLI exits zero, and reports Claude Code's 10 MB stdin
 ceiling explicitly. For joint artifacts the runner invokes both adapters
@@ -1201,7 +1201,7 @@ on every machine. Skill 5's `scripts/wave-gate.sh` is the existing
 proof of the pattern.
 
 **Schemas:** `state.schema.json` and `findings.schema.json` ship with
-the framework. `state.sh` and `ledger.mjs` validate on every write —
+the framework. `state.sh` and `findings.mjs` validate on every write —
 an agent writing a malformed record fails loudly at write time, not
 silently at render time.
 
@@ -1224,11 +1224,11 @@ response.
 | `validate-wave-plan.mjs` (5_executing) | wave plans + `wave-gate-config.json` | deterministic consistency verdict | validates unique AC mappings, bidirectional test files, broad regressions, auth budget, and protected-route coverage |
 | `wave-gate.sh` (5_executing, exists) | wave N, PROJ, config | gate verdict; PASSED block in progress.md; findings → ledger | runs current ACs + declared regressions, archives CodeRabbit evidence, checks cumulative blocking ledger, manages frontend readiness; red evidence → exit ≠ 0 |
 | `gen-component-registry.mjs` (5_executing) | every outermost `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`, …), recursive, nested `components/` counted once | `docs/components.md`, or `--out <path>` (relative to the caller) when the app root is nested | reads the doc block above each component export; `--check` exits ≠ 0 on a stale registry, a component without a doc block, or a component without its `id="<kebab-name>"` section on the showcase page (wave-gate step 6). The registry is never hand-written — one source, the component file |
-| `ledger.mjs` (quality) | non-empty normalized findings JSONL from all sources | deduped, normalized `findings.json`; fix-queue clusters | dedupe key file/anchor/category, adding a stable summary fingerprint when no location exists; idempotent with reopen support; empty stdin fails |
-| `cross-review.sh` (cross-review) | mode, artifact files, `author_provider` + `author_model`, prompt template | provider-attributed findings JSON lines → `ledger.mjs` | routes to opposite provider; for Claude-authored work only, unavailable Codex may fall back model-opposite via `claude -p --model` (logged + flagged); joint artifacts launch both adapters concurrently; up to 3 automatic rounds while findings remain; manual rounds have no limit |
+| `findings.mjs` (quality) | non-empty normalized findings JSONL from all sources | deduped, normalized `findings.json`; fix-queue clusters | dedupe key file/anchor/category, adding a stable summary fingerprint when no location exists; idempotent with reopen support; empty stdin fails |
+| `cross-review.sh` (cross-review) | mode, artifact files, `author_provider` + `author_model`, prompt template | provider-attributed findings JSON lines → `findings.mjs` | routes to opposite provider; for Claude-authored work only, unavailable Codex may fall back model-opposite via `claude -p --model` (logged + flagged); joint artifacts launch both adapters concurrently; up to 3 automatic rounds while findings remain; manual rounds have no limit |
 | `review-with-claude.sh` (cross-review) | rendered prompt + limits | normalized Claude JSON lines | invokes OAuth-preserving isolated `claude -p` read-only with validated JSON Schema; rejects structured API/auth errors; detects the 10 MB stdin ceiling; timeout/cancel as one process group |
 | `review-with-codex.sh` (cross-review) | rendered prompt + limits | normalized Codex JSON lines | invokes `codex exec` read-only; validates output; timeout/cancel as one process group |
-| `harvest-debt.sh` (quality) | repo tree | `ponytail:` markers as ledger records (status `deferred`) | grep-based; links marker → file/line; idempotent |
+| `findings.mjs harvest` (quality) | repo tree | `ponytail:` markers as ledger records (status `deferred`) | grep-based; links marker → file/line; idempotent |
 | `curation-caps.sh` (7_documentation) | `docs/*`, `src/**/agent.md` | cap report | exit ≠ 0 on any cap breach (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM 80 lines, agent.md 100 lines) — curation must shrink before P7 completes |
 | `conflict-probe.sh` (8_delivery) | PROJ branch, `main` | conflict report (JSON: none/trivial/semantic per file) | throwaway worktree, `merge --no-commit`; never touches real branches; classification by file type heuristics |
 | `render-pr-body.mjs` (8_delivery) | state.json + findings.json + template | PR body markdown | pure render, no side effects |

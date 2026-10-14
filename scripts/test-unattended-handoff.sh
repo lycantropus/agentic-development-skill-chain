@@ -102,7 +102,7 @@ out="$(bash probe.sh 2>&1)"; printf '%s\n' "$out" | grep -qx 'runner: ok' || die
 # The runner finds its helpers in both layouts (chain checkout and installed copy), outside any project scripts/.
 eval "$(sed -n '/^skill_file() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
 for RUNNER_DIR in "$ROOT/runner" "$CASE/.claude/skills/5_executing/runner" "$CASE/codexhome/skills/5_executing/runner"; do
-  for f in "5_executing scripts/chain" "5_executing scripts/state.sh" "5_executing scripts/worktree.sh" "6_qa scripts/ledger.mjs" "7_documentation scripts/curation-caps.sh" "8_delivery scripts/delivery.sh"; do
+  for f in "5_executing scripts/chain" "5_executing scripts/state.sh" "5_executing scripts/worktree.sh" "6_qa scripts/findings.mjs" "7_documentation scripts/curation-caps.sh" "8_delivery scripts/delivery.sh"; do
     [ -f "$(skill_file $f)" ] || die "runner at $RUNNER_DIR cannot resolve helper: $f"
   done
 done

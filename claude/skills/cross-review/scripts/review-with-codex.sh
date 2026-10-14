@@ -2,7 +2,7 @@
 # review-with-codex.sh — Codex adapter for the cross-review gate (CONCEPT.md §4/§7).
 #
 # Invokes an isolated `codex exec` worker on a self-contained rendered prompt
-# normalizes the output to the findings JSON-lines contract (ledger.mjs):
+# normalizes the output to the findings JSON-lines contract (findings.mjs):
 # only lines that parse as objects with severity+summary survive, each
 # stamped with "provider":"codex". The invocation runs as its own process
 # group and is killed whole (TERM then KILL) on timeout — no orphans.

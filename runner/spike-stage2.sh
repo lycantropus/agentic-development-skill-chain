@@ -80,7 +80,7 @@ printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · 
 
 for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/plan.mjs \
          5_executing/scripts/ponytail-check.sh \
-         6_qa/scripts/ledger.mjs 7_documentation/scripts/curation-caps.sh \
+         6_qa/scripts/findings.mjs 7_documentation/scripts/curation-caps.sh \
          0b_intake/scripts/intake-seal-check.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh; do

@@ -652,9 +652,9 @@ CR_SCRUBBED=$(mktemp "${CR_RAW}.tmp.XXXXXX")
 jq -c 'if .type=="review_context" then del(.workingDirectory) else . end' "$CR_RAW" >"$CR_SCRUBBED" && mv "$CR_SCRUBBED" "$CR_RAW"
 
 LEDGER_AVAILABLE=false
-if [[ -f scripts/ledger.mjs ]] && command -v node >/dev/null; then LEDGER_AVAILABLE=true; fi
+if [[ -f scripts/findings.mjs ]] && command -v node >/dev/null; then LEDGER_AVAILABLE=true; fi
 if [[ "$RAW_FINDINGS" -gt 0 && "$LEDGER_AVAILABLE" == true ]]; then
-  node scripts/ledger.mjs add "$PROJ" "$THEME" --wave "$WAVE" <"$CR_NORMALIZED" >/dev/null || fail "ledger ingestion failed"
+  node scripts/findings.mjs add "$PROJ" "$THEME" --wave "$WAVE" <"$CR_NORMALIZED" >/dev/null || fail "ledger ingestion failed"
 fi
 CUMULATIVE_BLOCKING=0
 if [[ "$LEDGER_AVAILABLE" == true && -f "$BASE/findings.json" ]]; then

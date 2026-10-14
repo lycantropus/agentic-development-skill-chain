@@ -196,7 +196,7 @@ RWORK="$(mktemp -d)"
 STUB="$RWORK/stub-bin"
 mkdir -p "$STUB" "$RWORK/repo/specs/PROJ-98-spike" "$RWORK/repo/scripts"
 cp "$REPO_ROOT/claude/skills/5_executing/scripts/chain" "$REPO_ROOT/claude/skills/5_executing/scripts/state.sh" "$RWORK/repo/scripts/"
-cp "$REPO_ROOT/claude/skills/6_qa/scripts/ledger.mjs" "$RWORK/repo/scripts/ledger.mjs"
+cp "$REPO_ROOT/claude/skills/6_qa/scripts/findings.mjs" "$RWORK/repo/scripts/findings.mjs"
 cat >"$STUB/claude" <<'STUBEOF'
 #!/bin/sh
 # stub writer lane: mimics a lane that starts the phase, then crashes
