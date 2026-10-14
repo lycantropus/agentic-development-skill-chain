@@ -560,9 +560,11 @@ Medium/Low as debt. Additional manually requested rounds have no limit.
 
 **Degraded mode (Codex unavailable):** provider-opposite is the PREFERRED
 reviewer, but Claude-authored work may fall back to MODEL-opposite within the
-surviving Claude provider: a DIFFERENT model than the author's (recorded as
-`author_model` in `state.json`) — e.g. Sonnet 5 reviewing Fable- or
-Opus-authored artifacts via `claude -p --model`. The invariant that survives degradation is: the
+surviving Claude provider: the STRONGEST Claude model that is not the author's
+(recorded as `author_model` in `state.json`; rank `CLAUDE_MODEL_RANK`, default
+`fable opus sonnet`) via `claude -p --model` — e.g. Fable reviewing Opus-authored
+artifacts, Opus reviewing Fable-authored ones. The reviewer is never weaker than
+the author. The invariant that survives degradation is: the
 gate is never satisfied by the same model that authored the artifact.
 Every degraded review is logged and flagged in the morning report and
 the PR body ("cross-review: model-opposite fallback") — never silent. For
@@ -694,10 +696,15 @@ for each wave N:
        then semantic merge gate
      – context is the worker's one compiled file (path in the spawn
        prompt); local knowledge via the agent.md reading protocol
-  2. Per US: TDD + provider-opposite inner review loop
+  2. Per US: TDD by the worker, closed by ONE bounded Inner Ralph
+     self-review (fix confirmed issues once, no AC verification)
      – learnings IMMEDIATELY into the folder agent.md (deepest
        applicable level)
-  3. Ralph loop per US (deterministic AC verification, cap 3)
+  3. After all workers of the wave: ONE wave-scoped Outer Ralph pass
+     (`chain gate wave --ac-only`, deterministic AC verification) with
+     exactly four recovery stages — fix round 1, fix round 2 with fresh
+     workers, fresh diagnosis without edits, a different implementer
+     applies it; still red → blocked path, the AC is never weakened
   4. Mode 3 only: MERGE GATE — merge story branches into the PROJ
      branch in dependency order; auto-fix trivial conflicts; semantic
      conflicts = planning error → finding into the ledger + escalate
@@ -706,11 +713,17 @@ for each wave N:
      – cached AC proof binds ID, command, positive selection, and committed HEAD
      – CodeRabbit `--agent --base-commit <wave-start>` with attempt-unique raw
        and normalized evidence; the cumulative open blocking ledger decides
-     – required top-level `sonar_cmd` with a timeout, executed from the
-       persistent PROJ worktree (scanner/npm/wrapper chosen by the project)
+     – optional `complexity_cmd` / `arch_rules_cmd` static checks after the
+       ACs; NO Sonar — the top-level `sonar_cmd` runs once at the PROJ-end
+       Quality Gate, never per wave
      – smoke test (agent-browser) for frontend waves
      → all findings into the ledger; Critical/High block
   6. green → next wave without stopping
+after the last wave (still P5, Skill 5 step 9):
+  PROJ QUALITY GATE on the assembled diff BASE_SHA..HEAD — integration
+  code review (`skillchain-reviewer`), build, optional `mutation_cmd`,
+  coverage, Sonar via the top-level `sonar_cmd` (once per PROJ), quality
+  tests, lint → `chain quality seal` → P5 done
 ```
 
 ### P6 — Quality & QA (= Skill 5 steps 9/10 + Skill 6, reorganized around the ledger)
@@ -721,10 +734,11 @@ dispatches fixes. The P6 phase controller owns the state machine,
 ledger processing, fix dispatch, and re-verification. This preserves an
 independent QA verdict without sacrificing unattended repair.
 
-Three parallel read-only collection streams:
-- Code review gate (`skillchain-reviewer`)
-- `sonar-scanner` full quality gate (once at PROJ end)
-- QA: browser E2E + red team + UI audit + persona panel (Skill 6)
+The code review gate (`skillchain-reviewer`), build and the `sonar-scanner`
+quality gate are NOT P6 streams: they form the PROJ Quality Gate that closes
+P5 (above). P6 is QA only, and sequential: the read-only QA finder runs
+first — browser E2E + red team + UI audit + persona panel (Skill 6) — and
+its findings are ingested into the ledger before the controller starts.
 
 Then the **P6 phase controller** processes the ledger while protecting
 its own context:
@@ -785,7 +799,7 @@ debt section in the PR — not mid-run.
    → auto-fix; semantic → risk assessment into the PR + escalate
 3. Create the PR (gh CLI) — body rendered by a **template script** from
    state.json + ledger (no LLM rendering): what was built, gate/QA
-   results, known gaps (Ralph cap hits), debt ledger, 📚 doc changes
+   results, known gaps (e.g. declared external prerequisites), debt ledger, 📚 doc changes
 4. CI polling (GitHub Actions, via `gh pr checks`); red checks with
    verbatim output to fix agents (max 3 attempts).
 5. ◇ Checkpoint 2: human reviews and merges (asynchronously — for
@@ -833,7 +847,7 @@ docs/                          ← LONG-LIVED, curated, injectable
 ├── ARCHITECTURE.md            ← § Stack (THE stack source of truth) +
 │                                overarching architecture (≤200 lines, hard cap)
 ├── architecture/…             ← details/ADRs, referenced only
-├── GUIDELINES.md              ← code conventions, error handling, naming
+├── GUIDELINES.md              ← code conventions, error handling, naming (≤120 lines, hard cap)
 ├── DESIGN-SYSTEM.md           ← tokens, scales, patterns, do/don't (≤80 lines, hard cap)
 └── components.md              ← component registry (GENERATED from the code)
 
@@ -916,8 +930,10 @@ context a role receives.
 - The context compiler counts the role context of every file (the story
   slice is reported, not capped). `compile` and `check` fail if a role
   exceeds its manifest budget (~2–7k tokens) → condense first, then start.
-- File caps (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM
-  80 lines, agent.md 100 lines, …) are checked as a hard gate in the P7 curation —
+- File caps (`curation.sh caps`: PRODUCT 30 non-blank lines = "half page",
+  ARCHITECTURE 200 lines, DESIGN-SYSTEM 80, GUIDELINES 120,
+  security-baseline 60, test-conventions 60, each `agent.md` 100) are
+  checked as a hard gate in the P7 curation —
   otherwise the curated docs grow unnoticed until every session gets
   more expensive.
 
@@ -1093,7 +1109,7 @@ port allocation. Mode 3 stays disabled until this passes.
 | `sonar_cmd` dependencies | project-defined local scan + secrets check, once per PROJ at the PROJ-end Quality Gate — no wave gate runs it | ✅ hard through the configured command |
 | `supabase` (drift check) | `migration-drift-check.sh`: compares the shared local DB's applied migrations against this worktree's own `supabase/migrations/` | 🟡 only if Supabase in the stack; hard-fails P0 preflight and every wave gate on drift |
 | `sonar` | optional additional PROJ-end Sonar CLI/API stream | 🟡 skippable with explicit PROJ-end disposition; never skips `sonar_cmd` |
-| `sonar-scanner` | full quality gate at PROJ end (P6) | 🟡 skippable with log entry |
+| `sonar-scanner` | full quality gate at PROJ end (P5 Quality Gate) | 🟡 skippable with log entry |
 | `supabase` | migrations, types, local instances (if the product uses Supabase) | 🟡 only if Supabase in the stack |
 | Jira access (Atlassian MCP or CLI/REST) | PRD intake Mode B (P2d) + status sync-back | 🟡 TODO — only for Mode B (Stage 3); Mode A (local PRDs in specs/) needs nothing |
 | `npm`/`pnpm` | build/tests; pnpm decision for worktree installs is made in Stage 4 | ✅ hard (project-dependent) |
@@ -1146,8 +1162,9 @@ progress.md/state.json. Auth is checked too (`gh auth status`,
 - P0 checks both auth states and performs a bounded live probe. `claude`
   is hard (it hosts the chain). `codex` missing or unauthenticated does
   NOT block: the run enters degraded single-provider mode — Mode 1's
-  peer lane and all cross-reviews fall back to a different Claude model
-  than the author's (e.g. Sonnet 5), recorded in `state.json` and
+  peer lane and all cross-reviews fall back to the strongest Claude model
+  that is not the author's (rank `fable opus sonnet`, never weaker than the
+  writer), recorded in `state.json` and
   flagged in the morning report and PR body.
 
 ### ponytail (ready-made plugin — DECIDED, do not rebuild ourselves)
@@ -1278,8 +1295,8 @@ sequentially).
 | Situation | Behavior |
 |---|---|
 | Medium/Low findings & bugs | auto-defer: debt marker + ledger, decision at Checkpoint 2 |
-| Ralph cap hit (3 iterations) | log as known gap, continue (as today) |
-| Wave gate red | fix and re-run; 3× red on the SAME check → stop condition |
+| Outer Ralph still red after its four recovery stages (or an AC proves invalid/contradictory) | blocked-run evidence path → stop condition; the AC is never weakened or shipped as a "known gap" |
+| Wave gate red | verbatim output to a follow-up worker, then rerun the same gate; exit 76 waits for the declared external prerequisite, exit 73 needs resource diagnosis; repeated failures → blocked/escalation path with the attempt history |
 | Critical bug survives 3 fix attempts | stop condition |
 | Semantic merge conflict (parallel) | 1 resolution attempt with the contract as reference; unresolved → stop condition |
 | Tool missing / auth broken / env broken | stop condition (never skip silently; the PROJ-end `sonar_cmd` is mandatory) |
@@ -1352,7 +1369,9 @@ its stop report. Notification failure never loses state.
 
 Unchanged and explicitly preserved: the current pre-PRD Skills 1–2
 flow, both delivery tracks, immutable generated `2b_handoff/` packages,
-the Ralph loop mechanics, the TDD cycle, the wave-gate script principle,
+the Ralph principle of deterministic verification (now one bounded Inner
+Ralph per worker plus a wave-scoped Outer Ralph with four recovery stages),
+the TDD cycle, the wave-gate script principle,
 the read-only persona QA, and
 agent-browser smoke tests.
 
