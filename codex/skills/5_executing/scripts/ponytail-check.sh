@@ -2,8 +2,8 @@
 # ponytail-check.sh — Ponytail install + parity gate for P0 (CONCEPT.md §7).
 #
 # Ponytail (github DietrichGebert/ponytail) is the single source of the
-# minimalism ladder on BOTH providers — the context injector deliberately
-# carries no ladder of its own. This check verifies, per provider:
+# minimalism ladder on BOTH providers — the worker files deliberately
+# carry no ladder of its own. This check verifies, per provider:
 #   installed?  version?  mode?  (mode: PONYTAIL_DEFAULT_MODE env, else
 #   ~/.config/ponytail/config.json defaultMode, else "full" — persisted to
 #   the config if absent: the ONE mutation this script makes, logged)

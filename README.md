@@ -145,7 +145,7 @@ CONCEPT.md       The agent workflow framework specification
 `AGENTS.md` is the only curated durable-context file. `CLAUDE.md` is
 pointer-only and tells Claude to read `AGENTS.md`.
 
-Framework helper scripts (`chain state`, `chain findings`, the context compiler and its retired injector stub,
+Framework helper scripts (`chain state`, `chain findings`, the context compiler,
 gates, adapters) are byte-identical across their skill copies — `validate.sh`
 enforces it.
 

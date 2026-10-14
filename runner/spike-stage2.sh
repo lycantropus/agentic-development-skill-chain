@@ -5,8 +5,7 @@
 #   context compiler   — worker files: determinism, a budget breach writes nothing,
 #                        tier matrix over the file contents (frontend vs backend
 #                        scoping, reviewer minimal, micro-fixer/explore no file),
-#                        never-inject (no PRD/progress.md content in any file),
-#                        retired injector stub (notice only, tier 0/explore nothing)
+#                        never-inject (no PRD/progress.md content in any file)
 #   curation caps      — pass + per-cap fail fixtures, --require-baseline
 #   ponytail gate      — parity ok / version mismatch / absent (enforce on+off)
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
@@ -81,7 +80,7 @@ printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · 
 
 for s in 5_executing/scripts/chain 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
          5_executing/scripts/story-slice.mjs 5_executing/scripts/validate-wave-plan.mjs \
-         5_executing/scripts/context-injector.mjs 5_executing/scripts/ponytail-check.sh \
+         5_executing/scripts/ponytail-check.sh \
          6_qa/scripts/ledger.mjs 7_documentation/scripts/curation-caps.sh \
          0b_intake/scripts/intake-seal-check.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
@@ -141,12 +140,6 @@ has() { grep -qF -- "## $2" "$1" 2>/dev/null; }
   && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
 grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
   || ok "never-inject holds: no PRD/progress.md content in any worker file"
-# Retired injector stub as an old hook calls it from the repo root (manifests
-# from templates/roles): a role with a file gets the abort notice, never context.
-hook() { printf '{"agent_type":"%s"}' "$1" | node scripts/context-injector.mjs claude; }
-{ hook skillchain-implementer | jq -e '.hookSpecificOutput.additionalContext | startswith("Dieser Hook ist stillgelegt.")' >/dev/null \
-  && hook reviewer-security | grep -q 'stillgelegt' && [ -z "$(hook micro-fixer)" ] && [ -z "$(hook explore)" ]; } \
-  && ok "retired injector stub: notice for roles with a file, nothing for tier 0/explore" || bad "injector stub output wrong"
 
 # =============================================================================
 step "curation caps + intake seal"

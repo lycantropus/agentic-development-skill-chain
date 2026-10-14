@@ -11,7 +11,7 @@ Every script is reached through one entry point, **`chain <verb> [<sub>] [argsâ€
 
 ## The five script kinds
 
-Every script belongs to exactly one kind. Only Records write state; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files and removes a retired hook from `.claude/settings.json`); Gates answer with an exit code and a report.
+Every script belongs to exactly one kind. Only Records write state; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files); Gates answer with an exit code and a report.
 
 | Kind | Contract | `chain` verbs â†’ script |
 |---|---|---|
@@ -23,7 +23,7 @@ Every script belongs to exactly one kind. Only Records write state; Renderers wr
 
 Stack-specific add-ons are separate scripts on purpose, so projects without that stack are unaffected: `chain check migrations` (Supabase projects), `chain render registry` (projects with a component library) and `chain check ponytail` (the Ponytail plugin). `chain check preflight` and `chain gate wave` call them when they apply.
 
-Not behind `chain`: `env-local.sh` (a library the gates `source`), `merge-project-settings.sh` (Claude only, run once per project by hand), `context-injector.mjs` (a retired stub kept for projects that still carry its hook) and the phase runner `runner/run-phase.sh`, which drives unattended runs.
+Not behind `chain`: `env-local.sh` (a library the gates `source`), `merge-project-settings.sh` (Claude only, run once per project by hand), and the phase runner `runner/run-phase.sh`, which drives unattended runs.
 
 ## The phases at a glance
 

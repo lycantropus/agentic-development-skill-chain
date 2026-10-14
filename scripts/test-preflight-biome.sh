@@ -31,7 +31,7 @@ run_preflight() {
     bash "$PREFLIGHT" 1 biome >/dev/null)
 }
 
-ignored='[".claude/settings.json","scripts/compile-context-bundles.mjs","scripts/context-injector.mjs","scripts/gen-component-registry.mjs","scripts/ledger.mjs","scripts/render-pr-body.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"]'
+ignored='[".claude/settings.json","scripts/compile-context-bundles.mjs","scripts/gen-component-registry.mjs","scripts/ledger.mjs","scripts/render-pr-body.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"]'
 
 biome1="$TMP/biome1"
 mkdir -p "$biome1"
@@ -87,24 +87,16 @@ grep -q 'npm-wrapped scanner engine' <<<"$sonar_output" \
 grep -q '✓ worker context check' <<<"$sonar_output" \
   || fail "preflight did not run the worker context check on a plan folder"
 
-# The retired context-injector hook: never installed, and an existing one is
-# removed with the Ponytail matcher; foreign hooks and env stay; idempotent.
+# No SubagentStart hook is installed, and settings.json is neither created nor changed.
 fresh="$TMP/hook-fresh"
 mkdir -p "$fresh"
 run_preflight "$fresh"
-[ ! -e "$fresh/.claude/settings.json" ] || fail "preflight created .claude/settings.json (no hook is installed any more)"
-legacy="$TMP/hook-legacy"
-mkdir -p "$legacy/.claude"
-cp "$ROOT/scripts/fixtures/injector-hook/settings.json" "$legacy/.claude/settings.json"   # shared with test-compile-context-bundles.sh
-run_preflight "$legacy"
-[ "$(jq -c . "$legacy/.claude/settings.json")" = "$(jq -c . "$ROOT/scripts/fixtures/injector-hook/expected.json")" ] \
-  || fail "preflight must remove only the injector hooks and the Ponytail matcher (same result as compile): $(jq -c . "$legacy/.claude/settings.json")"
-cp "$legacy/.claude/settings.json" "$TMP/settings.once"
-run_preflight "$legacy"
-cmp -s "$TMP/settings.once" "$legacy/.claude/settings.json" || fail "second preflight changed .claude/settings.json"
-printf '{"hooks":{"SubagentStart":[{"hooks":[{"type":"command","command":"node scripts/context-injector.mjs claude"}]}]},"env":{"PONYTAIL_SUBAGENT_MATCHER":"x"}}\n' >"$legacy/.claude/settings.json"
-run_preflight "$legacy"
-[ "$(jq -c . "$legacy/.claude/settings.json")" = '{}' ] || fail "an injector-only settings file must lose hooks and env"
+[ ! -e "$fresh/.claude/settings.json" ] || fail "preflight created .claude/settings.json"
+keep="$TMP/hook-keep"
+mkdir -p "$keep/.claude"
+printf '{"env":{"FOO":"1"}}\n' >"$keep/.claude/settings.json"
+run_preflight "$keep"
+[ "$(jq -c . "$keep/.claude/settings.json")" = '{"env":{"FOO":"1"}}' ] || fail "preflight changed .claude/settings.json"
 
 cmp -s "$PREFLIGHT" "$ROOT/claude/skills/5_executing/scripts/preflight.sh" \
   || fail "preflight provider copies are not byte-identical"

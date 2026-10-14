@@ -16,7 +16,7 @@ files on disk. No conversation history crosses a phase boundary.
 | `run-phase.sh` | run one phase (`P0 P5 P6 P7 P8`) or `auto` (all remaining phases → one-line summary; the morning report renders only when P8 neither left an open PR nor removed the worktree); P5 loads `5b_executing-large-model` by default; `SKILLCHAIN_P5_SKILL="executing (5_executing)"` swaps in the full-procedure skill for weaker writer models |
 | `render-report.mjs` (`chain render report`) | `morning` (scan all PROJs → `specs/morning-report-<date>.md` + one-liner) and `stop` (stop report) |
 | `spike-dual-lane.sh` | Stage 1 release gate: concurrent lanes, read-only enforcement, JSONL capture, attribution, kill-tree cancellation |
-| `spike-stage2.sh` | Stage 2 release gate: worker-file determinism and budgets, tier matrix over the file contents, retired injector stub, symmetric authenticated cross-review (including six-persona QA, structured Claude output, and 10 MB transport failure), P7 runner gate |
+| `spike-stage2.sh` | Stage 2 release gate: worker-file determinism and budgets, tier matrix over the file contents, symmetric authenticated cross-review (including six-persona QA, structured Claude output, and 10 MB transport failure), P7 runner gate |
 | `prompts/lane-prompt.md.tmpl` | generic lane prompt (role rules, state discipline) |
 | `prompts/p6-controller.md` | the P6 phase-controller contract (ledger triage, fix dispatch, opposite re-verification) |
 | `templates/morning-report.md.tmpl`, `templates/stop-report.md.tmpl` | report frames — reports are rendered, never hand-written |
@@ -100,9 +100,7 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
   column), `roles/wave-N/<role>.md` for reviewers and fix workers. There is
   no SubagentStart hook, no lock and no hash bookkeeping (a file's first line carries the plan hash): `compile --wave N` runs at each
   wave start, and no worker starts after a non-zero exit until a rerun
-  exits 0. A project that still has the old hook keeps running on the
-  retired `context-injector.mjs` stub, which only says to use the path;
-  `compile` removes the hook.
+  exits 0.
 - **Ponytail coverage (Stage 2):** the runner clears
   `PONYTAIL_SUBAGENT_MATCHER`, using Ponytail's native all-subagent path;
   P0 blocks any scoped matcher because it can miss generic implementation

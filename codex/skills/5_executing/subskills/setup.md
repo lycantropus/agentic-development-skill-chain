@@ -31,9 +31,8 @@ This subskill is aligned with the Claude variant. In Codex:
 - Do not require `claude --dangerously-skip-permissions` or
   `bypassPermissions` for THIS session. Use the current Codex session
   permissions and the normal approval/sandbox policy; there is no
-  permission-merge step. (The preflight installs no hook; it only removes a
-  retired context-injector hook from `.claude/settings.json`, which
-  configures the Claude LANES the runner starts, not this session.)
+  permission-merge step. (The preflight installs no hook and does not touch
+  `.claude/settings.json`.)
 - Reusable skill assets live under `~/.codex/skills/...` instead of
   `~/.claude/skills/...`.
 - The preflight itself is host-neutral: `claude` stays a HARD tool
@@ -215,7 +214,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 
 | From (installed skill) | To |
 |---|---|
-| `5_executing/scripts/chain`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `context-injector.mjs` (retired stub), `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
@@ -319,26 +318,14 @@ against the codebase, and ONLY what `docs/` does not already state (§5
 redundancy rule — the ground file never duplicates curated docs). Then
 recompile (5a) so the worker files carry it.
 
-**5c. Delivery — there is nothing to activate.** No hook and no injector:
-the lead (or the runner's lane prompt) names the worker file by path in each
-spawn prompt, and the worker reads it first. `chain check preflight` (step 3) installs
-no hook any more; it removes a retired context-injector hook and
-`PONYTAIL_SUBAGENT_MATCHER` from `.claude/settings.json`, so Ponytail's native
-all-subagent path also covers generic implementation fallbacks.
-Never paste file contents into spawn prompts.
-
-*Running projects (migration):* `sync-framework` → `compile --wave N` in the
-same step, no worker in between and no new `chain check preflight`. `compile` writes the
-worker and agent files and removes an old hook and `PONYTAIL_SUBAGENT_MATCHER`.
-Exit 0 does not prove the removal: an unparseable `.claude/settings.json` stays
-unchanged with a warning (`⚠ … is not valid JSON — left unchanged`). Read
-`compile`'s output, repair that file by hand if the warning appears, rerun
-`compile` (or `chain check preflight`), and check that
-`grep -c context-injector .claude/settings.json` prints 0 and
-`jq -e '.env.PONYTAIL_SUBAGENT_MATCHER // empty' .claude/settings.json` prints
-nothing. No worker between `sync` and `compile` is lead discipline: the retired
-hook stub only tells a worker whose prompt names no path to abort, it delivers
-no context and does not catch a worker holding a path to an outdated file.
+**5c. Delivery — there is nothing to activate.** No hook: the lead (or the
+runner's lane prompt) names the worker file by path in each spawn prompt, and the
+worker reads it first. `chain check preflight` installs nothing into
+`.claude/settings.json`. `bash scripts/merge-project-settings.sh` additionally
+merges the execution permission allowlist. Never paste file contents into spawn
+prompts. After `sync` the lead runs `compile --wave N` in the same step; no worker
+starts in between (lead discipline: a worker holding a path to an outdated file is
+not caught).
 
 **5d. Ponytail parity** is already gated inside step 3's preflight
 (`chain check ponytail`: absence or version/mode mismatch across active
@@ -371,7 +358,7 @@ re-executes itself there once, and starts every later phase from that path. The
 - [ ] `.context.ponytail` in state.json (parity gate result, enforced truthfully)
 - [ ] `specs/.../context/` has `workers/wave-N/` (one file per story) and `roles/wave-N/` for every wave; nothing recorded in state.json
 - [ ] `ground-file.md` written (only assumptions docs/ does not state)
-- [ ] No context-injector hook and no `PONYTAIL_SUBAGENT_MATCHER` in `.claude/settings.json` (`grep -c context-injector` prints 0)
+- [ ] No `PONYTAIL_SUBAGENT_MATCHER` in `.claude/settings.json` (`chain check ponytail` blocks a scoped matcher)
 - [ ] `scripts/` + `templates/` contain the framework copies, executable
 - [ ] `.coderabbit.yaml` present at repo root
 - [ ] One safe negative control was observed red, restored, and recorded

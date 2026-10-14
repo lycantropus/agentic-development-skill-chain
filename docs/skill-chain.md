@@ -198,8 +198,7 @@ Stage 2 adds the bootstrap and the full context system:
   migration required); the files are recompiled at every wave start
   (`compile --wave N`). `chain render context check` runs in
   writing-plans and at CP1, so a role over budget or a story without a role
-  surfaces before approval. `compile` also removes the retired context-injector
-  hook; running projects migrate with `sync-framework` → `compile --wave N`.
+  surfaces before approval. Running projects pick up changes with `sync` → `compile --wave N`.
   The lead reads only the wave shape (each plan's `User Stories in this Wave` and
   `Execution` sections) plus the current wave's plan.
 - **Ponytail parity:** the minimalism ladder comes from the Ponytail

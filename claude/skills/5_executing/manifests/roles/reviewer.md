@@ -8,7 +8,6 @@ inject:
   - review-criteria
   - diff-scope
 budget_tokens: 3000
-matcher: "^(skillchain-)?reviewer(-.+)?$"
 claude:
   agent_file: true
   tools: "Read,Grep,Glob,Bash"

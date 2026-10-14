@@ -5,7 +5,6 @@ tier: 0
 scope: any
 inject: []
 budget_tokens: 3000
-matcher: "^(skillchain-)?micro-fixer$"
 claude:
   agent_file: true
   tools: "Read,Grep,Glob,Bash,Edit,Write"
