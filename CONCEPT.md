@@ -647,7 +647,7 @@ the four recovery stages in
 [Wave-Scoped Outer Ralph](docs/executing-skill.md#wave-scoped-outer-ralph);
 the quality gate in the [Quality Gate reference](claude/skills/5_executing/references/quality-gate.md).
 
-### P6 — Quality & QA (= Skill 5 steps 9/10 + Skill 6, reorganized around the ledger)
+### P6 — QA (= Skill 6, reorganized around the ledger)
 
 **Ownership boundary:** Skill 6 remains a strictly read-only finder. It
 tests, reviews, and writes findings; it never changes production code or
@@ -758,12 +758,12 @@ primarily deterministic scripts and start model lanes only for judgment):
 AGENTS.md                      ← ROOT-ONLY durable agent rules
 
 docs/                          ← LONG-LIVED, curated, injectable
-├── PRODUCT.md                 ← "what am I even building" (½ page, hard cap)
+├── PRODUCT.md                 ← "what am I even building" (capped)
 ├── ARCHITECTURE.md            ← § Stack (THE stack source of truth) +
-│                                overarching architecture (≤200 lines, hard cap)
+│                                overarching architecture (capped)
 ├── architecture/…             ← details/ADRs, referenced only
-├── GUIDELINES.md              ← code conventions, error handling, naming (≤120 lines, hard cap)
-├── DESIGN-SYSTEM.md           ← tokens, scales, patterns, do/don't (≤80 lines, hard cap)
+├── GUIDELINES.md              ← code conventions, error handling, naming (capped)
+├── DESIGN-SYSTEM.md           ← tokens, scales, patterns, do/don't (capped)
 └── components.md              ← component registry (GENERATED from the code)
 
 specs/product-roadmap.md       ← PROJ map: outcome, Depends on, Status
@@ -864,7 +864,7 @@ Skill 5 — granular `references/` instead of whole skills). New skills
   feature agent.md; project-wide → AGENTS.md candidate; defect →
   findings.json.
 - **Format:** Gotchas / Patterns That Work Well / Dead Ends (as today),
-  every entry with date + commit SHA. Max ~100 lines per file — beyond
+  every entry with date + commit SHA. Capped per file — beyond
   that, curate first, then append.
 - **Status:** hints, not rules ("verify before you rely on it"). Rules
   come from docs/ and AGENTS.md.
