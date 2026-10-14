@@ -160,7 +160,7 @@ function findOrFail(ledger, id) {
 
 // One raw debt finding per `ponytail:` marker; the summary is the marker text after it.
 function harvestLines(root) {
-  if (!existsSync(root)) { console.log(`findings.mjs: search root '${root}' does not exist — nothing to harvest`); process.exit(0); }
+  if (!(existsSync(root) && statSync(root).isDirectory())) { console.log(`findings.mjs: search root '${root}' does not exist — nothing to harvest`); process.exit(0); }
   let matches = "";
   try {
     matches = execFileSync("grep", ["-R", "-n", "-I", "ponytail:", root, "--exclude-dir=.git", "--exclude-dir=node_modules", "--exclude-dir=specs"],

@@ -12,7 +12,7 @@
 //   plan.mjs context <compile|check|show> <proj-x> <theme> [args]
 //     The context compiler (CONCEPT.md §5, §7): one file per worker.
 //
-// compile-context-bundles.mjs — the context compiler (CONCEPT.md §5, §7).
+// `context` — the context compiler (CONCEPT.md §5, §7).
 //
 // Compiles ONE file per worker: for every story of a wave plan
 // `context/workers/wave-N/<US-ID>.md` (`<US-ID>.backend.md` + `.frontend.md`
@@ -38,10 +38,10 @@
 // a rerun is idempotent; a write (I/O) error exits 1 — rerun compile.
 //
 // Usage:
-//   node compile-context-bundles.mjs compile <proj-x> <theme> [--wave N|all] [--roles-dir D]
-//   node compile-context-bundles.mjs check   <proj-x> <theme> [--roles-dir D]
-//   node compile-context-bundles.mjs show    <proj-x> <theme> <US-ID>[.backend|.frontend]
-//   node compile-context-bundles.mjs show    <proj-x> <theme> --wave N <role>
+//   node plan.mjs context compile <proj-x> <theme> [--wave N|all] [--roles-dir D]
+//   node plan.mjs context check   <proj-x> <theme> [--roles-dir D]
+//   node plan.mjs context show    <proj-x> <theme> <US-ID>[.backend|.frontend]
+//   node plan.mjs context show    <proj-x> <theme> --wave N <role>
 //
 // `compile` without --wave (or --wave all) compiles every wave, each on its own.
 // `check` renders every wave in memory and writes nothing — run it before CP1.
@@ -87,7 +87,7 @@ function sliceMain([planPath, id]) {
     process.stdout.write(slice(readFileSync(planPath, "utf8"), id));
   } catch (error) {
     if (error.count === undefined) throw error;
-    console.error(`story-slice: ${id} has ${error.count} sections in ${planPath} (need exactly 1)`);
+    console.error(`plan.mjs slice: ${id} has ${error.count} sections in ${planPath} (need exactly 1)`);
     process.exit(1);
   }
 }

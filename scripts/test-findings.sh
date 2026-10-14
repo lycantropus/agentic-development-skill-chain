@@ -83,6 +83,7 @@ run_suite() {
   (cd "$hv" && node "$ledger" harvest 1 test) >/dev/null
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json") -eq 2 ]] || fail "$label: harvest is not idempotent"
   (cd "$hv" && node "$ledger" harvest 1 test nowhere) | grep -q 'does not exist' || fail "$label: a missing search root should be reported, not fatal"
+  (cd "$hv" && node "$ledger" harvest 1 test src/a.ts) | grep -q 'does not exist' || fail "$label: a file as search root should be reported like a missing directory"
   mkdir "$hv/empty"; (cd "$hv" && node "$ledger" harvest 1 test empty) | grep -q 'no ponytail: markers' || fail "$label: no markers should be reported, not fatal"
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json") -eq 2 ]] || fail "$label: an empty harvest changed the ledger"
   (cd "$hv" && node "$ledger" harvest 1 test .) >/dev/null
