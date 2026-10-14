@@ -471,14 +471,14 @@ init_repo "$repo" 12 runner absent
 runner_bin="$TMP_ROOT/runner-bin"
 mkdir -p "$runner_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$runner_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nwt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\ncp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\ncp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\nchmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs"\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\ngit -C "$wt" add -A\ngit -C "$wt" commit -qm "seal P0"\n' >"$runner_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nwt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\ncp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\ncp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/plan.mjs"\nchmod +x "$wt/scripts/worktree.sh" "$wt/scripts/plan.mjs"\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\ngit -C "$wt" add -A\ngit -C "$wt" commit -qm "seal P0"\n' >"$runner_bin/claude"
 chmod +x "$runner_bin/codex" "$runner_bin/claude"
 runner_out="$TMP_ROOT/runner.out"
 (cd "$repo" && \
   PATH="$runner_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   "$ROOT/runner/run-phase.sh" P0 12 runner --timeout 30 >"$runner_out" 2>&1) || { cat "$runner_out" >&2; fail "runner P0 exited non-zero"; }
 [ "$(grep -c 're-entering persistent PROJ worktree exactly once' "$runner_out")" -eq 1 ] || { cat "$runner_out" >&2; fail "runner did not re-exec exactly once"; }
 wt="$TMP_ROOT/runner/control-proj12"
@@ -494,7 +494,7 @@ restart_out="$TMP_ROOT/runner-restart.out"
   PATH="$runner_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   "$ROOT/runner/run-phase.sh" P0 12 runner --timeout 30 >"$restart_out" 2>&1)
 grep -F "registered PROJ worktree is already P0:done before runner restart" "$restart_out" >/dev/null || { cat "$restart_out" >&2; fail "P0 crash-window restart launched another writer"; }
 ok "runner restart discovers an already sealed P0 target before spawning"
@@ -505,14 +505,14 @@ init_repo "$repo" 27 omega absent
 auto_bin="$TMP_ROOT/runner-auto-bin"
 mkdir -p "$auto_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$auto_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\n  printf "#!/usr/bin/env bash\\nexit 0\\n" >"$wt/scripts/quality-gate-proof.sh"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs" "$wt/scripts/quality-gate-proof.sh"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/plan.mjs"\n  printf "#!/usr/bin/env bash\\nexit 0\\n" >"$wt/scripts/quality-gate-proof.sh"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/plan.mjs" "$wt/scripts/quality-gate-proof.sh"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
 chmod +x "$auto_bin/codex" "$auto_bin/claude"
 set +e
 (cd "$repo" && \
   PATH="$auto_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   RUNNER_TEST_P5_PWD="$TMP_ROOT/p5-pwd" \
   "$ROOT/runner/run-phase.sh" auto 27 omega --timeout 30 >"$TMP_ROOT/runner-auto.out" 2>&1)
 auto_rc=$?
@@ -528,7 +528,7 @@ set +e
   PATH="$auto_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   RUNNER_TEST_P5_PWD="$TMP_ROOT/p5-pwd" \
   "$ROOT/runner/run-phase.sh" auto 27 omega --timeout 30 >"$TMP_ROOT/runner-advanced-restart.out" 2>&1)
 advanced_rc=$?

@@ -110,12 +110,12 @@ check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
 check_identical "$ROOT/claude/skills/7_documentation/scripts/curation-caps.sh" \
   "$ROOT/codex/skills/7_documentation/scripts/curation-caps.sh"
-check_identical "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs" \
-  "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs"
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
   "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
-# These helpers have exactly one copy per tree; a second one would drift silently.
-for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh; do
+# Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
+for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
+         5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/story-slice.mjs 5_executing/scripts/compile-context-bundles.mjs \
+         8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh; do
   for platform in claude codex; do
     [ ! -e "$ROOT/$platform/skills/$dup" ] || fail "duplicate helper copy must stay deleted: $platform/skills/$dup"
   done
@@ -148,9 +148,8 @@ check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
 check_identical "$ROOT/claude/skills/1a_clarification/SKILL.md" \
   "$ROOT/codex/skills/1a_clarification/SKILL.md"
 for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/scripts/sync-framework.mjs 5_executing/templates/decisions.md.tmpl \
-         5_executing/scripts/ponytail-check.sh 5_executing/scripts/compile-context-bundles.mjs \
+         5_executing/scripts/ponytail-check.sh 5_executing/scripts/plan.mjs \
          5_executing/scripts/migration-drift-check.sh \
-         5_executing/scripts/story-slice.mjs \
          5_executing/manifests/roles/micro-fixer.md 5_executing/manifests/roles/implementer.md \
          5_executing/manifests/roles/frontend-implementer.md 5_executing/manifests/roles/backend-implementer.md \
          5_executing/manifests/roles/reviewer.md 5_executing/manifests/roles/explore.md \

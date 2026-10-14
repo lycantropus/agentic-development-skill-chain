@@ -9,7 +9,7 @@ any implementation, so implementer lanes start with a clean branch,
 verified tools, and a machine-readable state file.
 
 P0 is script-driven — run the scripts, record the results — with exactly
-ONE bounded judgment step: the ground file (step 6b, context-curator
+ONE bounded judgment step: the ground file (step 6a, context-curator
 judgment). There are no user questions in P0.
 
 ## Subagent Contract
@@ -207,7 +207,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 
 | From (installed skill) | To |
 |---|---|
-| `5_executing/scripts/chain`, `render.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `render.mjs`, `plan.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl`, `morning-report.md.tmpl`, `stop-report.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
@@ -278,7 +278,14 @@ taken (key left absent = silently skipped) under the defaulted decisions in
 
 ### 6. Worker context (compile worker files, ground file)
 
-**6a. Compile the worker files for every wave.**
+**6a. Generate the ground file** — the one bounded judgment step in P0.
+Write `specs/PROJ-<X>-<theme>/ground-file.md`: assumptions the plans rely
+on (stack versions, conventions, data-model facts), each VALIDATED
+against the codebase, and ONLY what `docs/` does not already state (§5
+redundancy rule — the ground file never duplicates curated docs). It comes
+before the compile, so the worker files carry it from the first run.
+
+**6b. Compile the worker files for every wave** (once, after the ground file).
 
 ```bash
 bash scripts/chain render context compile <X> <theme>
@@ -290,7 +297,7 @@ from the plan table's `Agent Type`; `Split: contract` gives `.backend.md` and
 `.frontend.md`) and `context/roles/wave-N/<role>.md` per role without a story
 (reviewer, Quality-Gate fix workers). Step 5 recompiles `--wave N` at each wave
 start. CP1 already ran `chain render context check`, so a failure here
-means the sources changed since CP1 (or the ground file below pushed a role
+means the sources changed since CP1 (or the ground file pushed a role
 over its budget).
 
 - A role over its manifest budget aborts `compile` with exit 1 (role, tokens,
@@ -303,13 +310,6 @@ over its budget).
   — only `skillchain-*` files are ever written, existing agents
   are never touched — and sweeps up leftovers of the old layout (`bundle-*`,
   `bundles.lock.json`, `blocked-roles.json`).
-
-**6b. Generate the ground file** — the one bounded judgment step in P0.
-Write `specs/PROJ-<X>-<theme>/ground-file.md`: assumptions the plans rely
-on (stack versions, conventions, data-model facts), each VALIDATED
-against the codebase, and ONLY what `docs/` does not already state (§5
-redundancy rule — the ground file never duplicates curated docs). Then
-recompile (6a) so the worker files carry it.
 
 **6c. Delivery — there is nothing to activate.** No hook: the lead (or the
 runner's lane prompt) names the worker file by path in each spawn prompt, and the

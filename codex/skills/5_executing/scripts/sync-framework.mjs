@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
 const inventory = [
-  ...["chain", "render.mjs", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "compile-context-bundles.mjs", "worktree.sh", "validate-wave-plan.mjs", "migration-drift-check.sh", "story-slice.mjs", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
+  ...["chain", "render.mjs", "plan.mjs", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "worktree.sh", "migration-drift-check.sh", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
   ...["backend-implementer", "explore", "frontend-implementer", "implementer", "micro-fixer", "reviewer"].map(name => [`5_executing/manifests/roles/${name}.md`, `templates/roles/${name}.md`]),
   ...["decisions", "morning-report", "stop-report"].map(name => [`5_executing/templates/${name}.md.tmpl`, `templates/${name}.md.tmpl`]),
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),

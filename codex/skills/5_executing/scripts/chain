@@ -30,7 +30,7 @@ findings|harvest|harvest-debt.sh|Record
 quality||quality-evidence.mjs|Record
 quality|seal|quality-gate-proof.sh|Gate
 gate|wave|wave-gate.sh|Gate
-check|plan|validate-wave-plan.mjs|Gate
+check|plan|plan.mjs|Gate|validate
 check|preflight|preflight.sh|Gate
 check|ponytail|ponytail-check.sh|Gate
 check|migrations|migration-drift-check.sh|Gate
@@ -38,8 +38,8 @@ check|caps|curation-caps.sh|Gate
 check|intake|intake-seal-check.sh|Gate
 check|conflicts|delivery.sh|Gate|probe
 check|ci|delivery.sh|Gate|poll
-render|context|compile-context-bundles.mjs|Renderer
-render|slice|story-slice.mjs|Renderer
+render|context|plan.mjs|Renderer|context
+render|slice|plan.mjs|Renderer|slice
 render|registry|gen-component-registry.mjs|Renderer
 render|pr|render.mjs|Renderer|pr
 render|report|render.mjs|Renderer|report

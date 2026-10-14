@@ -78,8 +78,7 @@ EOF
 mkdir -p specs/intake
 printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · Decision: adopt\n' > specs/intake/decisions.md
 
-for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
-         5_executing/scripts/story-slice.mjs 5_executing/scripts/validate-wave-plan.mjs \
+for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/plan.mjs \
          5_executing/scripts/ponytail-check.sh \
          6_qa/scripts/ledger.mjs 7_documentation/scripts/curation-caps.sh \
          0b_intake/scripts/intake-seal-check.sh \
