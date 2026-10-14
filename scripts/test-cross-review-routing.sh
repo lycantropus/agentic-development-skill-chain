@@ -104,8 +104,11 @@ QA_STUB_LOG="$LOG" review qa 96 stage2 --artifacts docs/ARCHITECTURE.md --author
   || die "missing codex must degrade to six claude personas (rc=$rc)"
 
 # Model-opposite fallback is flagged in state; the reviewer is never the author model.
-CLAUDE_REVIEW_MODEL=sonnet review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 2 >/dev/null 2>&1 || true
-[ "$(xr '.cross_review[-1] | (.degraded_fallback|tostring) + ":" + .reviewer_model')" = true:sonnet ] || die 'degraded model-opposite fallback not flagged in state'
+before="$(xr '.cross_review | length')"; rc=0
+CLAUDE_REVIEW_MODEL=sonnet review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 2 >/dev/null 2>&1 || rc=$?
+{ [ "$rc" -eq 0 ] || [ "$rc" -eq 3 ]; } && [ "$(xr '.cross_review | length')" -eq $((before + 1)) ] \
+  && [ "$(xr '.cross_review[-1] | .mode + ":" + (.round|tostring) + ":" + (.degraded_fallback|tostring) + ":" + .reviewer_model')" = docs:2:true:sonnet ] \
+  || die "degraded model-opposite fallback not recorded as a new docs round 2 record (rc=$rc)"
 rc=0; CLAUDE_REVIEW_MODEL=opus review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta >"$CASE/same.out" 2>&1 || rc=$?
 [ "$rc" -eq 1 ] && grep -q 'fallback reviewer equals author model' "$CASE/same.out" || die "reviewer model == author model must be refused (rc=$rc)"
 
