@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# chain — one entry point for the framework helpers: `chain <verb> [<sub>] [args…]`.
+# A thin wrapper: it finds the helper script and runs it unchanged (same args,
+# cwd, stdin/stdout and exit code). No logic lives here, only the table below.
+#
+# Works from a synchronized repo (`scripts/chain`, helpers next to it) and from
+# an installed skill tree (`<skills>/5_executing/scripts/chain`, helpers in the
+# sibling skills' `scripts/` folders and in `5_executing/runner/`).
+#
+# `chain --list` prints the table, `chain --where <verb> [sub]` the resolved path.
+#
+# Not routed: env-local.sh (a library other helpers `source`) and
+# merge-project-settings.sh (Claude-only, manual one-time step).
+set -euo pipefail
+
+# The one place that maps verb -> script. Columns: verb | sub | script | kind.
+# A row with a sub matches when the first argument equals it (and is consumed);
+# a row without a sub takes every other call and passes all arguments through.
+# kind is one of the five script kinds: Record (sole writer of a file), Gate
+# (exit 0/1 plus report), Renderer (data to document), Environment (lifecycle,
+# setup) and Review (reviewer adapter).
+table() {
+  cat <<'EOF'
+state||state.sh|Record
+findings||ledger.mjs|Record
+findings|harvest|harvest-debt.sh|Record
+quality||quality-evidence.mjs|Record
+quality|seal|quality-gate-proof.sh|Gate
+gate|wave|wave-gate.sh|Gate
+check|plan|validate-wave-plan.mjs|Gate
+check|preflight|preflight.sh|Gate
+check|ponytail|ponytail-check.sh|Gate
+check|migrations|migration-drift-check.sh|Gate
+check|caps|curation-caps.sh|Gate
+check|intake|intake-seal-check.sh|Gate
+check|conflicts|conflict-probe.sh|Gate
+check|ci|ci-poll.sh|Gate
+render|context|compile-context-bundles.mjs|Renderer
+render|slice|story-slice.mjs|Renderer
+render|registry|gen-component-registry.mjs|Renderer
+render|pr|render-pr-body.mjs|Renderer
+render|report|render-report.mjs|Renderer
+worktree||worktree.sh|Environment
+sync||sync-framework.mjs|Environment
+review||cross-review.sh|Review
+review|claude|review-with-claude.sh|Review
+review|codex|review-with-codex.sh|Review
+EOF
+}
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+  echo "Usage: chain <verb> [<sub>] [args…]   (chain --list prints the table, chain --where <verb> [sub] the script path)" >&2
+  table | awk -F'|' '{ printf "  %-9s %-11s %-30s %s\n", $1, $2, $3, $4 }' >&2
+  exit 64
+}
+
+# Where a script lives: next to chain, or (installed skill tree only) in a sibling skill / the runner.
+find_script() {
+  local name="$1" dir
+  if [ -f "$here/$name" ]; then echo "$here/$name"; return 0; fi
+  if [ -f "$here/../SKILL.md" ]; then
+    for dir in "$here"/../../*/scripts "$here/../runner" "$here/../../../../runner"; do
+      if [ -f "$dir/$name" ]; then echo "$dir/$name"; return 0; fi
+    done
+  fi
+  return 1
+}
+
+where=0
+if [ "${1:-}" = "--where" ]; then where=1; shift; fi # print the resolved script path instead of running it
+verb="${1:-}"
+case "$verb" in
+  "" | -h | --help) usage ;;
+  --list) table; exit 0 ;;
+esac
+shift
+
+sub="${1:-}"
+row="$(table | awk -F'|' -v v="$verb" -v s="$sub" '$1 == v && $2 == s && s != "" { print; exit }')"
+if [ -n "$row" ]; then shift; else row="$(table | awk -F'|' -v v="$verb" '$1 == v && $2 == "" { print; exit }')"; fi
+[ -n "$row" ] || { echo "chain: unknown verb '$verb${sub:+ $sub}'" >&2; usage; }
+
+script="$(cut -d'|' -f3 <<<"$row")"
+path="$(find_script "$script")" || { echo "chain: $script not found (looked next to $here and in the installed skill tree)" >&2; exit 127; }
+[ "$where" = 0 ] || { echo "$path"; exit 0; }
+case "$script" in
+  *.mjs) exec node "$path" "$@" ;;
+  *) exec bash "$path" "$@" ;;
+esac
