@@ -89,11 +89,27 @@ function statusBlock(config, fingerprint) {
   const rows = [['Code Review', passed(['review'])], ['Mutation', mutation], ['Build', passed(['build'])], ['Tests', tests.length ? passed(tests) : 'skipped (none declared)'], ['Lint', passed(['lint'])], ['SonarCloud', sonar]];
   return [STATUS_BEGIN, '### Gate Status', '', '| Check | Status |', '|---|---|', ...rows.map(([name, status]) => `| ${name} | ${status} |`), STATUS_END].join('\n');
 }
+// The "## Quality Gate —" section: from its heading to the next "## " heading. The status block counts only inside it.
+function qualitySection(text) {
+  const heading = /^## Quality Gate —.*$/m.exec(text);
+  if (!heading) return null;
+  const next = /^## /m.exec(text.slice(heading.index + heading[0].length));
+  return { start: heading.index, end: next ? heading.index + heading[0].length + next.index : text.length, headingEnd: heading.index + heading[0].length };
+}
+const STATUS_BLOCK = /<!-- quality-status:[^\n]*-->[\s\S]*?<!-- \/quality-status -->/g;
 function refreshProgress(config, fingerprint) {
   if (!fs.existsSync(progressFile)) return;
-  const block = statusBlock(config, fingerprint), text = fs.readFileSync(progressFile, 'utf8');
-  const marked = /<!-- quality-status:[^\n]*-->[\s\S]*?<!-- \/quality-status -->/, heading = /^## Quality Gate —.*$/m;
-  fs.writeFileSync(progressFile, marked.test(text) ? text.replace(marked, () => block) : heading.test(text) ? text.replace(heading, line => `${line}\n\n${block}`) : `${text.replace(/\n*$/, '\n')}\n## Quality Gate — PROJ-${proj}\n\n${block}\n`);
+  const block = statusBlock(config, fingerprint);
+  let text = fs.readFileSync(progressFile, 'utf8');
+  const section = qualitySection(text);
+  if (!section) text = `${text.replace(STATUS_BLOCK, '').replace(/\n*$/, '\n')}\n## Quality Gate — PROJ-${proj}\n\n${block}\n`;
+  else {
+    let inner = text.slice(section.start, section.end), seen = false;
+    inner = inner.replace(STATUS_BLOCK, () => seen++ ? '' : block); // first block updated, duplicates dropped
+    if (!seen) inner = inner.replace(/^(## Quality Gate —.*)$/m, (line) => `${line}\n\n${block}`);
+    text = text.slice(0, section.start).replace(STATUS_BLOCK, '') + inner + text.slice(section.end).replace(STATUS_BLOCK, '');
+  }
+  fs.writeFileSync(progressFile, text);
 }
 // Same rules as env-local.sh (sourced by every other gate): .env.local fills only unset variables, quotes stripped once per side.
 function loadEnvLocal() {
@@ -133,7 +149,11 @@ function act(config, fingerprint) {
   if (action === 'seal') {
     verifyAll(config, fingerprint);
     if (!fs.existsSync(progressFile)) throw new Error(`progress file missing: ${progressFile}`);
-    if (!fs.readFileSync(progressFile, 'utf8').includes(statusBlock(config, fingerprint))) throw new Error('Quality Gate status block missing or edited — run `chain quality <X> <theme> check` to render it');
+    const text = fs.readFileSync(progressFile, 'utf8'), section = qualitySection(text);
+    if (!section) throw new Error('Quality Gate section missing in the progress file');
+    // exactly one block in the whole file, inside the section, identical to the one derived from the records
+    const blocks = text.match(STATUS_BLOCK) ?? [];
+    if (blocks.length !== 1 || !text.slice(section.start, section.end).includes(blocks[0]) || blocks[0] !== statusBlock(config, fingerprint)) throw new Error('Quality Gate status block missing, duplicated, outside the section or edited — run `chain quality <X> <theme> check` to render it');
     console.log('✓ Quality Gate proof present (code review, build, Sonar disposition)'); return;
   }
   if (action === 'review' || action === 'skip-sonar') {

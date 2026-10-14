@@ -91,10 +91,20 @@ try {
     const restore = text => write(`${progress}/PROJ-1-progress.md`, text);
     ok('check'); assert.match(block(), /\| Mutation \| ran \|/); assert.equal(seal().status, 0, seal().stderr);
     const rendered = progressText();
-    edited('| Mutation | ran |', '| Mutation | skipped (not configured) |'); assert.match(seal().stderr, /missing or edited/); restore(rendered);
+    edited('| Mutation | ran |', '| Mutation | skipped (not configured) |'); assert.match(seal().stderr, /or edited/); restore(rendered);
     edited('| Mutation | ran |', '| Mutation | pending |'); assert.notEqual(seal().status, 0); restore(rendered);
-    edited('| Mutation | ran |', '| Mutation | ran (survivors carried forward) |'); assert.match(seal().stderr, /missing or edited/); restore(rendered);
+    edited('| Mutation | ran |', '| Mutation | ran (survivors carried forward) |'); assert.match(seal().stderr, /or edited/); restore(rendered);
     write(`${progress}/PROJ-1-progress.md`, rendered.replace(block(), '')); assert.notEqual(seal().status, 0, 'a deleted block must fail'); restore(rendered);
+    // The block counts only once and only inside the Quality Gate section.
+    const bare = rendered.replace(block(), ''), heading = '## Quality Gate — PROJ-1';
+    restore(`${block()}\n\n${bare}`); assert.match(seal().stderr, /outside the section/, 'block before the section'); restore(rendered);
+    restore(`${bare}\n## Variant Notes\n${block()}\n`); assert.notEqual(seal().status, 0, 'block in a later section'); restore(rendered);
+    restore(rendered.replace(block(), `${block()}\n\n${block()}`)); assert.match(seal().stderr, /duplicated/); restore(rendered);
+    restore(rendered.replace(heading, '## Quality Results')); assert.match(seal().stderr, /section missing/); restore(rendered);
+    // A refresh pulls a stray copy back into the section and drops duplicates.
+    restore(`${block()}\n\n${rendered.replace(block(), `${block()}\n\n${block()}`)}`); ok('check');
+    assert.equal(progressText().match(/<!-- quality-status:/g).length, 1); assert.equal(seal().status, 0, seal().stderr);
+    restore(rendered);
     assert.equal(seal().status, 0, seal().stderr);
     // Only exit 1 means survivors; a crash or timeout with a printed count is a failed run.
     config.mutation_cmd = 'echo "Mutants: 5"; exit 2'; saveConfig(); commit();
@@ -111,7 +121,7 @@ try {
     ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
     assert.match(block(), /\| Mutation \| ran \(survivors carried forward\) \|/); assert.equal(seal().status, 0, seal().stderr);
     const survivors = progressText();
-    edited('| Mutation | ran (survivors carried forward) |', '| Mutation | ran |'); assert.match(seal().stderr, /missing or edited/); restore(survivors);
+    edited('| Mutation | ran (survivors carried forward) |', '| Mutation | ran |'); assert.match(seal().stderr, /or edited/); restore(survivors);
     // A later commit (e.g. a Sonar fix) makes mutation evidence stale until it is rerun.
     write('source.txt', 'three'); commit(); bad('check'); assert.notEqual(seal().status, 0);
     // Unconfigured: the block says skipped; claiming a run does not pass.
