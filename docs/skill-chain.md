@@ -167,7 +167,8 @@ Stage 2 adds the bootstrap and the full context system:
   block the phase). The runner re-verifies both gates after the seal.
 - **`cross-review`:** symmetric opposite-provider review mechanism — a Claude
   author is reviewed by Codex and the reverse; without Codex the strongest
-  non-author model takes over, flagged degraded. Active call sites: required
+  non-author model takes over, flagged degraded (the six-persona QA fallback
+  runs on the strongest Claude model even when it is the author's). Active call sites: required
   PRD review in Step 2, automatic concept/architecture/plan reviews, the required
   P6 QA six-persona review, and the P7 docs truth gate. Routing, rounds and
   size limits are in
