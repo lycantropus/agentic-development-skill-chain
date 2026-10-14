@@ -97,10 +97,10 @@ CHAIN_SKILL="$(skill_file 5_executing scripts/chain || true)"
 # The skill-tree chain gets the project's scripts/ dir, so a project copy of any helper (also a customized one
 # in a repo that has no scripts/chain yet) is still preferred over the installed one, as before.
 chain_has() { # <verb> [<sub>]: is the helper behind this verb present?
-  local c; for c in $CHAIN_REPO $CHAIN_SKILL; do CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" --where "$@" >/dev/null 2>&1 && return 0; done; return 1
+  local c; for c in ${CHAIN_REPO:+"$CHAIN_REPO"} ${CHAIN_SKILL:+"$CHAIN_SKILL"}; do CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" --where "$@" >/dev/null 2>&1 && return 0; done; return 1
 }
 chain() { # <verb> [<sub>] [args…]
-  local c; for c in $CHAIN_REPO $CHAIN_SKILL; do
+  local c; for c in ${CHAIN_REPO:+"$CHAIN_REPO"} ${CHAIN_SKILL:+"$CHAIN_SKILL"}; do
     if CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" --where "$@" >/dev/null 2>&1; then CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" "$@"; return; fi
   done
   echo "run-phase.sh: no helper for 'chain $1' (repo and skill tree)" >&2; return 127

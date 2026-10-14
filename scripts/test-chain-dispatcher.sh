@@ -68,7 +68,8 @@ case "$got" in */5_executing/scripts/state.sh) ;; *) fail "helper missing in CHA
 # the phase runner passes its project's scripts/ dir: a customized helper in a repo WITHOUT scripts/chain stays selected
 (
   cd "$proj"; printf 'echo custom-worktree "$@"\n' >scripts/worktree.sh
-  CHAIN_REPO=""; CHAIN_SKILL="$ROOT/claude/skills/5_executing/scripts/chain"
+  cp -R "$ROOT/claude/skills" "$TMP/sp ace"   # a skill tree path with a space must survive the runner's loops
+  CHAIN_REPO=""; CHAIN_SKILL="$TMP/sp ace/5_executing/scripts/chain"
   eval "$(sed -n '/^chain_has() {/,/^}/p;/^chain() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
   [ "$(chain worktree locate 1)" = "custom-worktree locate 1" ] || { echo "runner chain() ignored the project copy" >&2; exit 1; }
   chain_has worktree || { echo "chain_has lost the project copy" >&2; exit 1; }

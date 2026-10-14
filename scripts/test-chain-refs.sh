@@ -25,6 +25,7 @@ rejects "unknown project script" "scripts/gone.sh does not exist"    'Run `bash 
 rejects "unknown verb"           "'chain bogus' is not a chain verb"  'Run `chain bogus x`.'
 rejects "unknown sub"            "'chain check nope' is not in the dispatcher table" 'Run `chain check nope`.'
 rejects "unknown sub in a table row" "'chain check nonexistent' is not in the dispatcher table" '| Gate | `chain check nonexistent` |'
+rejects "verb without its required sub" "'chain check' needs a sub" 'Run `chain check` first.'
 rejects "table names a missing script" "table names gone.sh, which does not exist" '| `gone.sh` | `scripts/` |'
 
 # the how-it-works page must cover every verb of the table

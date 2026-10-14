@@ -7,7 +7,7 @@ Start here if you have not used the chain before. This page explains the part th
 - **Skills** are written procedures an agent follows (concept, requirements, architecture, plans, executing, QA, docs, delivery). They decide things.
 - **Scripts** are small deterministic programs the skills call. They record state, check gates, render documents and manage the worktree. They never decide anything; they either succeed or refuse.
 
-Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
+Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. Two routes need the installed dispatcher rather than the repo copy: `chain render report` (the report renderer ships with the runner, which is not synchronized into repos) and anything run before the first sync. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
 
 ## The five script kinds
 
