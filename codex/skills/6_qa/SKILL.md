@@ -154,20 +154,20 @@ Run this in the background. Wait until it reports a local URL (typically `http:/
 
 ### 1b. Sonar Quality-Gate Input
 
-Read the `### SonarCloud` block in `5_progress/PROJ-<X>-progress.md`.
+Read the `SonarCloud` row of the `### Gate Status` table and the `### SonarCloud` block in `5_progress/PROJ-<X>-progress.md`.
 
 - If Skill 5 logged Sonar findings, treat confirmed BLOCKER/CRITICAL/MAJOR issues in touched files as QA bugs and include them in the severity merge.
-- If Skill 5 logged `SonarCloud: skipped (sonar CLI unavailable)` or `skipped (project not configured)`, record Sonar as skipped in the QA summary and continue. Missing Sonar tooling/config is not a QA blocker.
+- If the `SonarCloud` row reads `skipped (sonar CLI unavailable)` or `skipped (project not configured)`, record Sonar as skipped in the QA summary and continue. Missing Sonar tooling/config is not a QA blocker.
 - Do not run `sonar-scanner` during QA. The scan belongs to Skill 5's Quality Gate; QA consumes its result and verifies any unresolved high-signal findings.
 - Treat MINOR/INFO findings as non-blocking unless manual verification shows real user, security, or maintainability impact.
 
 ### 1c. Mutation Input
 
-Read the `### Mutation` block in `5_progress/PROJ-<X>-progress.md`.
+Read the `Mutation` row of the `### Gate Status` table in `5_progress/PROJ-<X>-progress.md` (rendered from the evidence records).
 
-- `Status: ran (survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
-- `Status: ran`: the tool's own threshold was met; record it and continue.
-- `Status: skipped (not configured)`: record Mutation as skipped; not a QA blocker.
+- `ran (survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
+- `ran`: the tool's own threshold was met; record it and continue.
+- `skipped (not configured)`: record Mutation as skipped; not a QA blocker.
 - Never run `mutation_cmd` during QA. The run belongs to Skill 5's Quality Gate; QA consumes its result.
 - Document it under `### Mutation Quality Input` (§7): the status with the survivor count, and the survivors promoted to QA bugs with BUG-IDs and severity.
 

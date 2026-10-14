@@ -217,7 +217,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 | `5_executing/templates/agent-md-entry.md.tmpl` | `templates/` |
 | `8_delivery/scripts/delivery.sh` | `scripts/` |
 | `8_delivery/templates/pr-body.md.tmpl` | `templates/` |
-| `5_executing/scripts/wave-gate.sh`, `quality-gate-proof.sh`, `quality-evidence.mjs`, `gen-component-registry.mjs` | `scripts/` (as today) |
+| `5_executing/scripts/wave-gate.sh`, `quality.mjs`, `gen-component-registry.mjs` | `scripts/` (as today) |
 
 `chmod +x` the shell scripts.
 

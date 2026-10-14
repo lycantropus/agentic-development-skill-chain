@@ -130,7 +130,7 @@ from `5_executing` and the same scripts enforce them.
    coverage, Sonar once per PROJ with at most three fix rounds,
    combined recovery rounds; triage findings before fixing
    (`quality-gate.md` § Handling findings). Zero P0/P1 review findings to
-   pass. Fill the `## Quality Gate — PROJ-X` section, then `bash scripts/chain quality seal <X> <theme>`
+   pass. Write the findings under `## Quality Gate — PROJ-X`, then `bash scripts/chain quality seal <X> <theme>`
    must exit 0.
 9. **Handoff.** Framework run: `bash scripts/chain state transition <X> <theme> P5 done`
    and stop; the runner starts P6 as fresh lanes. In-session driver run: go on
@@ -247,8 +247,9 @@ Parallel wave: do not stage or commit; the lead integrates and commits.
 
 ## progress.md skeleton
 
-Headings under `## Quality Gate` are parsed by `chain quality seal`; keep
-them and their `Status:` lines verbatim.
+The `### Gate Status` block under `## Quality Gate` is rendered by
+`chain quality` from the evidence records and checked by `chain quality seal`;
+never edit it, write only the findings below it.
 
 ```markdown
 # PROJ-X Progress
@@ -266,24 +267,10 @@ them and their `Status:` lines verbatim.
 ## Quality Gate — PROJ-X
 
 ### Code Review
-Status: pending
 Spec: <findings, worst> — vs PRD/AC/plan
 Standards: <findings, worst> — vs AGENTS.md/conventions
 
 ### SonarCloud
-Status: pending
-
-### Mutation
-Status: pending | ran | ran (survivors carried forward) | skipped (not configured)
-
-### Build
-Status: pending
-
-### Tests
-Status: pending
-
-### Lint
-Status: pending
 
 ### Fixed Issues
 

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-const root = process.cwd(), temp = fs.mkdtempSync(path.join(os.tmpdir(), 'quality-evidence-'));
+const root = process.cwd(), temp = fs.mkdtempSync(path.join(os.tmpdir(), 'quality-'));
 try {
   for (const platform of ['codex', 'claude']) {
     const cwd = path.join(temp, platform); fs.mkdirSync(cwd);
@@ -17,6 +17,9 @@ try {
     const bad = (...args) => { const r = call(...args); assert.notEqual(r.status, 0, r.stdout); return r.stderr; };
     fs.mkdirSync(path.join(cwd, `${base}/3-4_plan`), { recursive: true });
     fs.mkdirSync(path.join(cwd, progress), { recursive: true });
+    const progressPath = path.join(cwd, progress, 'PROJ-1-progress.md'), progressText = () => fs.readFileSync(progressPath, 'utf8');
+    write(`${progress}/PROJ-1-progress.md`, '# PROJ-1 Progress\n\n## US-1: story\n');
+    const seal = () => spawnSync('bash', [chain, 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8' });
     write('.gitignore', 'out/\ncoverage/\n.scannerwork/\n.env.local\nnode_modules/\n');
     write('source.txt', 'one');
     const config = {
@@ -38,21 +41,22 @@ try {
     ok('run', 'sonar'); ok('run', 'lint'); ok('run', 'test:integration');
     write(`${progress}/review.md`, 'Reviewed integration; no P0/P1 findings.'); ok('review', `${progress}/review.md`);
     ok('check');
+    const block = () => progressText().match(/<!-- quality-status:[\s\S]*?<!-- \/quality-status -->/)?.[0];
+    for (const row of ['Code Review | passed', 'Mutation | skipped (not configured)', 'Build | passed', 'Tests | passed', 'Lint | passed', 'SonarCloud | ran']) assert.match(block(), new RegExp(`\\| ${row.replace(/[()|]/g, '\\$&')} \\|`));
+    assert.match(progressText(), /^## Quality Gate — PROJ-1$/m); assert.ok(progressText().startsWith('# PROJ-1 Progress\n\n## US-1: story\n'));
     const buildProof = JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-build.json`), 'utf8'));
     const savedLog = fs.readFileSync(path.join(cwd, buildProof.log));
     write(buildProof.log, 'tampered log'); bad('check'); write(buildProof.log, savedLog); ok('check');
-    const statuses = ['Code Review', 'Build', 'Tests', 'Lint'].map(name => `### ${name}\nStatus: passed\n`).join('');
-    write(`${progress}/PROJ-1-progress.md`, `## Quality Gate — PROJ-1\n${statuses}### SonarCloud\nStatus: ran\n`);
-    const proof = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/chain'), 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8' });
+    const proof = seal;
     // This fixture's .env.local is not sourced for direct helper calls.
     const sourceEnv = process.env.SETTING; process.env.SETTING = 'new';
-    assert.notEqual(proof().status, 0, 'environment change must invalidate apparently green statuses');
+    assert.notEqual(proof().status, 0, 'environment change must invalidate a rendered green block');
     if (sourceEnv === undefined) delete process.env.SETTING; else process.env.SETTING = sourceEnv;
     fs.rmSync(path.join(cwd, '.env.local')); // re-verify all commands with one environment
     ok('run', 'build'); ok('run', 'coverage'); ok('run', 'sonar'); ok('run', 'lint'); ok('run', 'test:integration'); ok('review', `${progress}/review.md`);
     assert.equal(proof().status, 0, proof().stderr);
     commit(); ok('check'); // committing operational evidence preserves code proof
-    write('source.txt', 'two'); bad('check'); assert.notEqual(proof().status, 0, 'stale green markdown must fail'); bad('run', 'build'); commit(); bad('check');
+    write('source.txt', 'two'); bad('check'); assert.notEqual(proof().status, 0, 'stale evidence must fail the seal'); bad('run', 'build'); commit(); bad('check');
     assert.doesNotMatch(ok('run', 'build'), /reused/);
     config.phase_commands[0].command = 'echo no-tests'; saveConfig(); commit(); bad('run', 'test:integration');
     config.coverage_cmd = 'exit 7'; saveConfig(); commit(); bad('run', 'coverage'); bad('run', 'sonar');
@@ -83,14 +87,15 @@ try {
     const mutationLog = fs.readFileSync(path.join(cwd, mutationRecord().log), 'utf8');
     assert.match(mutationLog, /base=[0-9a-f]{40}/); assert.match(mutationLog, /source\.txt/);
     ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
-    const statuses2 = ['Code Review', 'Build', 'Tests', 'Lint'].map(name => `### ${name}\nStatus: passed\n`).join('');
-    const progressFile = mutation => write(`${progress}/PROJ-1-progress.md`, `## Quality Gate — PROJ-1\n${statuses2}### SonarCloud\nStatus: ran\n${mutation ? `### Mutation\nStatus: ${mutation}\n` : ''}`);
-    const proofCall = () => spawnSync('bash', [path.join(root, platform, 'skills/5_executing/scripts/chain'), 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8' });
-    progressFile('ran'); assert.equal(proofCall().status, 0, proofCall().stderr);
-    progressFile('skipped (not configured)'); assert.match(proofCall().stderr, /needs Status: ran/);
-    progressFile('pending'); assert.notEqual(proofCall().status, 0);
-    progressFile(null); assert.notEqual(proofCall().status, 0, 'configured mutation needs a Mutation block');
-    progressFile('ran (survivors carried forward)'); assert.match(proofCall().stderr, /shows none/);
+    const edited = (from, to) => { const text = progressText(); assert.ok(text.includes(from), from); write(`${progress}/PROJ-1-progress.md`, text.replace(from, to)); return text; };
+    const restore = text => write(`${progress}/PROJ-1-progress.md`, text);
+    ok('check'); assert.match(block(), /\| Mutation \| ran \|/); assert.equal(seal().status, 0, seal().stderr);
+    const rendered = progressText();
+    edited('| Mutation | ran |', '| Mutation | skipped (not configured) |'); assert.match(seal().stderr, /missing or edited/); restore(rendered);
+    edited('| Mutation | ran |', '| Mutation | pending |'); assert.notEqual(seal().status, 0); restore(rendered);
+    edited('| Mutation | ran |', '| Mutation | ran (survivors carried forward) |'); assert.match(seal().stderr, /missing or edited/); restore(rendered);
+    write(`${progress}/PROJ-1-progress.md`, rendered.replace(block(), '')); assert.notEqual(seal().status, 0, 'a deleted block must fail'); restore(rendered);
+    assert.equal(seal().status, 0, seal().stderr);
     // Only exit 1 means survivors; a crash or timeout with a printed count is a failed run.
     config.mutation_cmd = 'echo "Mutants: 5"; exit 2'; saveConfig(); commit();
     bad('run', 'mutation'); bad('check');
@@ -104,16 +109,35 @@ try {
     config.mutation_cmd = 'echo "2 mutants survived"; echo "Mutants: 5"; exit 1'; saveConfig(); commit();
     assert.match(bad('run', 'mutation'), /surviving mutants/); assert.equal(mutationRecord().rc, 1);
     ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
-    progressFile('ran'); assert.match(proofCall().stderr, /surviving mutants/);
-    progressFile('ran (survivors carried forward)'); assert.equal(proofCall().status, 0, proofCall().stderr);
+    assert.match(block(), /\| Mutation \| ran \(survivors carried forward\) \|/); assert.equal(seal().status, 0, seal().stderr);
+    const survivors = progressText();
+    edited('| Mutation | ran (survivors carried forward) |', '| Mutation | ran |'); assert.match(seal().stderr, /missing or edited/); restore(survivors);
     // A later commit (e.g. a Sonar fix) makes mutation evidence stale until it is rerun.
-    write('source.txt', 'three'); commit(); bad('check'); assert.notEqual(proofCall().status, 0);
-    // Unconfigured: an absent block or an explicit skip passes; claiming a run does not.
+    write('source.txt', 'three'); commit(); bad('check'); assert.notEqual(seal().status, 0);
+    // Unconfigured: the block says skipped; claiming a run does not pass.
     delete config.mutation_cmd; saveConfig(); commit();
+    ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`); ok('check');
+    assert.match(block(), /\| Mutation \| skipped \(not configured\) \|/); assert.equal(seal().status, 0, seal().stderr);
+    const unconfigured = progressText();
+    edited('| Mutation | skipped (not configured) |', '| Mutation | ran |'); assert.notEqual(seal().status, 0); restore(unconfigured);
+
+    // The seal runs in a plain environment but the commands ran with .env.local sourced: the seal loads it the same way.
+    write('.env.local', '# comment\nA_KEY="quoted value"\nB_KEY=\'single\'\nBARE\n');
+    const sourced = (...args) => { const r = spawnSync('bash', ['-c', 'source "$1"; shift; exec "$@"', '_', path.join(root, platform, 'skills/5_executing/scripts/env-local.sh'), 'bash', chain, 'quality', '1', 'test', ...args], { cwd, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr); };
+    sourced('run', 'build'); sourced('run', 'lint'); sourced('run', 'sonar'); sourced('review', `${progress}/review.md`); sourced('check');
+    bad('check'); // a plain environment is a different environment ...
+    assert.equal(seal().status, 0, seal().stderr); // ... which the seal reproduces from .env.local
+    fs.rmSync(path.join(cwd, '.env.local'));
     ok('run', 'build'); ok('run', 'lint'); ok('run', 'sonar'); ok('review', `${progress}/review.md`);
-    progressFile(null); assert.equal(proofCall().status, 0, proofCall().stderr);
-    progressFile('skipped (not configured)'); assert.equal(proofCall().status, 0, proofCall().stderr);
-    progressFile('ran'); assert.notEqual(proofCall().status, 0);
+
+    // Seal exits: 64 on usage, 1 without a progress file; check keeps existing progress prose and rewrites only its own block.
+    assert.equal(spawnSync('bash', [chain, 'quality', 'seal'], { cwd, encoding: 'utf8' }).status, 64);
+    ok('check'); const settled = progressText(); ok('check'); assert.equal(progressText(), settled, 'rendering twice changes nothing');
+    fs.renameSync(progressPath, `${progressPath}.off`); const noProgress = seal(); assert.equal(noProgress.status, 1); assert.match(noProgress.stderr, /progress file missing/);
+    ok('check'); assert.ok(!fs.existsSync(progressPath), 'a missing progress file is never created'); fs.renameSync(`${progressPath}.off`, progressPath);
+    write(`${progress}/PROJ-1-progress.md`, `# P\n\n## Quality Gate — PROJ-1\n\n### Code Review\nSpec: 0 findings\n\n## Variant Notes\n- note\n`); ok('check');
+    assert.match(progressText(), /## Quality Gate — PROJ-1\n\n<!-- quality-status:[\s\S]*<!-- \/quality-status -->\n\n### Code Review\nSpec: 0 findings\n\n## Variant Notes\n- note\n/);
+    assert.equal(seal().status, 0, seal().stderr);
   }
   console.log('quality evidence behavior tests (codex + claude): PASS');
 } finally { fs.rmSync(temp, { recursive: true, force: true }); }

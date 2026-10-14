@@ -26,8 +26,8 @@ table() {
   cat <<'EOF'
 state||state.sh|Record
 findings||findings.mjs|Record
-quality||quality-evidence.mjs|Record
-quality|seal|quality-gate-proof.sh|Gate
+quality||quality.mjs|Record
+quality|seal|quality.mjs|Gate|seal
 gate|wave|wave-gate.sh|Gate
 check|plan|plan.mjs|Gate|validate
 check|preflight|preflight.sh|Gate
