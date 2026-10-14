@@ -519,8 +519,9 @@ rest is reported or deferred as debt per §8. Provider-opposite is PREFERRED,
 not hard: without Codex, Claude-authored work falls back to the strongest
 Claude model that is not the author's (rank `fable opus sonnet`), flagged
 in the morning report and PR body — the invariant that survives degradation
-is that the gate is never satisfied by the authoring model. Routing, the
-six-persona QA fallback and the output-integrity rules are in
+is that the gate is never satisfied by the authoring model, except the
+six-persona QA fallback, which runs on the strongest Claude model even when it
+is the author's and is flagged degraded. Routing, that fallback and the output-integrity rules are in
 [cross-review/SKILL.md](claude/skills/cross-review/SKILL.md#routing-and-output-integrity);
 the pinned writer/review models in
 [runner/README.md](runner/README.md#invariants-the-runner-owns).
@@ -1071,7 +1072,8 @@ progress.md/state.json. Auth is checked too (`gh auth status`,
 - P0 checks both auth states and performs a bounded live probe. `claude`
   is hard (it hosts the chain). `codex` missing or unauthenticated does
   NOT block: the run enters degraded single-provider mode — Mode 1's
-  peer lane and all cross-reviews fall back to the strongest Claude model
+  peer lane and all cross-reviews (the six-persona QA fallback excepted, see
+  `cross-review/SKILL.md`) fall back to the strongest Claude model
   that is not the author's (rank `fable opus sonnet`; it must differ from the
   writer's model), recorded in `state.json` and
   flagged in the morning report and PR body.
