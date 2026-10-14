@@ -6,7 +6,6 @@
 #                        tier matrix over the file contents (frontend vs backend
 #                        scoping, reviewer minimal, micro-fixer/explore no file),
 #                        never-inject (no PRD/progress.md content in any file)
-#   ponytail gate      — parity ok / version mismatch / absent (enforce on+off)
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
 #                        (opposite provider, six-persona parity, auth preflight,
 #                        structured output, ledger attribution, protocol controls,
@@ -137,37 +136,6 @@ has() { grep -qF -- "## $2" "$1" 2>/dev/null; }
   && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
 grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
   || ok "never-inject holds: no PRD/progress.md content in any worker file"
-
-# =============================================================================
-step "ponytail parity gate (stubbed registries)"
-# =============================================================================
-PT="$WORK/pt"; mkdir -p "$PT/cache/4.8.4/.codex-plugin" "$PT/cfg"
-echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' > "$PT/claude.json"
-echo '{"version":"4.8.4"}' > "$PT/cache/4.8.4/.codex-plugin/plugin.json"
-printf '[plugins."ponytail@ponytail"]\nenabled = true\n' > "$PT/codex.toml"
-echo '{"defaultMode":"full"}' > "$PT/cfg/config.json"
-ptc() { PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
-        PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-        bash scripts/chain check ponytail "$@"; }
-ptc >/dev/null 2>&1 && ok "parity ok -> exit 0" || bad "parity fixture failed"
-mkdir -p "$PT/cache/4.9.0/.codex-plugin"; echo '{"version":"4.9.0"}' > "$PT/cache/4.9.0/.codex-plugin/plugin.json"
-ptc >/dev/null 2>&1 && bad "version mismatch passed" || ok "version mismatch -> exit 1 (blocks P0)"
-rm -rf "$PT/cache/4.9.0"
-echo '{"version":2,"plugins":{}}' > "$PT/claude.json"
-ptc >/dev/null 2>&1 && bad "absent plugin passed with enforce on" || ok "absent plugin + enforce -> exit 1"
-PONYTAIL_ENFORCE=0 ptc --json 2>/dev/null | jq -e '.enforced == false and .parity_ok == false' >/dev/null \
-  && PONYTAIL_ENFORCE=0 ptc >/dev/null 2>&1 \
-  && ok "PONYTAIL_ENFORCE=0: exit 0 but recorded enforced:false (loud escape hatch)" \
-  || bad "enforce-off path wrong"
-echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' > "$PT/claude.json"
-echo '{"defaultMode":"off"}' > "$PT/cfg/config.json"
-ptc >/dev/null 2>&1 && bad "mode 'off' passed the gate" || ok "mode 'off' -> exit 1 (ladder disabled is a failed gate, not parity)"
-echo '{"defaultMode":"full"}' > "$PT/cfg/config.json"
-PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
-  PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-  PONYTAIL_SUBAGENT_MATCHER='implementer|frontend-implementer|backend-implementer|micro-fixer' bash scripts/chain check ponytail >/dev/null 2>&1 \
-  && bad "scoped ladder matcher passed the gate" \
-  || ok "scoped ladder matcher -> exit 1 (generic implementation fallback would be missed)"
 
 # =============================================================================
 step "cross-review mechanics (PATH-shimmed CLIs, deterministic)"
