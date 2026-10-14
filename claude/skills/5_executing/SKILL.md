@@ -23,7 +23,7 @@ Orchestrate implementation by creating an agent team and spawning teammates per 
 The orchestrator (main agent) must stay lean so it survives the full PROJ → QA → docs chain. **Delegate every code, test, and fix edit when subagents are available and delegation is permitted; the main agent coordinates.**
 
 - **CP1 + P0:** the checkpoint and setup subskills run in spawned subagents; the orchestrator holds only the review point list and the verdicts.
-- **US implementation:** always spawned as P0's projected `skillchain-implementer` / `skillchain-backend-implementer` / `skillchain-frontend-implementer` (compiled from `manifests/roles/`; no other implementer agent files exist). Never write code inline.
+- **US implementation:** always spawned as `skillchain-implementer` / `skillchain-backend-implementer` / `skillchain-frontend-implementer` (`compile` writes them from `manifests/roles/`; no other implementer agent files exist), each reading its worker file by path. Never write code inline.
 - **Wave-scoped Outer Ralph:** the main agent owns deterministic commands and evidence; workers own every resulting fix.
 - **PROJ-end Ken review:** spawned in Skill 6, not read inline. Ken no longer runs per wave — only once against the assembled PROJ.
 - **Quality Gate (Step 9):** `skillchain-reviewer` plus optional `sonar-cli` quality input run as delegated streams, not inline review by the orchestrator.
@@ -76,7 +76,7 @@ Before doing ANYTHING else — before reading plans, before spawning any agent:
    - **Unattended handoff, once, on `P0:done`:** follow `references/unattended-handoff.md`
      in `.worktree.path` (one probe, at most one question: unattended, in this session, or interactive).
    - **On every implementation start or resume**, after verifying the worktree path and before launching workers, run `node ~/.claude/skills/5_executing/scripts/sync-framework.mjs`. Use the installed command, not a potentially stale project copy. A non-zero result blocks implementation: reconcile reported differences against installed sources, test adaptations, and rerun with `--adopt <reviewed-path>` for each resolved file. Never overwrite or blindly adopt project customizations.
-   - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If a refresh changes context tooling or role templates, recompile the context bundles and record them via `state.sh`. This new commit invalidates old gate evidence; never refresh during workers or a gate.
+   - Commit `.skillchain-helpers.json` and changed managed helpers/templates before implementation. If the refresh changed any helper, template or role manifest, run `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>` (N = the wave about to start) in the same step as `sync-framework` — it rewrites the worker and agent files and removes a retired context-injector hook. Start no worker between `sync` and `compile`, and none after a non-zero `compile` until a rerun exits 0 (lead discipline: the retired hook stub only tells a worker whose prompt names no path to abort and delivers no context; it does not catch a worker holding a path to an outdated file). Read `compile`'s output: a `⚠ … is not valid JSON — left unchanged` for `.claude/settings.json` means the old hook is still there; repair the file by hand and rerun `compile` (`grep -c context-injector .claude/settings.json` must print 0). This new commit invalidates old gate evidence; never refresh during workers or a gate.
    - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/state.sh transition <X> <theme> P5 running`.
 2. **Standalone fallback (no state.json — manual run without the framework):**
    run the legacy preflights inline before wave 1: (a) permission preflight —
@@ -283,11 +283,11 @@ Read lazily — the lead's context has to last the whole PROJ, and nothing below
 for p in specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md; do node scripts/story-slice.mjs "$p" "User Stories in this Wave"; node scripts/story-slice.mjs "$p" Execution; done
 ```
 
-**At each wave start** — only that wave's plan, `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md`. Its lead-facing header (`## User Stories in this Wave`, `## Execution`) drives dispatch. Each `## <US-ID>` section is that worker's slice — ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints, gotchas — and reaches the worker verbatim through `scripts/story-slice.mjs` (Step 3). Never re-read earlier waves' plans: what previous waves implemented comes from the wave shape plus `5_progress/PROJ-<X>-progress.md`.
+**At each wave start** — only that wave's plan, `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md`. Its lead-facing header (`## User Stories in this Wave`, `## Execution`) drives dispatch. Each `## <US-ID>` section is that worker's slice — ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints, gotchas — and is compiled verbatim into the worker's file under `## Deine Story` (Step 2). Never re-read earlier waves' plans: what previous waves implemented comes from the wave shape plus `5_progress/PROJ-<X>-progress.md`.
 
-**PRDs** — `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` stay the authoritative requirements source. The plan's ACs were traced against them by the plan cross-review and CP1, and Skill 6 tests the PRD ACs again, so open the matching PRD story only when a plan/PRD AC conflict is suspected (an AC in the slice reads paraphrased or incomplete, or a worker or the Outer Ralph pass questions one). If plan and PRD disagree on AC text, the PRD wins: add the PRD wording to the spawn prompt, marked as superseding the slice, and log the drift in `progress.md`.
+**PRDs** — `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` stay the authoritative requirements source. The plan's ACs were traced against them by the plan cross-review and CP1, and Skill 6 tests the PRD ACs again, so open the matching PRD story only when a plan/PRD AC conflict is suspected (an AC in the slice reads paraphrased or incomplete, or a worker or the Outer Ralph pass questions one). If plan and PRD disagree on AC text, the PRD wins: add the PRD wording to the spawn prompt, marked as superseding the file's slice, and log the drift in `progress.md`.
 
-**Architecture** — workers get the implementer view of `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (their wave's decision Summaries, compiled) through their context bundle. The lead opens the full file only for a cross-PRD design question that the slice and the wave shape do not settle.
+**Architecture** — workers get the implementer view of `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (their wave's decision Summaries, compiled) through their worker file. The lead opens the full file only for a cross-PRD design question that the slice and the wave shape do not settle.
 
 **UI implementation handoff** — for UI PROJs, read `specs/PROJ-<X>-<theme>/1d_prototypes/implementation-handoff.md` before the first wave with UI stories. It is the compact source for project mode, component reuse, new component candidates, design tokens, interaction contract, implementation tolerance, and demo-only mockup exclusions.
 
@@ -337,7 +337,7 @@ Wave 3: US-3                    → 1 teammate
 ...
 ```
 
-### 2. Before each wave: read `agent.md`, refresh the context bundles
+### 2. Before each wave: read `agent.md`, compile the worker files
 
 Read wave N's plan now — this wave's plan only (see Input).
 
@@ -346,14 +346,13 @@ Include relevant sections in the teammate prompt so they don't repeat known dead
 (Implementers additionally follow the agent.md read/write protocol in `references/implementer.md`;
 entries are rendered with `templates/agent-md-entry.md.tmpl`.)
 
-Recompile the bundles wave-scoped — the architecture view then carries only this
-wave's decisions and `api-contracts-own-wave` only its contracts — and record the
-new hashes:
+Compile wave N's worker files: one per story (`context/workers/wave-<N>/<US-ID>.md`) and one per role without a story (`context/roles/wave-<N>/<role>.md`, for reviewers and fix workers). The architecture view carries only this wave's decisions and `api-contracts-own-wave` only its contracts. `compile` also rewrites the `skillchain-*` agent files; it keeps no lock, no hash bookkeeping and no `state.sh` entry (each file's first line carries the plan hash):
 
 ```bash
 node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>
-bash scripts/state.sh set <X> <theme> .context.bundles "$(jq -c . specs/PROJ-<X>-<theme>/context/bundles.lock.json)"
 ```
+
+Exit ≠ 0 (budget breach, unassignable story, outdated local manifest, write error): start no worker until a rerun exits 0. Exit 0 is not enough: read the warnings too (e.g. `.claude/settings.json is not valid JSON — left unchanged`: repair, rerun; see `subskills/setup.md`). The file's first line carries the plan hash; after a plan change, rerun `compile`.
 
 ### 2a. Mark wave start with a git tag
 
@@ -362,10 +361,11 @@ Before spawning any teammate for wave N, tag the current HEAD as the wave base. 
 </HARD-GATE>
 
 ```bash
-git tag "wave-${WAVE}-start-PROJ-${PROJ}"
+git rev-parse -q --verify "refs/tags/wave-${WAVE}-start-PROJ-${PROJ}" >/dev/null \
+  || git tag "wave-${WAVE}-start-PROJ-${PROJ}"
 ```
 
-One tag per (wave, PROJ) pair. Tags are local-only; do not push. If neither `WAVE_BASE_SHA` nor `wave-${WAVE}-start-PROJ-${PROJ}` exists, `wave-gate.sh` fails hard. There is no `HEAD~20`, commit-message, or root-commit fallback. If the tag already exists from a re-run, delete and re-create: `git tag -d "wave-${WAVE}-start-PROJ-${PROJ}"`.
+One tag per (wave, PROJ) pair. Tags are local-only; do not push. If neither `WAVE_BASE_SHA` nor `wave-${WAVE}-start-PROJ-${PROJ}` exists, `wave-gate.sh` fails hard. There is no `HEAD~20`, commit-message, or root-commit fallback. An existing tag stays: `wave-gate.sh` sets the next wave's tag when a gate passes, and on a resume the tag must keep marking the wave base, otherwise workers' commits fall out of the CodeRabbit diff. Delete and re-create it (`git tag -d "wave-${WAVE}-start-PROJ-${PROJ}"`) only when the wave restarts from a reset checkout.
 
 ### 3. Create team and spawn teammates for the wave
 
@@ -398,16 +398,15 @@ worktree's own `supabase/migrations/` still matches what the shared DB has
 actually applied (`scripts/migration-drift-check.sh`), since a sibling
 worktree can advance the schema between waves with no lock involved at all.
 
-**Choose the right implementer type per US.** Where the current session can
-spawn P0's `skillchain-<role>` agent types, use them. Otherwise use the normal
-agent type and put the bundle path
-`specs/PROJ-<X>-<theme>/context/bundle-<role>.md` in its prompt with "read this
-first" (the file is hash-locked by `bundles.lock.json`). No such file means the
-role is blocked (`context/blocked-roles.json`) and must not be spawned. A generic
-`general-purpose` spawn gets no bundle unless that path is explicitly passed:
-- US touches only UI (components, pages, styling) → `frontend-implementer` (`skillchain-frontend-implementer`)
-- US touches only server-side (API, DB, server actions) → `backend-implementer` (`skillchain-backend-implementer`)
-- US is full-stack (both UI and server logic) → `implementer` (`skillchain-implementer`, generic)
+**The story worker's role comes from the plan, not from your judgment.** The `Agent Type` column of `## User Stories in this Wave` is binding. Read it with `node scripts/validate-wave-plan.mjs --stories specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (JSON per story: `role`, `split`, `complexity`, `fallback`) and spawn that role (`implementer`, `frontend-implementer`, `backend-implementer`; `skillchain-<role>` where the session can spawn P0's agent types). `Split: contract` is one backend and one frontend worker, each with its own file; `Split: fan-out` is one story file shared by all fan-out workers. For every worker file spawn exactly the role named in the file's first line (`role <role>`) and in the `--stories` JSON. Old plans without an `Agent Type` column (`fallback: true`; `compile` warns) get `implementer` for a story without split and the two side roles (`backend-implementer`, `frontend-implementer`) for `Split: contract`. Only fix workers choose the type themselves, and they take the role file of the type they chose:
+- fix touches only UI (components, pages, styling) → `frontend-implementer`
+- fix touches only server-side (API, DB, server actions) → `backend-implementer`
+- both, or unclear → `implementer` (generic)
+
+**Every worker reads one file, named by path in its spawn prompt** (the normal case, not a fallback):
+- Story worker: `specs/PROJ-<X>-<theme>/context/workers/wave-<N>/<US-ID>.md` (`<US-ID>.backend.md` / `<US-ID>.frontend.md` under `Split: contract`).
+- Fix worker without a story: `specs/PROJ-<X>-<theme>/context/roles/wave-<N>/<role>.md` of the wave the affected files belong to. A fix across waves stays one worker; add the other waves' role files by path.
+- Missing file or a wrong one: rerun `compile <X> <theme> --wave <N>` (`show <X> <theme> <US-ID>` / `show <X> <theme> --wave <N> <role>` prints a file); never hand-assemble the context. Where the session cannot spawn the `skillchain-<role>` agent types, use the normal agent type; the path in the prompt does the same job. A `general-purpose` spawn gets no file unless its path is in the prompt. `micro-fixer` and `explore` get none.
 
 **Choose the right model per US (from the wave plan's `Complexity` column):**
 Read the `Complexity` column in the wave plan's "User Stories in this Wave" table. Pass the value as the `model` parameter on the `Agent` spawn so the teammate runs on the right brain for the job.
@@ -420,20 +419,33 @@ Haiku is deliberately not in the menu — US-level work loses too much fidelity 
 Create an agent team for Wave N of PROJ-X.
 
 Spawn teammates:
-- "us-2" using the skillchain-frontend-implementer agent type, model: "sonnet": [US-2 prompt with full context]
-- "us-7" using the skillchain-backend-implementer agent type, model: "opus": [US-7 prompt with full context — this one touches auth/session]
+- "us-2" using the skillchain-frontend-implementer agent type, model: "sonnet": [US-2 spawn prompt: path + ownership]
+- "us-7" using the skillchain-backend-implementer agent type, model: "opus": [US-7 spawn prompt: path + ownership — this one touches auth/session]
 
 Require plan approval for each implementer before they make changes.
 ```
 
-**For waves with a single user story:** Use a regular subagent (no team overhead needed). Pick the matching implementer type based on the US scope. Local editing is permitted only when delegation is unavailable or prohibited; report that reason explicitly.
+**For waves with a single user story:** Use a regular subagent (no team overhead needed). Use the role from the plan's `Agent Type` column. Local editing is permitted only when delegation is unavailable or prohibited; report that reason explicitly.
+
+Spawn prompt for a story worker (about six lines; everything else is in the file). Keep "Wave <N>" in the text: the global `wave-gate-enforcer` hook reads the wave number from the prompt and abstains without it:
+
+```
+Implementiere <US-ID> (Wave <N>). Dein vollständiger Auftrag steht in `<Pfad>`. Lies ihn
+vollständig, bevor du irgendetwas anderes tust, und beginne deinen Report mit
+`Brief: <US-ID>`. Nenne im Report je AC die Testdatei (`AC-1 → tests/x.test.ts`).
+Du besitzt `<Dateien>`. Ausführung: <parallel|sequential>, <Laufzeit-Constraints, Shared-Lock- und Dev-Server-Regel>.
+Prior waves: <Zusammenfassung aus progress.md>.
+```
+
+A fix worker's prompt names the role file the same way (plus the other waves' role files by path for a cross-wave fix), carries the finding, and asks for a report starting with `Brief: <Finding-ID>`.
 
 Pass to each teammate (via `references/implementer.md` template):
-- **The story slice, verbatim:** the unedited output of `node scripts/story-slice.mjs specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md <US-ID>`. It carries the story heading, ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints and gotchas. Never re-type, summarise or trim it. A non-zero exit (ID missing or duplicated) is a plan defect: stop and fix the plan, never fall back to hand-copying.
+- **The path of its worker file** (above). It holds the role rules, project context, this wave's architecture and API contracts, and `## Deine Story` — the story slice with ACs, smoke test, UI Implementation Notes, tasks, UI handoff constraints and gotchas, verbatim from the plan. Never paste or re-type any of it. A `compile` failure (story ID missing or duplicated, unassignable role) is a plan defect: stop and fix the plan, never hand-copy.
 - What only the lead knows: execution mode, runtime constraints, file ownership and the shared-lock and dev-server rules (above)
-- What previous waves implemented — a short summary from `progress.md` (the wave shape is lead-only, it is not in the worker bundle)
+- What previous waves implemented — a short summary from `progress.md` (the wave shape is lead-only, it is not in the worker file)
 - Relevant sections from `agent.md`
-- Codebase context and conventions only outside bundle runs; in framework runs the role bundle injects the architecture, guidelines and test conventions — do not paste them again
+- The report asks per AC for the test file (`AC-1 → tests/x.test.ts`) and starts with `Brief: <US-ID>`. This is a hint for the lead; the lead still runs the AC commands. A report without `Brief:` means the file was not read: send the worker back.
+- **Only on a plan/PRD AC conflict:** the PRD wording, marked as superseding the file's slice.
 - **If the US touches UI:** the matching sections from `1d_prototypes/implementation-handoff.md` that the slice's UI Implementation Notes point to but do not quote:
   - Project mode (`greenfield`, `brownfield`, `hybrid`)
   - Mockup file reference and selected UI direction
@@ -441,9 +453,9 @@ Pass to each teammate (via `references/implementer.md` template):
   - Approved new component candidates
   - Required interaction contract and responsive behavior
   - Implementation tolerance and demo-only exclusions
-- **If the US touches UI:** the design system baseline is `docs/DESIGN-SYSTEM.md` (rules) plus `docs/components.md` (inventory). The `skillchain-frontend-implementer` context bundle injects both — do not paste them again, that pays the token budget twice. The generic `implementer` bundle (full-stack stories) does not, and neither does a run without bundles: paste both files there. Either way the teammate reuses registered components — never one-off styled elements.
+- **If the US touches UI:** the design system baseline is `docs/DESIGN-SYSTEM.md` (rules) plus `docs/components.md` (inventory). The `frontend-implementer` and the full-stack `implementer` file already contain the rules of `docs/DESIGN-SYSTEM.md` and a mandatory read-by-path reference to `docs/components.md` (the inventory is deliberately not embedded) — do not paste either, that pays the token budget twice. The `backend-implementer` file has neither; UI work in a story belongs to a frontend or full-stack role. The teammate reuses registered components — never one-off styled elements.
 - **If a US needs a component the catalog does not have:** the teammate escalates instead of styling a one-off. The main agent runs the extension procedure from `1c_frontend-design` → *Extending The Design System* (variant before new component, confirm with the user, then catalog + `docs/components.md` + `/dev/components` showcase), then the teammate composes the new entry. A component that reaches QA without a catalog and registry entry is a Critical bug (`6_qa` hard-checks this).
-- **Do not paste framework skill files** (Tailwind, Next.js) or generic checklists into the prompt: the model knows the stack, and the project's rules arrive through `docs/DESIGN-SYSTEM.md` and `docs/GUIDELINES.md` in the bundle. Pasting them pays those tokens per worker for nothing.
+- **Do not paste framework skill files** (Tailwind, Next.js) or generic checklists into the prompt: the model knows the stack, and the project's rules arrive through `docs/DESIGN-SYSTEM.md` and `docs/GUIDELINES.md` in the worker file. Pasting them pays those tokens per worker for nothing.
 
 **UI implementation rule:** Existing app components and design tokens take precedence over standalone mockup approximations. Preserve the selected layout direction and interaction contract; do not replace a sidepanel with a modal, a wizard with a single page, or a brownfield component with a one-off styled element unless the user explicitly approved that change.
 
@@ -632,8 +644,8 @@ Create an agent team for Quality Gate of PROJ-X.
 
 Spawn teammates:
 - "reviewer" using the `skillchain-reviewer` agent type (tier 2, read-only) with prompt:
-  "Review criteria: cross-wave contracts, shared state, authorization boundaries and unresolved wave findings; use references/code-reviewer.md only for relevant integration risks. Diff scope: the feature diff from BASE_SHA=$BASE_SHA (`git diff $BASE_SHA..HEAD`). Return findings without starting fixes."
-- "sonar" only if `sonar` and `sonar-scanner` are installed, a `general-purpose` spawn (no bundle) using the sonar-cli skill with prompt:
+  "Your assignment is in `specs/PROJ-<X>-<theme>/context/roles/wave-<last>/reviewer.md` (the last wave's reviewer file; its content is wave-neutral). Read it completely first. Review criteria: cross-wave contracts, shared state, authorization boundaries and unresolved wave findings; use references/code-reviewer.md only for relevant integration risks. Diff scope: the feature diff from BASE_SHA=$BASE_SHA (`git diff $BASE_SHA..HEAD`). Return findings without starting fixes."
+- "sonar" only if `sonar` and `sonar-scanner` are installed, a `general-purpose` spawn (no worker file) using the sonar-cli skill with prompt:
   "Wait for successful current-revision coverage, then run the PROJ Sonar scan through quality-evidence.mjs run sonar, which executes the top-level sonar_cmd from wave-gate-config.json from the persistent PROJ worktree, then use sonar CLI/API for quality gate, issue, coverage, and duplication data. Verify a fresh .scannerwork/report-task.txt after sonar_cmd exits 0 so a silent no-op doesn't read as green. If project Sonar config is absent, record an allowed skip. Return findings to the lead; do not start an independent fix loop."
 ```
 

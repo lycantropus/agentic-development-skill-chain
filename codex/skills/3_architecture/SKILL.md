@@ -158,7 +158,7 @@ note when it `Changes baseline`, filtered to the PRDs of the running wave. So:
 - Whatever an implementer must obey goes into a Summary; the body and the
   diagram stay for the human and the reviewers. A migration decision's Summary
   keeps its `migration-design.md` pointer.
-- The non-decision sections are injected verbatim into every bundle — keep them
+- The non-decision sections go verbatim into every worker file — keep them
   to the format above. `writing-plans` runs the budget check once waves exist.
 
 ## Cross-Review (automatic, same turn)

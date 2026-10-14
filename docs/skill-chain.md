@@ -175,23 +175,30 @@ Stage 2 adds the bootstrap and the full context system:
   developer interview → checkpoint-subskill bootstrap reconcile → sealed
   baseline commit (`intake-seal-check.sh`; no state.json — concept (1)
   creates one per PROJ).
-- **Context bundles:** P0 compiles one canonical bundle per role from the
-  baseline (`compile-context-bundles.mjs`, per-role token budgets — a role
-  over budget is blocked: no bundle, recorded in `context/blocked-roles.json`,
-  never spawned, while fitting roles still compile) plus Claude/Codex projections with the same canonical
-  hash. Claude subagents get their bundle via the SubagentStart hook
-  (`context-injector.mjs`), codex lanes read `bundle-<role>.codex.md`;
-  micro-fixer and explore spawns get nothing by design.
+- **Worker context files:** P0 compiles one file per worker from the
+  baseline (`compile-context-bundles.mjs`): `context/workers/wave-N/<US-ID>.md`
+  per story — role rules, project context, the PROJ architecture filtered to
+  the wave, the wave's API contracts and `## Deine Story` with the story's
+  wave-plan section verbatim (`story-slice.mjs`) — and
+  `context/roles/wave-N/<role>.md` for roles without a story (reviewer,
+  Quality-Gate fix workers). The story's role is the `Agent Type` column of the
+  plan table; every wave compiles on its own, there is no cross-wave view. Per-role
+  token budgets cover the role context (the story size is reported, not capped);
+  a role over budget aborts `compile`. No hook, no lock, no hash bookkeeping (a file's first line carries the plan hash): the lead
+  names the file by path in the spawn prompt and the worker reports
+  `Brief: <US-ID>` plus the test file per AC. micro-fixer and explore spawns get
+  nothing by design.
   The PROJ architecture reaches implementers as a compiled view of the one
   `PROJ-<X>-architecture.md`: each decision's and key flow's Summary line
   (plus an override note when it `Changes baseline`), filtered to the PRDs of
-  the running wave; bundles are recompiled at every wave start, and a
-  recompile without `--wave` keeps the lock's scope. `compile-context-bundles.mjs
-  check` runs in writing-plans and at CP1, so a role that would be blocked
-  surfaces before approval; a budget override is recorded in the lock.
-  The story itself is not in the bundle: each implementer's spawn prompt
-  embeds its section of the wave plan verbatim (`story-slice.mjs`), and the
-  lead reads only the wave shape (each plan's `User Stories in this Wave` and
+  the running wave (projects planned before Summary lines existed get
+  `architecture-delta.md`, else the whole file unfiltered — fallback, no
+  migration required); the files are recompiled at every wave start
+  (`compile --wave N`). `compile-context-bundles.mjs check` runs in
+  writing-plans and at CP1, so a role over budget or a story without a role
+  surfaces before approval. `compile` also removes the retired context-injector
+  hook; running projects migrate with `sync-framework` → `compile --wave N`.
+  The lead reads only the wave shape (each plan's `User Stories in this Wave` and
   `Execution` sections) plus the current wave's plan.
 - **Ponytail parity:** the minimalism ladder comes from the Ponytail
   plugin on both providers — same version and mode, gated in the P0

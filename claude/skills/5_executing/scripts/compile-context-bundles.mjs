@@ -1,87 +1,89 @@
 #!/usr/bin/env node
 // compile-context-bundles.mjs — the context compiler (CONCEPT.md §5, §7).
 //
-// Compiles ONE canonical context bundle per role (from the provider-neutral
-// role manifests) plus thin Claude/Codex projections that embed the canonical
-// body VERBATIM — both providers receive the same canonical bundle hash.
-// Counts tokens against the per-role budget. A breach blocks only that role:
-// fitting bundles are written and blocked-roles.json records the denial.
+// Compiles ONE file per worker: for every story of a wave plan
+// `context/workers/wave-N/<US-ID>.md` (`<US-ID>.backend.md` + `.frontend.md`
+// under `Split: contract`), and for every role with an inject list
+// `context/roles/wave-N/<role>.md` (reviewers, Quality-Gate fix workers).
+// A file holds, in this order: a header line (plan path, plan hash, role,
+// wave), the role preamble, the project context of the role's inject list,
+// the PROJ architecture filtered to the wave's PRDs, the wave's API
+// contracts and — story files only — `## Deine Story` with the story's
+// wave-plan section verbatim (story-slice.mjs). The worker's role comes from
+// the plan table's `Agent Type` column (validate-wave-plan.mjs resolveStories).
+// Every wave compiles on its own; there is no merged cross-wave view.
 //
 // The source-id -> path map and the hard never-inject list (whole PRDs,
 // other stories' wave plans, progress.md, SKILL.md texts, src/**/agent.md)
 // live HERE, not in the manifests: a manifest can only pick from the closed
-// vocabulary below. agent.md files are distributed via the reading protocol,
-// never injected.
+// vocabulary below. agent.md files are distributed via the reading protocol.
 //
-// Output is DETERMINISTIC (no timestamps inside bundle files) so two compiles
-// of the same inputs are byte-identical; only bundles.lock.json carries
-// compiled_at. All writes are atomic (tmp + rename). The compiler is
-// state-free — recording hashes into state.json is the caller's job
-// (setup subskill step 6a, via state.sh).
+// The manifest budget covers the role context (preamble to contracts); story
+// tokens are reported, not capped. Everything renders in memory first: a
+// budget, parser, assignment, plan-folder or manifest error exits before
+// anything is written or deleted. Output is deterministic (no timestamps), so
+// a rerun is idempotent; a write (I/O) error exits 1 — rerun compile.
 //
 // Usage:
-//   node compile-context-bundles.mjs compile <proj-x> <theme> [--wave N|all] [--budget N] [--roles-dir D]
-//   node compile-context-bundles.mjs check   <proj-x> <theme> [--budget N] [--roles-dir D]
-//   node compile-context-bundles.mjs verify  <proj-x> <theme> [--roles-dir D]
-//   node compile-context-bundles.mjs show    <proj-x> <theme> <role>
+//   node compile-context-bundles.mjs compile <proj-x> <theme> [--wave N|all] [--roles-dir D]
+//   node compile-context-bundles.mjs check   <proj-x> <theme> [--roles-dir D]
+//   node compile-context-bundles.mjs show    <proj-x> <theme> <US-ID>[.backend|.frontend]
+//   node compile-context-bundles.mjs show    <proj-x> <theme> --wave N <role>
 //
-// `compile` without --wave keeps the lock's current scope (a resume or a
-// stale-bundle recovery cannot silently widen it); no lock or a mixed one →
-// exit 2, pass --wave N or --wave all (unscoped).
-//
-// `check` compiles every wave in memory and writes nothing — run it before
-// CP1 so a budget breach surfaces while the architecture is still open.
-//
-// Env: CONTEXT_BUNDLE_BUDGET  overrides every manifest budget (tokens); the
-//      lock records it as budget_override so state.json shows the bypass.
-// Exit: 0 ok · 1 projection drift / verify mismatch / bad manifest or architecture / check breach · 2 missing inputs · 64 usage
+// `compile` without --wave (or --wave all) compiles every wave, each on its own.
+// `check` renders every wave in memory and writes nothing — run it before CP1.
+// `compile` also removes the retired context-injector hook and
+// env.PONYTAIL_SUBAGENT_MATCHER from .claude/settings.json (migration).
+// Exit: 0 ok · 1 budget breach / bad manifest or architecture / write error · 2 missing or unresolvable inputs · 64 usage
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, mkdirSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { slice } from "./story-slice.mjs";
+import { resolveStories } from "./validate-wave-plan.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
-function usage() {
-  console.error(
-    "Usage: compile-context-bundles.mjs <compile|check|verify|show> <proj-x> <theme> [args]\n" +
-    "  compile [--wave N|all] [--budget N] [--roles-dir D]\n" +
-    "  check   [--budget N] [--roles-dir D]\n" +
-    "  verify  [--roles-dir D]\n" +
-    "  show    <role>",
+function usage(candidates) {
+  if (candidates) console.error(candidates);
+  else console.error(
+    "Usage: compile-context-bundles.mjs <compile|check|show> <proj-x> <theme> [args]\n" +
+    "  compile [--wave N|all] [--roles-dir D]\n" +
+    "  check   [--roles-dir D]\n" +
+    "  show    <US-ID>[.backend|.frontend] | --wave N <role>",
   );
   process.exit(64);
 }
 
 const [cmd, projX, theme, ...rest] = process.argv.slice(2);
-if (!cmd || !projX || !theme) usage();
+if (!["compile", "check", "show"].includes(cmd) || !projX || !theme) usage();
 
-let wave = null, waveArg = null, budgetOverride = null, rolesDirArg = null, showRole = null;
+let waveArg = null, rolesDirArg = null;
+const positional = [];
 for (let i = 0; i < rest.length; i++) {
   if (rest[i] === "--wave") waveArg = rest[++i];
-  else if (rest[i] === "--budget") budgetOverride = parseInt(rest[++i], 10);
   else if (rest[i] === "--roles-dir") rolesDirArg = rest[++i];
-  else if (cmd === "show" && !showRole) showRole = rest[i];
-  else usage();
+  else if (rest[i].startsWith("--")) usage();
+  else positional.push(rest[i]);
 }
-if (process.env.CONTEXT_BUNDLE_BUDGET) budgetOverride = parseInt(process.env.CONTEXT_BUNDLE_BUDGET, 10);
+if (waveArg !== null && waveArg !== "all" && !/^\d+$/.test(waveArg ?? "")) usage();
+if (cmd === "check" && waveArg !== null) usage();
+if (cmd === "show" ? positional.length !== 1 : positional.length) usage();
 
 const BASE = `specs/PROJ-${projX}-${theme}`;
 const OUT_DIR = join(BASE, "context");
-const LOCK = join(OUT_DIR, "bundles.lock.json");
-const BLOCKED = join(OUT_DIR, "blocked-roles.json");
 
 function fail(msg, code = 1) { console.error(`compile-context-bundles: ${msg}`); process.exit(code); }
-
-if (waveArg === "all") wave = null;
-else if (waveArg !== null) { wave = parseInt(waveArg, 10); if (Number.isNaN(wave)) usage(); }
-else if (cmd === "compile") {
-  const waves = existsSync(LOCK) ? [...new Set(Object.values(JSON.parse(readFileSync(LOCK, "utf8"))).map((r) => r.wave))] : [];
-  if (waves.length !== 1) fail(`${LOCK} has no single bundle scope (missing, empty or mixed) — pass --wave N for the current wave, or --wave all`, 2);
-  wave = waves[0] ?? null;
-}
 function sha256(s) { return createHash("sha256").update(s).digest("hex"); }
 function tokens(s) { return Math.ceil(s.length / 4); } // documented heuristic: ~4 chars/token
+
+if (!existsSync(BASE)) fail(`${BASE} not found — run from the repo root of an active PROJ`, 2);
+// The one plan-folder resolution every plan read uses.
+const PLAN_DIR = ["3-4_plan", "6_plan"].map((d) => join(BASE, d)).find((d) => existsSync(d))
+  ?? fail(`${BASE} has neither 3-4_plan/ nor 6_plan/`, 2);
+const PLAN_RE = new RegExp(`^PROJ-${projX}-wave-(\\d+)-plan\\.md$`);
+const PLAN_WAVES = readdirSync(PLAN_DIR).map((f) => f.match(PLAN_RE)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b);
+const planPath = (w) => join(PLAN_DIR, `PROJ-${projX}-wave-${w}-plan.md`);
 
 // --- role manifests -----------------------------------------------------------
 function rolesDir() {
@@ -150,13 +152,27 @@ function loadManifests() {
     const { fm, body } = parseFrontmatter(readFileSync(join(dir, f), "utf8"), join(dir, f));
     for (const req of ["name", "description", "tier", "scope", "inject", "budget_tokens", "matcher"])
       if (fm[req] === undefined) fail(`${f}: missing required manifest field '${req}'`);
+    // the name becomes a file name (roles/wave-N/<name>.md, .claude/agents/skillchain-<name>.md)
+    if (typeof fm.name !== "string" || !/^[a-z][a-z0-9-]*$/.test(fm.name)) fail(`${f}: manifest name '${fm.name}' must match ^[a-z][a-z0-9-]*$`);
     fm.inject = fm.inject.map((id) => SOURCE_ALIASES[id] ?? id);
     for (const id of fm.inject)
       if (!SOURCE_IDS.includes(id)) fail(`${f}: unknown inject source id '${id}' (closed vocabulary: ${SOURCE_IDS.join(", ")})`);
-    manifests.push({ ...fm, preamble: body, file: f });
+    manifests.push({ ...fm, preamble: body, file: join(dir, f) });
   }
-  if (manifests.length === 0) fail(`no role manifests in ${rolesDir()}`, 2);
+  if (manifests.length === 0) fail(`no role manifests in ${dir}`, 2);
   return manifests;
+}
+
+// A repo-local manifest synced before worker files existed would contradict
+// the file its worker reads (story in the spawn prompt, no design system).
+function checkManifests(manifests) {
+  for (const m of manifests) {
+    if (!["implementer", "frontend-implementer", "backend-implementer"].includes(m.name)) continue;
+    if (/tasks\s+arrive\s+in\s+the\s+spawn\s+prompt/.test(m.preamble))
+      fail(`${m.file}: preamble still says the story arrives in the spawn prompt — take the current manifest via sync-framework or align it by hand (story and ACs are in the worker file's \`## Deine Story\`)`, 2);
+    if (m.name === "implementer" && !m.inject.includes("design-system"))
+      fail(`${m.file}: inject list lacks design-system — take the current manifest via sync-framework or align it by hand`, 2);
+  }
 }
 
 // --- sources ------------------------------------------------------------------
@@ -165,17 +181,13 @@ function readOr(path, note) {
   return `_(source missing: ${path} — ${note})_`;
 }
 
-function apiContractsOwnWave() {
+function apiContractsOwnWave(wave) {
   const path = join(BASE, "api-contracts.md");
   if (!existsSync(path)) return `_(source missing: ${path} — no contracts yet)_`;
-  const full = readFileSync(path, "utf8");
-  if (wave === null) {
-    return `_(compiled without wave scope — recompile with --wave N at wave start for own-wave contracts)_`;
-  }
   // Keep ## sections whose heading names this wave; heuristic, documented.
-  const sections = full.split(/^(?=## )/m);
+  const sections = readFileSync(path, "utf8").split(/^(?=## )/m);
   const kept = sections.filter((s) => new RegExp(`wave\\s*${wave}\\b`, "i").test(s.split("\n")[0]));
-  if (kept.length === 0) return `_(no api-contracts sections matched wave ${wave} — check specs/${"PROJ-" + projX}-${theme}/api-contracts.md headings)_`;
+  if (kept.length === 0) return `_(no api-contracts sections matched wave ${wave} — check ${path} headings)_`;
   return kept.join("").trim();
 }
 
@@ -183,23 +195,20 @@ function apiContractsOwnWave() {
 // view: fenced blocks (Mermaid) and diagram-only sections dropped, every
 // `### Decision N` and `### Flow N` reduced to its ID, Affects and Summary line
 // (plus its optional `Changes baseline` pointer, so a worker knows which
-// injected docs/ARCHITECTURE.md rule it overrides), and — with --wave N — only
-// the items whose Affects names a PRD of that wave (or `all`). Wave plans cite
-// these same IDs. Parsing is strict: a malformed item heading, a doubled field
-// or an Affects that names no PRD fails instead of vanishing from the bundle.
-// PROJs planned before Summary lines existed fall back to
-// architecture-delta.md, then to the full document.
+// injected docs/ARCHITECTURE.md rule it overrides), and only the items whose
+// Affects names a PRD of the wave (or `all`). Wave plans cite these same IDs.
+// Parsing is strict: a malformed item heading, a doubled field or an Affects
+// that names no PRD fails instead of vanishing from the file. PROJs planned
+// before Summary lines existed fall back to architecture-delta.md, then to
+// the full document.
 const DROPPED_SECTIONS = ["PRDs Covered", "System Boundaries"];
 const ITEM_SECTIONS = { "Cross-Cutting Tech Decisions": "Decision", "Key Flows": "Flow" };
 const itemReached = new Map();   // item id -> listed in at least one compiled view (read by `check`)
 
-function wavePrds() {
-  if (wave === null) return null;
-  const plan = join(BASE, "3-4_plan", `PROJ-${projX}-wave-${wave}-plan.md`);
-  if (!existsSync(plan)) return null;
+function wavePrds(text, plan) {
   const lines = [];
   let fence = null;
-  for (const line of readFileSync(plan, "utf8").split("\n")) {
+  for (const line of text.split("\n").map((l) => l.replace(/\r$/, ""))) {
     const [, marker, info] = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/) ?? [];
     if (marker && !fence) { fence = marker; continue; }
     if (marker && fence && marker[0] === fence[0] && marker.length >= fence.length && !info.trim()) { fence = null; continue; }
@@ -213,10 +222,10 @@ function wavePrds() {
   return ids.size ? ids : null;
 }
 
-function implementerView(text, path, scope) {
+function implementerView(text, path, scope, wave, prds) {
   const sections = [];   // { heading, lines }
   let fence = null;
-  for (const line of text.split("\n")) {
+  for (const line of text.split("\n").map((l) => l.replace(/\r$/, ""))) {
     const marker = line.match(/^ {0,3}(`{3,}|~{3,})/)?.[1];
     if (marker && !fence) { fence = marker; continue; }
     if (marker && fence && marker[0] === fence[0] && marker.length >= fence.length) { fence = null; continue; }
@@ -224,7 +233,6 @@ function implementerView(text, path, scope) {
     if (line.startsWith("## ")) sections.push({ heading: line.slice(3).trim(), lines: [] });
     else if (sections.length) sections.at(-1).lines.push(line);
   }
-  const prds = wavePrds();
   const out = [];
   for (const { heading, lines } of sections) {
     if (DROPPED_SECTIONS.some((d) => heading.startsWith(d))) continue;
@@ -265,38 +273,40 @@ function implementerView(text, path, scope) {
   return `_Implementer view of \`${path}\`: diagrams dropped, each decision and key flow reduced to its Summary.${filter} Wave plans cite these Decision IDs; open the full file for the WHY._\n\n${out.join("\n").trim()}`;
 }
 
-function projArchitecture(scope) {
-  const arch = join(BASE, "3-4_plan", `PROJ-${projX}-architecture.md`);
+function projArchitecture(scope, wave, prds) {
+  const arch = join(PLAN_DIR, `PROJ-${projX}-architecture.md`);
   const delta = join(BASE, "architecture-delta.md");
   const text = existsSync(arch) ? readFileSync(arch, "utf8") : null;
-  if (text && /^\*\*Summary:\*\*/m.test(text)) return { title: `PROJ architecture (${arch})`, text: implementerView(text, arch, scope) };
+  if (text && /^\*\*Summary:\*\*/m.test(text)) return { title: `PROJ architecture (${arch})`, text: implementerView(text, arch, scope, wave, prds) };
   if (existsSync(delta)) return { title: `Architecture delta of this PROJ (${delta} — legacy PROJ)`, text: readFileSync(delta, "utf8").trim() };
   if (text) return { title: `PROJ architecture (${arch} — legacy format without Summary lines, injected whole)`, text: text.trim() };
   return { title: "PROJ architecture", text: `_(source missing: ${arch} — no decisions recorded)_` };
 }
 
-function sourceContent(id, manifest) {
+function sourceContent(id, manifest, wave, prds) {
   switch (id) {
     case "product":              return { title: "Product (docs/PRODUCT.md)", text: readOr("docs/PRODUCT.md", "no intake baseline yet") };
     case "architecture-overview":return { title: "Architecture overview (docs/ARCHITECTURE.md)", text: readOr("docs/ARCHITECTURE.md", "no intake baseline yet") };
-    case "proj-architecture":    return projArchitecture(manifest.scope);
+    case "proj-architecture":    return projArchitecture(manifest.scope, wave, prds);
     case "guidelines":           return { title: "Guidelines (docs/GUIDELINES.md)", text: readOr("docs/GUIDELINES.md", "no intake baseline yet") };
     case "ground-file":          return { title: `Validated assumptions (${BASE}/ground-file.md)`, text: readOr(join(BASE, "ground-file.md"), "generated in P0 step 6b") };
     case "test-conventions":     return { title: "Test conventions (docs/test-conventions.md)", text: readOr("docs/test-conventions.md", "no intake baseline yet") };
     case "design-system":        return { title: "Design system (docs/DESIGN-SYSTEM.md)", text: readOr("docs/DESIGN-SYSTEM.md", "no intake baseline yet") };
-    case "components":           return { title: "Component registry (docs/components.md)", text: "Read `docs/components.md` before creating or changing a component; it is deliberately referenced by path so its inventory does not consume this bundle's budget." };
+    case "components":           return { title: "Component registry (docs/components.md)", text: "Read `docs/components.md` before creating or changing a component; it is deliberately referenced by path so its inventory does not consume this file's budget." };
     case "security-baseline":    return { title: "Security baseline (docs/security-baseline.md)", text: readOr("docs/security-baseline.md", "no intake baseline yet") };
-    case "api-contracts-own-wave": return { title: "API contracts — own wave only", text: apiContractsOwnWave() };
+    case "api-contracts-own-wave": return { title: "API contracts — own wave only", text: apiContractsOwnWave(wave) };
     case "review-criteria":      return { title: "Review criteria", text: "_(dynamic: your persona's review criteria arrive in the spawn prompt — read them there)_" };
     case "diff-scope":           return { title: "Diff scope", text: "_(dynamic: the diff scope for this review arrives in the spawn prompt)_" };
     default: fail(`unknown source id '${id}'`);
   }
 }
 
-// --- bundle assembly ------------------------------------------------------------
-function canonicalBody(manifest) {
+// --- rendering (in memory) ---------------------------------------------------------
+// Role context = file parts 2 to 5 (preamble, project context, architecture,
+// contracts); the manifest budget applies to exactly this.
+function roleContext(manifest, wave, prds) {
   const parts = [
-    `# Context bundle — role: ${manifest.name} (tier ${manifest.tier}, scope ${manifest.scope})`,
+    `# Worker context — role: ${manifest.name} (tier ${manifest.tier}, scope ${manifest.scope})`,
     "",
     manifest.preamble,
     "",
@@ -305,22 +315,80 @@ function canonicalBody(manifest) {
     "agent.md before your first edit there)._",
   ];
   for (const id of manifest.inject) {
-    const { title, text } = sourceContent(id, manifest);
+    const { title, text } = sourceContent(id, manifest, wave, prds);
     parts.push("", `## ${title}`, "", text);
   }
   return parts.join("\n").trim() + "\n";
 }
 
-function claudeProjection(manifest, body) {
-  return `<!-- skillchain claude projection · role: ${manifest.name} · injected by the SubagentStart hook (context-injector.mjs claude) · canonical body below, verbatim -->\n${body}`;
+const CONTRACT_SIDES = [["backend", "backend-implementer"], ["frontend", "frontend-implementer"]];
+// Worker file names (without .md) and roles of one resolved story.
+const storyTargets = (s) => s.split === "contract"
+  ? CONTRACT_SIDES.map(([side, role]) => ({ name: `${s.id}.${side}`, role, story: s }))
+  : [{ name: s.id, role: s.role, story: s }];
+
+function planStories(wave) {
+  const path = planPath(wave);
+  const text = readFileSync(path, "utf8");
+  let stories;
+  try { stories = resolveStories(text, path); }
+  catch (error) { fail(error.message, 2); }
+  if (stories.length === 0) fail(`${path}: no story — a wave plan needs at least one story section`, 2);
+  return { path, text, stories };
 }
-function codexProjection(manifest, body) {
-  return `<!-- skillchain codex projection · role: ${manifest.name} · prompt-file delivery: a codex lane reads this file before implementing · canonical body below, verbatim -->\n${body}`;
+
+// Every story of every wave plan, each ID in exactly one plan — otherwise the
+// cross-wave cleanup would delete another wave's file and show would guess.
+function allStories() {
+  const seen = new Map();   // id -> plan path
+  const byWave = new Map();
+  for (const w of PLAN_WAVES) {
+    const { path, stories } = planStories(w);
+    for (const s of stories) {
+      if (seen.has(s.id)) fail(`${s.id} is a story in two wave plans: ${seen.get(s.id)} and ${path} — keep it in one`, 2);
+      seen.set(s.id, path);
+    }
+    byWave.set(w, stories);
+  }
+  return byWave;
+}
+
+// Renders one wave: { files: Map(relPath -> content), breaches, report, fallback }.
+function renderWave(wave, manifests) {
+  const { path, text, stories } = planStories(wave);
+  const prds = wavePrds(text, path);
+  const head = (role) => `Generated from ${path} @ ${sha256(text).slice(0, 12)} · role ${role} · wave ${wave}\n\n`;
+  const files = new Map(), breaches = [], report = [];
+  const contexts = new Map();
+  for (const m of manifests) {
+    if (m.inject.length === 0) continue;   // tier 0 / explore: no file
+    const body = roleContext(m, wave, prds);
+    const t = tokens(body);
+    contexts.set(m.name, body);
+    if (t > m.budget_tokens) breaches.push(`wave ${wave}: ${m.name} ${t}/${m.budget_tokens} tokens`);
+    report.push(`${m.name} ${t}/${m.budget_tokens}`);
+    files.set(join(OUT_DIR, "roles", `wave-${wave}`, `${m.name}.md`), head(m.name) + body);
+  }
+  const storyReport = [];
+  for (const target of stories.flatMap(storyTargets)) {
+    const body = contexts.get(target.role);
+    if (!body) fail(`${path}: ${target.story.id} needs role ${target.role}, which has no manifest with an inject list in ${rolesDir()}`, 2);
+    let storyText;
+    try { storyText = slice(text, target.story.id); }
+    catch (error) { fail(`${path}: ${target.story.id}: ${error.message}`, 2); }
+    files.set(join(OUT_DIR, "workers", `wave-${wave}`, `${target.name}.md`), `${head(target.role)}${body}\n## Deine Story\n\n${storyText}`);
+    storyReport.push(`${target.name} (${target.role}, story ${tokens(storyText)} tokens)`);
+  }
+  return { files, breaches, stories, fallback: stories.some((s) => s.fallback) ? path : null,
+    report: `wave ${wave}: roles ${report.join(", ")} · workers ${storyReport.join(", ")}` };
 }
 
 function agentFileContent(manifest) {
   const model = manifest.claude?.model ? `model: ${manifest.claude.model}\n` : "";
-  return `---\nname: skillchain-${manifest.name}\ndescription: "${manifest.description.replace(/"/g, '\\"')}"\ntools: ${manifest.claude?.tools ?? "Read,Grep,Glob"}\n${model}---\n\n${manifest.preamble}\n\nYour context bundle (role: ${manifest.name}) is injected automatically via the\nSubagentStart hook — nobody pastes bundles into spawn prompts. If the bundle\nis absent, say so instead of improvising conventions.\n`;
+  const pointer = manifest.inject.length
+    ? "\n\nDein vollständiger Auftrag steht in der Datei aus dem Spawn-Prompt. Lies sie zuerst vollständig. Fehlt der Pfad oder ist die Datei nicht lesbar, brich ab und melde das."
+    : "";
+  return `---\nname: skillchain-${manifest.name}\ndescription: "${manifest.description.replace(/"/g, '\\"')}"\ntools: ${manifest.claude?.tools ?? "Read,Grep,Glob"}\n${model}---\n\n${manifest.preamble}${pointer}\n`;
 }
 
 function atomicWrite(path, content) {
@@ -330,125 +398,140 @@ function atomicWrite(path, content) {
   renameSync(tmp, path);
 }
 
-function compileAll() {
-  const manifests = loadManifests();
-  const compiled = [];   // { manifest, body, claude, codex, tokens }
-  const breaches = [];
-  for (const m of manifests) {
-    if (m.inject.length === 0) continue;   // tier 0 / explore: no bundle, injector emits nothing
-    const body = canonicalBody(m);
-    const t = tokens(body);
-    const budget = budgetOverride ?? m.budget_tokens;
-    if (t > budget) { breaches.push({ role: m.name, tokens: t, budget }); continue; }
-    const cl = claudeProjection(m, body);
-    const cx = codexProjection(m, body);
-    // Projection drift check: the canonical body must be embedded verbatim.
-    const embedded = (p) => p.slice(p.indexOf("\n") + 1);
-    if (sha256(embedded(cl)) !== sha256(body) || sha256(embedded(cx)) !== sha256(body))
-      fail(`${m.name}: projection drift — a provider projection does not embed the canonical body verbatim`);
-    compiled.push({ manifest: m, body, cl, cx, tokens: t, budget });
+// The retired SubagentStart hook and the Ponytail matcher leave
+// .claude/settings.json, so a running project needs no new preflight. Only
+// the injector entry goes: a foreign hook keeps its group, and a container
+// (group, SubagentStart, hooks, env) goes only when this emptied it. Returns
+// true when the file changed; an absent file stays absent.
+const SETTINGS = join(".claude", "settings.json");
+function removeInjectorHook() {
+  if (!existsSync(SETTINGS)) return false;
+  const raw = readFileSync(SETTINGS, "utf8");
+  let s;
+  try { s = JSON.parse(raw); } catch {
+    console.warn(`⚠ ${SETTINGS} is not valid JSON — left unchanged; remove the context-injector hook and env.PONYTAIL_SUBAGENT_MATCHER by hand`);
+    return false;
   }
-  return { compiled, breaches };
-}
-
-function removeRoleBundles(role) {
-  for (const suffix of [".md", ".claude.md", ".codex.md"])
-    rmSync(join(OUT_DIR, `bundle-${role}${suffix}`), { force: true });
-}
-
-if (cmd === "compile") {
-  if (!existsSync(BASE)) fail(`${BASE} not found — run from the repo root of an active PROJ`, 2);
-  const { compiled, breaches } = compileAll();
-  const lock = {};
-  for (const { manifest: m, body, cl, cx, tokens: t, budget } of compiled) {
-    atomicWrite(join(OUT_DIR, `bundle-${m.name}.md`), body);
-    atomicWrite(join(OUT_DIR, `bundle-${m.name}.claude.md`), cl);
-    atomicWrite(join(OUT_DIR, `bundle-${m.name}.codex.md`), cx);
-    lock[m.name] = {
-      hash: sha256(body),
-      claude_hash: sha256(cl),
-      codex_hash: sha256(cx),
-      tokens: t,
-      budget,
-      budget_override: budgetOverride !== null,
-      wave: wave,
-      compiled_at: new Date().toISOString(),
-    };
-  }
-  atomicWrite(LOCK, JSON.stringify(lock, null, 2) + "\n");
-  atomicWrite(BLOCKED, JSON.stringify(breaches, null, 2) + "\n");
-  for (const { role } of breaches) removeRoleBundles(role);
-  for (const [role, rec] of Object.entries(lock))
-    console.log(`compiled ${role}: ${rec.tokens} tokens · ${rec.hash.slice(0, 12)}… · wave ${rec.wave ?? "-"}`);
-  console.log(`✓ ${Object.keys(lock).length} bundle(s) -> ${OUT_DIR} (canonical + claude/codex projections, one hash)`);
-  if (budgetOverride !== null) console.warn(`⚠ budget override ${budgetOverride} replaces every manifest budget (recorded as budget_override in the lock)`);
-  if (breaches.length > 0) {
-    console.warn(`⚠ blocked role(s), no bundle written: ${breaches.map((b) => `${b.role} (${b.tokens}/${b.budget})`).join(", ")}`);
-    console.warn("  Spawn only roles with a compiled bundle; condense their sources or raise that role's manifest budget when its scope genuinely requires it.");
-  }
-  // Claude agent-file projection. Safety: ONLY skillchain-<role>.md files are
-  // ever written — pre-existing agents in .claude/agents/ are never touched.
-  let agentFiles = 0;
-  for (const m of loadManifests()) {
-    if (m.claude?.agent_file === true) {
-      atomicWrite(join(".claude", "agents", `skillchain-${m.name}.md`), agentFileContent(m));
-      agentFiles++;
+  if (!s || typeof s !== "object" || Array.isArray(s)) return false;
+  let changed = false;
+  const groups = s.hooks?.SubagentStart;
+  if (Array.isArray(groups)) {
+    const isInjector = (h) => typeof h?.command === "string" && /(^|[\s/\\])context-injector\.mjs(\s|$)/.test(h.command);
+    const kept = groups.flatMap((g) => {
+      if (!Array.isArray(g?.hooks) || !g.hooks.some(isInjector)) return [g];
+      changed = true;
+      const rest = g.hooks.filter((h) => !isInjector(h));
+      return rest.length ? [{ ...g, hooks: rest }] : [];
+    });
+    if (changed) {
+      if (kept.length) s.hooks.SubagentStart = kept; else delete s.hooks.SubagentStart;
+      if (Object.keys(s.hooks).length === 0) delete s.hooks;
     }
   }
-  console.log(`✓ ${agentFiles} agent file(s) projected -> .claude/agents/skillchain-*.md`);
+  if (s.env && typeof s.env === "object" && "PONYTAIL_SUBAGENT_MATCHER" in s.env) {
+    delete s.env.PONYTAIL_SUBAGENT_MATCHER;
+    if (Object.keys(s.env).length === 0) delete s.env;
+    changed = true;
+  }
+  if (changed) atomicWrite(SETTINGS, JSON.stringify(s, null, /^\t/m.test(raw) ? "\t" : 2) + "\n");
+  return changed;
+}
+
+const waveDirs = (kind) => existsSync(join(OUT_DIR, kind))
+  ? readdirSync(join(OUT_DIR, kind)).filter((d) => /^wave-\d+$/.test(d)).map((d) => join(OUT_DIR, kind, d))
+  : [];
+
+if (cmd === "compile") {
+  if (PLAN_WAVES.length === 0) fail(`${PLAN_DIR} has no PROJ-${projX}-wave-<N>-plan.md`, 2);
+  if (waveArg !== null && waveArg !== "all" && !PLAN_WAVES.includes(Number(waveArg)))
+    fail(`${planPath(waveArg)} not found — no plan for wave ${waveArg}`, 2);
+  const waves = waveArg === null || waveArg === "all" ? PLAN_WAVES : [Number(waveArg)];
+  const manifests = loadManifests();
+  checkManifests(manifests);
+  const storiesByWave = allStories();
+  const rendered = waves.map((w) => renderWave(w, manifests));
+  const breaches = rendered.flatMap((r) => r.breaches);
+  if (breaches.length) fail(`budget breach — nothing written:\n  ${breaches.join("\n  ")}\n  Condense the sources or raise that role's manifest budget when its scope genuinely requires it.`);
+  const agentFiles = manifests.filter((m) => m.claude?.agent_file === true)
+    .map((m) => [join(".claude", "agents", `skillchain-${m.name}.md`), agentFileContent(m)]);
+  // Only now touch the disk. A write error leaves a partial set: exit 1, rerun.
+  try {
+    for (const f of existsSync(OUT_DIR) ? readdirSync(OUT_DIR) : [])
+      if (/^bundle-.*\.md$/.test(f) || f === "bundles.lock.json" || f === "blocked-roles.json") rmSync(join(OUT_DIR, f), { force: true });
+    for (const dir of [...waveDirs("workers"), ...waveDirs("roles")]) {
+      const w = Number(dir.match(/wave-(\d+)$/)[1]);
+      if (waves.includes(w) || !PLAN_WAVES.includes(w)) rmSync(dir, { recursive: true, force: true });
+    }
+    // Waves not compiled now keep their valid files untouched; a file of a
+    // story deleted, moved or re-split in that wave's plan, a story file whose
+    // header names another role than the plan now resolves (or no parseable
+    // header), and a role file without manifest/inject list are removed. The
+    // plan hash is deliberately not compared: post-wave notes change a plan
+    // after its wave, and finished waves keep their files.
+    const roleFiles = new Map(manifests.filter((m) => m.inject.length).map((m) => [`${m.name}.md`, null]));
+    for (const dir of [...waveDirs("workers"), ...waveDirs("roles")]) {
+      const w = Number(dir.match(/wave-(\d+)$/)[1]);
+      const keep = dir.startsWith(join(OUT_DIR, "workers"))
+        ? new Map(storiesByWave.get(w).flatMap(storyTargets).map((t) => [`${t.name}.md`, t.role]))
+        : roleFiles;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, entry.name);
+        const valid = entry.isFile() && keep.has(entry.name) && (keep.get(entry.name) === null ||
+          readFileSync(p, "utf8").split("\n", 1)[0].match(/^Generated from .+ · role (\S+) · wave \d+$/)?.[1] === keep.get(entry.name));
+        if (!valid) rmSync(p, { recursive: true, force: true });
+      }
+    }
+    for (const r of rendered) for (const [path, content] of r.files) atomicWrite(path, content);
+    // ONLY skillchain-<role>.md files are ever written — other agents in
+    // .claude/agents/ are never touched.
+    for (const [path, content] of agentFiles) atomicWrite(path, content);
+    if (removeInjectorHook()) console.log(`✓ removed the retired context-injector hook / PONYTAIL_SUBAGENT_MATCHER from ${SETTINGS}`);
+  } catch (error) {
+    fail(`write failed (${error.message}) — the context is incomplete; fix the cause and rerun compile before spawning workers`);
+  }
+  for (const r of rendered) {
+    console.log(r.report);
+    if (r.fallback) console.warn(`⚠ ${r.fallback}: no Agent Type column in the story table — every story falls back to implementer`);
+  }
+  console.log(`✓ ${rendered.reduce((n, r) => n + r.files.size, 0)} file(s) -> ${OUT_DIR}/{workers,roles}/wave-{${waves.join(",")}} · ${agentFiles.length} agent file(s) -> .claude/agents/skillchain-*.md`);
 } else if (cmd === "check") {
-  if (!existsSync(BASE)) fail(`${BASE} not found — run from the repo root of an active PROJ`, 2);
-  const planDir = join(BASE, "3-4_plan");
-  const planRe = new RegExp(`^PROJ-${projX}-wave-(\\d+)-plan\\.md$`);
-  const waves = existsSync(planDir)
-    ? readdirSync(planDir).map((f) => f.match(planRe)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b)
-    : [];
+  if (PLAN_WAVES.length === 0) fail(`${PLAN_DIR} has no PROJ-${projX}-wave-<N>-plan.md`, 2);
+  const manifests = loadManifests();
+  checkManifests(manifests);
+  allStories();
   let breached = false;
-  for (const w of waves.length ? waves : [null]) {
-    wave = w;
-    const { compiled, breaches } = compileAll();
-    console.log(`wave ${w ?? "-"}: ${compiled.map((c) => `${c.manifest.name} ${c.tokens}/${c.budget}`).join(", ")}`);
-    for (const b of breaches) { console.error(`✗ wave ${w ?? "-"}: ${b.role} ${b.tokens}/${b.budget} tokens — would be blocked at P0`); breached = true; }
+  for (const w of PLAN_WAVES) {
+    const r = renderWave(w, manifests);
+    console.log(r.report);
+    if (r.fallback) console.warn(`⚠ ${r.fallback}: no Agent Type column in the story table — every story falls back to implementer`);
+    for (const b of r.breaches) { console.error(`✗ ${b} — compile would refuse at P0`); breached = true; }
   }
   const unreached = [...itemReached].filter(([, reached]) => !reached).map(([id]) => id);
   if (unreached.length) { console.error(`✗ ${unreached.join(", ")}: Affects names no PRD of any wave plan — no implementer would see it`); breached = true; }
-  if (budgetOverride !== null) console.warn(`⚠ budget override ${budgetOverride} active — manifest budgets ignored`);
   if (breached) { console.error("Shorten the Summary lines or the curated docs before CP1; the ground file (written at P0) still adds to these numbers."); process.exit(1); }
-  console.log(`✓ check ok — every role fits its budget in ${waves.length || 1} wave(s); nothing written`);
-} else if (cmd === "verify") {
-  if (!existsSync(LOCK)) fail(`${LOCK} missing — nothing to verify (run compile first)`, 2);
-  const lock = JSON.parse(readFileSync(LOCK, "utf8"));
-  const wavesSeen = [...new Set(Object.values(lock).map((r) => r.wave))];
-  if (wavesSeen.length > 1) fail(`lock file mixes wave scopes (${wavesSeen.join(", ")}) — recompile`);
-  wave = wavesSeen[0] ?? null;
-  const { compiled, breaches } = compileAll();
-  const problems = [];
-  for (const { manifest: m, body, tokens: t } of compiled) {
-    const rec = lock[m.name];
-    if (!rec) { problems.push(`${m.name}: in manifests but not in lock — recompile`); continue; }
-    if (rec.hash !== sha256(body)) problems.push(`${m.name}: semantic drift — docs/manifests changed since compile (lock ${rec.hash.slice(0, 12)}…, now ${sha256(body).slice(0, 12)}…)`);
-    const onDisk = join(OUT_DIR, `bundle-${m.name}.md`);
-    if (!existsSync(onDisk)) problems.push(`${m.name}: bundle file missing on disk`);
-    else if (sha256(readFileSync(onDisk, "utf8")) !== rec.hash) problems.push(`${m.name}: bundle file on disk was tampered with (hash != lock)`);
-    for (const [proj, key] of [["claude", "claude_hash"], ["codex", "codex_hash"]]) {
-      const p = join(OUT_DIR, `bundle-${m.name}.${proj}.md`);
-      if (!existsSync(p)) problems.push(`${m.name}: ${proj} projection missing`);
-      else if (sha256(readFileSync(p, "utf8")) !== rec[key]) problems.push(`${m.name}: ${proj} projection drift (hash != lock)`);
-    }
-    const budget = budgetOverride ?? m.budget_tokens;
-    if (t > budget) problems.push(`${m.name}: ${t} tokens > budget ${budget}`);
-  }
-  for (const role of Object.keys(lock))
-    if (!compiled.find((c) => c.manifest.name === role)) problems.push(`${role}: in lock but no longer compiled from manifests`);
-  const blocked = existsSync(BLOCKED) ? JSON.parse(readFileSync(BLOCKED, "utf8")) : [];
-  if (JSON.stringify(blocked) !== JSON.stringify(breaches)) problems.push("blocked roles changed — recompile");
-  if (problems.length > 0) fail(`verify FAILED:\n  ${problems.join("\n  ")}`);
-  console.log(`✓ verify ok — ${Object.keys(lock).length} bundle(s) match the lock, budgets hold`);
-} else if (cmd === "show") {
-  if (!showRole) usage();
-  const p = join(OUT_DIR, `bundle-${showRole}.md`);
-  if (!existsSync(p)) fail(`${p} not found (tier-0/explore roles have no bundle by design)`, 2);
-  process.stdout.write(readFileSync(p, "utf8"));
+  console.log(`✓ check ok — every story maps to a role, every role fits its budget in ${PLAN_WAVES.length} wave(s); nothing written`);
 } else {
-  usage();
+  const [name] = positional;
+  if (waveArg !== null) {
+    const roles = loadManifests().filter((m) => m.inject.length).map((m) => m.name);
+    const w = Number(waveArg);
+    if (waveArg === "all" || !PLAN_WAVES.includes(w) || !roles.includes(name))
+      usage(`show: no role file '${name}' in wave ${waveArg} — candidates: ${PLAN_WAVES.flatMap((pw) => roles.map((r) => `--wave ${pw} ${r}`)).join(", ")}`);
+    const p = join(OUT_DIR, "roles", `wave-${w}`, `${name}.md`);
+    if (!existsSync(p)) fail(`${p} not found — run compile ${projX} ${theme} --wave ${w}`, 2);
+    process.stdout.write(readFileSync(p, "utf8"));
+  } else {
+    const targets = [...allStories()].flatMap(([w, stories]) => stories.flatMap(storyTargets).map((t) => ({ ...t, wave: w })));
+    const target = targets.find((t) => t.name === name);
+    if (!target) {
+      const split = targets.filter((t) => t.story.id === name).map((t) => t.name);
+      if (split.length) usage(`show: ${name} is split (contract) — candidates: ${split.join(", ")}`);
+      const roles = loadManifests().filter((m) => m.inject.length).map((m) => m.name);
+      if (roles.includes(name)) usage(`show: role files are per wave — candidates: ${PLAN_WAVES.map((w) => `--wave ${w} ${name}`).join(", ")}`);
+      usage(`show: unknown worker '${name}' — candidates: ${targets.map((t) => t.name).join(", ")}`);
+    }
+    const p = join(OUT_DIR, "workers", `wave-${target.wave}`, `${name}.md`);
+    if (!existsSync(p)) fail(`${p} not found — run compile ${projX} ${theme} --wave ${target.wave}`, 2);
+    process.stdout.write(readFileSync(p, "utf8"));
+  }
 }

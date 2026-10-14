@@ -240,7 +240,7 @@ Include a short implementation-facing section:
 
 **The components themselves** — implement each catalog entry in the chosen stack, in the project's component directory (for example `src/components/ui/`). Tokens only: no hardcoded hex values, no arbitrary pixel sizes. Every component must be usable without further styling by the consumer.
 
-**`docs/DESIGN-SYSTEM.md`** — the curated baseline slot the chain already reserves for the design system (`0b_intake` lists it and points at this skill when no design system exists). It is injected into every `frontend-implementer` context bundle, so it is **capped at 80 lines** (`curation-caps.sh`) and holds rules only — no component inventory, no rationale:
+**`docs/DESIGN-SYSTEM.md`** — the curated baseline slot the chain already reserves for the design system (`0b_intake` lists it and points at this skill when no design system exists). It is compiled into every `frontend-implementer` and full-stack `implementer` worker file, so it is **capped at 80 lines** (`curation-caps.sh`) and holds rules only — no component inventory, no rationale:
 
 ```markdown
 # Design System — [Project Name]

@@ -71,8 +71,8 @@ PHASES=(CP1 P0 P5 P6 P7 P8 done)
 # narrow matcher silently drop generic implementation fallbacks.
 unset PONYTAIL_SUBAGENT_MATCHER
 
-# Pin the injector to THIS run's PROJ — without these the injector falls back
-# to guessing the most recently modified specs/PROJ-* (wrong with parallel PROJs).
+# Pin helper scripts to THIS run's PROJ (no guessing the most recently modified
+# specs/PROJ-* with parallel PROJs).
 export SKILLCHAIN_PROJ="$PROJ" SKILLCHAIN_THEME="$THEME"
 
 # Model-opposite is only real if the models actually differ (review fix #4).
@@ -188,32 +188,34 @@ render_prompt() { # role task_text out_var — writes prompt file, sets $out_var
   {\"source\":\"review\",\"severity\":\"critical|high|medium|low\",\"category\":\"...\",\"summary\":\"...\",\"file\":\"...\",\"line\":N}
 - The runner feeds your lines into the findings ledger; invalid lines are dropped."
   fi
-  # Context bundles (Stage 2): P5/P7 writer lanes get a POINTER to the
-  # compiled bundles — never the bundle text itself (the SubagentStart hook
-  # injects it into Claude subagents; codex lanes read their projection file).
+  # Worker context (Stage 2): P5/P7 writer lanes get a POINTER to the
+  # compiled worker files — never the file text itself. Every worker reads
+  # exactly one file whose path the spawn prompt names.
   local ctx=""
   if { [ "$PHASE" = "P5" ] || [ "$PHASE" = "P7" ]; } && [ "$role" = "writer" ]; then
     ctx="
-## Context bundles
+## Worker context files
 
-Compiled role bundles live in \`$BASE/context/\` (hashes in
-\`bundles.lock.json\` — the canonical hash is identical for both
-providers). Rules:
-- Claude subagents receive their type-scoped bundle automatically via the
-  SubagentStart hook — NEVER paste bundle contents into spawn prompts.
-- A Codex lane reads \`$BASE/context/bundle-<role>.codex.md\` before
-  implementing.
-- Micro-fixer spawns receive NOTHING beyond the finding, file paths, and
-  an optional agent.md pointer (tier 0).
-- If a bundle is missing or stale, recompile and record the lock via
-  state.sh. \`compile\` without \`--wave\` keeps the lock's current scope (P5
-  may have advanced waves since this prompt was created). If it refuses
-  (lock missing, empty or mixed), establish the current wave from the
-  execution plan and rerun it with \`--wave N\`. Do not hand-assemble context.
+Every worker reads exactly one compiled file, named by path in its spawn
+prompt — NEVER paste its contents into a prompt. They live in \`$BASE/context/\`:
+- Story worker: \`workers/wave-<N>/<US-ID>.md\` (\`<US-ID>.backend.md\` /
+  \`<US-ID>.frontend.md\` under \`Split: contract\`); its role is the story's
+  \`Agent Type\` in the wave plan
+  (\`node scripts/validate-wave-plan.mjs --stories <wave-plan>\`).
+- Fix worker or reviewer without a story: \`roles/wave-<N>/<role>.md\` of the
+  wave the touched files belong to (a fix across waves stays one worker and
+  gets the other waves' role files by path as well).
+- The spawn prompt asks for a report starting with \`Brief: <US-ID>\` (fix:
+  \`Brief: <finding id>\`) and, per AC, the test file.
+- Claude: spawn the \`skillchain-<role>\` agent type; a Codex lane reads the
+  file before doing anything else.
+- Micro-fixer and explore spawns receive NOTHING beyond the finding, file
+  paths, and an optional agent.md pointer (tier 0).
+- Before each wave run \`compile --wave <N>\`; if it exits non-zero, start no
+  worker until a rerun exits 0. Do not hand-assemble context.
 
 \`\`\`bash
-node scripts/compile-context-bundles.mjs compile $PROJ $THEME &&
-  bash \"$STATE_SH\" set $PROJ $THEME .context.bundles \"\$(jq -c . \"$BASE/context/bundles.lock.json\")\"
+node scripts/compile-context-bundles.mjs compile $PROJ $THEME --wave <N>
 \`\`\`"
   fi
   tpl="$(cat "$RUNNER_DIR/prompts/lane-prompt.md.tmpl")"

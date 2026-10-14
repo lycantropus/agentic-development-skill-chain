@@ -278,34 +278,36 @@ if ! grep -qxF '.state.lock' .gitignore 2>/dev/null; then
   printf '.state.lock\n' >> .gitignore
 fi
 
-# --- context injector hook (host-neutral, idempotent) ---------------------
-# Keep the context hook deterministic. Ponytail deliberately has no matcher:
-# its native unset path reaches every normal subagent, including generic
-# implementation fallbacks. Runs before the Ponytail check so stale project
-# settings are removed before coverage is verified.
-INJECTOR_CMD="node scripts/context-injector.mjs claude"
-mkdir -p .claude
-[ -f .claude/settings.json ] || echo '{}' > .claude/settings.json
-if jq -e --arg cmd "$INJECTOR_CMD" \
-     '[.hooks.SubagentStart[]?.hooks[]? | select(.command == $cmd)] | length > 0
-      and ((.env.PONYTAIL_SUBAGENT_MATCHER // "") == "")' \
-     .claude/settings.json >/dev/null 2>&1; then
-  say "✓ context injector hook present; Ponytail applies to all subagents (.claude/settings.json)"
-else
+# --- retired context injector hook: remove (idempotent) -------------------
+# Workers read one compiled file named in the spawn prompt; no SubagentStart
+# hook is installed any more. Remove only the injector entry (foreign hooks
+# and their groups stay; a container goes only when this emptied it) and the
+# Ponytail matcher, with or without a hook: Ponytail's native unset path
+# reaches every normal subagent. Runs before the Ponytail check so stale
+# project settings are removed before coverage is verified. A missing
+# .claude/settings.json is not created.
+if [ -f .claude/settings.json ]; then
+  STRIP_INJECTOR='
+    def inj: (objects | .command | strings | test("(^|[\\s/\\\\])context-injector\\.mjs(\\s|$)")) // false;
+    ([.hooks.SubagentStart[]?.hooks[]? | select(inj)] | length > 0) as $hook
+    | (.env | type == "object" and has("PONYTAIL_SUBAGENT_MATCHER")) as $matcher
+    | if $hook then
+        .hooks.SubagentStart |= map(
+          if any(.hooks[]?; inj) then (.hooks |= map(select(inj | not))) | select(.hooks != []) else . end)
+        | if .hooks.SubagentStart == [] then del(.hooks.SubagentStart) else . end
+        | if .hooks == {} then del(.hooks) else . end
+      else . end
+    | if $matcher then del(.env.PONYTAIL_SUBAGENT_MATCHER) | if .env == {} then del(.env) else . end else . end'
   TMP_SETTINGS="$(mktemp)"
-  if jq --arg cmd "$INJECTOR_CMD" \
-       '.hooks.SubagentStart = (
-          (.hooks.SubagentStart // [])
-          + (if ([.hooks.SubagentStart[]?.hooks[]? | select(.command == $cmd)] | length) > 0
-             then [] else [{hooks: [{type: "command", command: $cmd}]}] end))
-        | del(.env.PONYTAIL_SUBAGENT_MATCHER)
-        | if .env == {} then del(.env) else . end' \
-       .claude/settings.json > "$TMP_SETTINGS" 2>/dev/null; then
-    mv "$TMP_SETTINGS" .claude/settings.json
-    say "✓ context injector hook merged; stale Ponytail matcher removed (.claude/settings.json)"
-  else
+  if ! jq "$STRIP_INJECTOR" .claude/settings.json > "$TMP_SETTINGS" 2>/dev/null; then
     rm -f "$TMP_SETTINGS"
-    say "⚠ could not merge the injector hook (.claude/settings.json unparseable?) — merge it manually via merge-project-settings.sh"
+    say "⚠ .claude/settings.json unparseable — remove the context-injector hook and env.PONYTAIL_SUBAGENT_MATCHER by hand"
+  elif jq -e --slurpfile new "$TMP_SETTINGS" '. == $new[0]' .claude/settings.json >/dev/null 2>&1; then
+    rm -f "$TMP_SETTINGS"
+    say "✓ no context injector hook; Ponytail applies to all subagents (.claude/settings.json)"
+  else
+    mv "$TMP_SETTINGS" .claude/settings.json
+    say "✓ retired context injector hook / Ponytail matcher removed (.claude/settings.json)"
   fi
 fi
 
@@ -337,17 +339,17 @@ else
   HARD_MISSING+=("ponytail-check.sh")
 fi
 
-# --- context bundles: verify when compiled (§5 budget gate is HARD) -------
-if [ -f "$BASE/context/bundles.lock.json" ]; then
+# --- worker context: compile check once a plan folder exists (HARD) -------
+if [ -d "$BASE/3-4_plan" ] || [ -d "$BASE/6_plan" ]; then
   if COMPILER="$(resolve_helper compile-context-bundles.mjs)" \
-     && node "$COMPILER" verify "$PROJ" "$THEME" >/dev/null 2>&1; then
-    say "✓ context bundles verify (hashes match, budgets hold)"
+     && node "$COMPILER" check "$PROJ" "$THEME" >/dev/null 2>&1; then
+    say "✓ worker context check (every story maps to a role, budgets hold)"
   else
-    say "❌ context bundles verify FAILED (budget breach, drift, or compiler missing — hard) — condense docs/, recompile (setup subskill step 6a)"
-    HARD_MISSING+=("context-bundles")
+    say "❌ worker context check FAILED (budget breach, unassignable story, outdated manifest, or compiler missing — hard) — run: node scripts/compile-context-bundles.mjs check $PROJ $THEME"
+    HARD_MISSING+=("context-check")
   fi
 else
-  say "– context bundles not compiled yet (setup subskill step 6a runs after this preflight)"
+  say "– worker context check skipped: no plan folder ($BASE/3-4_plan or 6_plan) yet"
 fi
 
 # --- repo structure: migration state of the curated baseline -------------

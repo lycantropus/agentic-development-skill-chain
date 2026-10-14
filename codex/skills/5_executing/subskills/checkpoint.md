@@ -188,9 +188,14 @@ node ~/.codex/skills/5_executing/scripts/validate-wave-plan.mjs \
 node ~/.codex/skills/5_executing/scripts/compile-context-bundles.mjs check <X> <theme>
 ```
 
-The `check` compiles every role's bundle per wave in memory and fails when a
-role would be blocked at P0, a decision or key flow is malformed, or one
-reaches no wave.
+The `check` compiles every wave's worker and role files in memory (it writes
+nothing) and fails when a role would exceed its budget at P0, a decision or key
+flow is malformed, or one reaches no wave. It also fails (exit 2) when a story
+cannot be assigned to a role from the plan table's `Agent Type` column
+(duplicate, missing, unsupported, or contradicting `Scope`/`Split`), and when a
+project-local role manifest (`templates/roles/`) still has the old preamble or
+lacks the design system in `implementer`: take the current manifest via
+`sync-framework` or align it by hand.
 
 This is a hard pre-approval gate. It checks unique AC IDs, their task/command
 mapping, bidirectional task/test-file agreement, broad regressions, auth-budget

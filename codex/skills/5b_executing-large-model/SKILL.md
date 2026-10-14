@@ -60,10 +60,9 @@ from `5_executing` and the same scripts enforce them.
    in the current checkout after its own preflights. On every
    start or resume run `node ~/.claude/skills/5_executing/scripts/sync-framework.mjs`
    (Codex: the installed `.codex/skills` copy), reconcile any reported
-   difference, commit (if the refresh changed context tooling or role
-   templates, recompile the context bundles and record their hashes via
-   `state.sh` first), then `bash scripts/state.sh transition <X> <theme> P5 running`
-   if the phase was `P0:done`.
+   difference, commit, and in the same step run only the `compile` of item 3
+   (no worker between `sync` and `compile`; lead discipline, the retired hook stub catches only workers without a path), then
+   `bash scripts/state.sh transition <X> <theme> P5 running` if the phase was `P0:done`.
 2. **Records before work.** `BASE_SHA` comes from `state.json` (standalone:
    `git rev-parse HEAD`). Create
    `specs/PROJ-<X>-<theme>/5_progress/PROJ-<X>-progress.md` from the skeleton
@@ -77,12 +76,14 @@ from `5_executing` and the same scripts enforce them.
    `scripts/story-slice.mjs` (`5_executing` § Input) — and the wave 1 plan; at
    each wave start only that wave's plan, never earlier ones — what previous
    waves built comes from the wave shape plus `progress.md`. Before dispatching wave N:
-   `git tag "wave-${WAVE}-start-PROJ-${PROJ}"` (delete and recreate on a
-   re-run). The gate scopes CodeRabbit to this tag and fails hard without it.
-   Recompile the bundles wave-scoped (this wave's architecture decisions and
-   API contracts) and record the hashes before any worker starts:
-   `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>`, then
-   `bash scripts/state.sh set <X> <theme> .context.bundles "$(jq -c . specs/PROJ-<X>-<theme>/context/bundles.lock.json)"`.
+   `git tag "wave-${WAVE}-start-PROJ-${PROJ}"` unless it exists (keep it on a
+   resume; recreate only after a reset restart). The gate scopes CodeRabbit to this tag and fails hard without it.
+   Before any worker starts, compile the wave's worker files (this wave's
+   architecture decisions and API contracts; no lock, no hash bookkeeping, no `state.sh`; the file header carries the plan hash):
+   `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>`.
+   Exit ≠ 0 → no worker until a rerun exits 0; read the warnings before dispatch
+   (e.g. `settings.json is not valid JSON — left unchanged`: repair, rerun; see
+   `5_executing/subskills/setup.md`).
 4. **Workers own edits.** Every code, test, and fix edit is worker-owned when
    delegation is available. The lead owns decomposition, dispatch, integration,
    deterministic verification, gates, commits, and records. Editing locally is a
@@ -165,16 +166,24 @@ expected to choose the concrete steps.
   implementation is the worker's call. Test-evidence rules (positive control,
   external state, polling, shared-lock caveat):
   `5_executing/references/writing-tests.md` § Evidence Rules.
-- **Worker briefs.** A brief carries the story slice verbatim — the output of
-  `node scripts/story-slice.mjs <wave-plan> <US-ID>` with the story, its
-  acceptance criteria (verified by the lead, not the worker) and tasks; never
-  re-typed, and a non-zero exit is a plan defect to fix first — plus only what
-  the slice lacks: execution mode, the ownership set, the shared-resource rule,
-  a prior-wave summary from `progress.md`, a pointer to `agent.md`, and
-  for UI stories a pointer to `1d_prototypes/implementation-handoff.md` plus the
-  design-system baseline (`docs/DESIGN-SYSTEM.md`, `docs/components.md`) when
-  no context bundle injects it. Do not paste framework skill files
-  (Tailwind, Next.js) or generic checklists; the model knows the stack.
+- **Worker briefs.** A story worker's role is the `Agent Type` column of the
+  wave plan (binding; read it with `node scripts/validate-wave-plan.mjs --stories
+  <wave-plan>`; spawn exactly the role in the file header and the JSON (plans without
+  the column: `implementer`, or the two side roles under `Split: contract`);
+  only fix workers choose the type, with that type's role file). Its whole brief is ONE file,
+  `context/workers/wave-N/<US-ID>[.backend|.frontend].md`: role rules, project
+  context (DESIGN-SYSTEM.md rules for frontend and full-stack, `docs/components.md` as a read-by-path reference), the wave's
+  architecture and contracts, and the story slice verbatim. A fix worker gets
+  `context/roles/wave-N/<role>.md` of the wave of the touched files plus the
+  finding (a cross-wave fix stays one worker; the other waves' role files by
+  path), the Quality Gate reviewer `roles/wave-<last>/reviewer.md`. The
+  spawn prompt carries the path and only what the file lacks: execution mode,
+  ownership set, shared-resource rule, a prior-wave summary from `progress.md`,
+  a pointer to `agent.md`, on a plan/PRD AC conflict the PRD wording
+  (superseding), and for UI stories the sections of
+  `1d_prototypes/implementation-handoff.md`. Never paste the slice, the design
+  system, framework skill files or generic checklists; a `compile` failure is a
+  plan defect to fix first.
 - **Story granularity.** One story is one worker. The lead does not split a
   story unless its header declares it: `Split: contract` → one backend and one
   frontend worker, both bound to the wave's section of `api-contracts.md`, the
@@ -204,7 +213,7 @@ expected to choose the concrete steps.
 - **Debugging.** Root cause before fix (`5_executing/references/debugging.md`).
   Repeated failures use the Outer Ralph stages in item 6 or the blocked path.
 - **Reviews.** CodeRabbit inside the wave gate and the Quality Gate reviewer
-  are the only Step 5 reviews. No minimalism persona, no six-persona panel;
+  (given its role file by path) are the only Step 5 reviews. No minimalism persona, no six-persona panel;
   those belong to Skill 6. Structure and test quality are judged by the
   project's tools (`complexity_cmd`, `arch_rules_cmd`, `mutation_cmd`); a
   failing tool feeds the recovery stages above.
@@ -212,20 +221,21 @@ expected to choose the concrete steps.
 ## Worker brief
 
 ```
-Implement US-<N> "<title>" for PROJ-<X>.
-
-Your story — verbatim slice of the wave plan; the lead verifies its acceptance
-criteria, do not run the AC commands:
-<output of node scripts/story-slice.mjs <wave-plan> <US-ID>, unedited>
-<only on a plan/PRD AC conflict: PRD wording, superseding the slice>
+Implementiere US-<N> (Wave <W>) für PROJ-<X>. Dein vollständiger Auftrag steht
+in <specs/PROJ-<X>-<theme>/context/workers/wave-<W>/<US-ID>.md>. Lies ihn
+vollständig, bevor du irgendetwas anderes tust, und beginne deinen Report mit
+`Brief: US-<N>` (Fix-Auftrag: `Brief: <Finding-ID>`). Die ACs verifiziert der
+Lead, führe die AC-Commands nicht aus; nenne im Report je AC die Testdatei
+(`AC-1 → tests/x.test.ts`).
+<only on a plan/PRD AC conflict: PRD wording, superseding the file's slice>
 Execution: <parallel|sequential>, <runtime constraints>.
 You own: <files/dirs>. Touch nothing else; escalate if you must.
 Shared resources: wrap every migration and auth-consuming command as
   scripts/worktree.sh with-shared-lock -- <cmd>. Do not start or stop a dev server.
 Prior waves: <one paragraph>. Notes: <path>/agent.md (read first, append walls).
-UI (if any): 1d_prototypes/implementation-handoff.md; follow screen/source references
-and reuse registered components. Component mockups do not replace production
-implementation or required tests.
+UI (if any): the handoff sections the slice points to
+  (1d_prototypes/implementation-handoff.md); component mockups do not replace
+  production implementation or required tests.
 
 Every behavior change needs a test that failed before and passes after; run it
 and read the output (rules: 5_executing/references/writing-tests.md). Before
@@ -305,13 +315,13 @@ runs use `state.sh` for the blocked phase and reason and render the stop report.
 
 ## Provider notes
 
-- **Claude:** spawn P0's projected `skillchain-implementer` /
+- **Claude:** spawn `skillchain-implementer` /
   `skillchain-frontend-implementer` / `skillchain-backend-implementer` (the
-  only implementer agent files; they pin no model — pass `model` from the
-  wave plan's Complexity column on every spawn). If they are not projected yet, compile first;
-  for a generic type put `specs/PROJ-<X>-<theme>/context/bundle-<role>.md` in the
-  prompt ("read this first"; no file = blocked role, do not spawn). Background
-  spawns are the default for independent workers.
+  only implementer agent files, written by `compile`; they pin no model — pass
+  `model` from the wave plan's Complexity column on every spawn). With a
+  generic type the path in the prompt does the same job; no worker file = run
+  `compile`, do not spawn. Background spawns are the default for independent
+  workers.
 - **Codex:** use `spawn_agent` worker roles with explicit file ownership; no
   `/compact`, so item 9 becomes: suggest a different model, then invoke
   `/6_qa`; skill assets live under `.codex/skills`; the installed synchronizer is `~/.codex/skills/5_executing/scripts/sync-framework.mjs`.

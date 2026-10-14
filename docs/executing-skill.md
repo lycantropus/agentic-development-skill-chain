@@ -20,7 +20,7 @@ Inputs:
 - Wave shape: each plan's `## User Stories in this Wave` and `## Execution`, sliced with `story-slice.mjs` (read at PROJ start)
 - Wave plans in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (one per wave, read at that wave's start)
 - PRDs in `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` (authoritative; opened only when a plan/PRD AC conflict is suspected)
-- Architecture in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (on demand; workers get its compiled implementer view — their wave's decision Summaries — through their context bundle)
+- Architecture in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (on demand; workers get its compiled implementer view — their wave's decision Summaries — through their worker file; projects planned before Summary lines existed get `architecture-delta.md`, else the whole file unfiltered)
 - Gate config in `specs/PROJ-<X>-<theme>/3-4_plan/wave-gate-config.json`
 - UI handoff in `specs/PROJ-<X>-<theme>/1d_prototypes/implementation-handoff.md`, when the PROJ has UI work
 
@@ -123,13 +123,9 @@ git tag "wave-${WAVE}-start-PROJ-${PROJ}"
 
 The wave base tag scopes the CodeRabbit review inside the wave gate. Without the tag or `WAVE_BASE_SHA`, the gate fails.
 
-For implementation, the skill chooses the implementer type by scope:
+For implementation, a story worker's type is the `Agent Type` column of the wave plan's story table (read with `validate-wave-plan.mjs --stories <wave-plan>`): `frontend-implementer`, `backend-implementer` or `implementer` (full-stack); `Split: contract` yields a backend and a frontend worker. The lead spawns exactly the role named in each worker file's first line and in that JSON; old plans without the column get `implementer` (or the two side roles under `Split: contract`). Only fix workers choose the type themselves, with that type's role file.
 
-- UI-only user story -> frontend implementer.
-- Server-only user story -> backend implementer.
-- Full-stack user story -> generic implementer.
-
-Each worker's spawn prompt embeds its story section of the wave plan verbatim, printed by `scripts/story-slice.mjs <wave-plan> <US-ID>`; the lead adds only what the slice lacks (execution mode, ownership and lock rules, a prior-wave summary from `progress.md`, `agent.md` and UI-handoff pointers).
+Each worker reads one compiled file, `context/workers/wave-<N>/<US-ID>.md` (a fix worker: `context/roles/wave-<N>/<role>.md`), named by path in its spawn prompt. The file holds the role rules, project context, the wave's architecture and contracts and the story section of the wave plan verbatim. The lead adds only what the file lacks (execution mode, ownership and lock rules, a prior-wave summary from `progress.md`, `agent.md` and UI-handoff pointers); the worker's report starts with `Brief: <US-ID>` and names the test file per AC.
 
 Parallel waves can run multiple independent user stories at once. In those cases, the lead monitors file ownership and overlap (`worker-lifecycle.md`). Single-story waves do not need team overhead.
 

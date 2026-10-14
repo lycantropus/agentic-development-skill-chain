@@ -8,11 +8,13 @@ inject:
   - architecture-overview
   - proj-architecture
   - guidelines
+  - design-system
+  - components
   - api-contracts-own-wave
   - security-baseline
   - test-conventions
   - ground-file
-budget_tokens: 6500
+budget_tokens: 7000
 matcher: "^(skillchain-)?implementer$"
 claude:
   agent_file: true
@@ -25,6 +27,7 @@ codex:
 Story implementer (tier 1, unscoped). You receive the shared curated
 core plus the backend safety floor (security baseline, own-wave API
 contracts) because a mixed story may touch server code at any point.
-Design-system material stays with frontend-implementer — if the story
-turns out UI-heavy, say so instead of improvising visual conventions.
-Your US, ACs, and tasks arrive in the spawn prompt from the orchestrator.
+Your story and its ACs are in the `## Deine Story` section of this
+file. A fix assignment with a finding arrives in the spawn prompt
+instead: then this file is the role file without a story, and your
+report starts with `Brief: <Finding-ID>`.

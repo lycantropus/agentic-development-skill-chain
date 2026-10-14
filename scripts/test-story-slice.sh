@@ -33,6 +33,24 @@ grep -qF 'US-10' "$CASE/out" && { echo "slice leaked into US-10" >&2; exit 1; }
 grep -qF 'Execution' "$CASE/out" && { echo "slice leaked the lead header" >&2; exit 1; }
 node "$SLICE" "$CASE/plan.md" PROJ-1-PRD-1-US-10 | grep -qF 'US-10-AC-1' || { echo "last section must slice to EOF" >&2; exit 1; }
 
+# CRLF plan: fences and headings still match; only the line endings differ
+sed 's/$/\r/' "$CASE/plan.md" >"$CASE/crlf.md"
+node "$SLICE" "$CASE/crlf.md" PROJ-1-PRD-1-US-1 | tr -d '\r' | cmp - "$CASE/out" || { echo "CRLF plan sliced differently" >&2; exit 1; }
+node "$SLICE" "$CASE/crlf.md" PROJ-1-PRD-1-US-1 | head -1 | grep -q $'\r$' || { echo "CRLF slice must keep its bytes" >&2; exit 1; }
+
+# exported slice(): same bytes as the CLI; throws with `count` unless exactly one section matches
+node --input-type=module -e '
+const { slice } = await import(process.argv[1]);
+const { readFileSync, writeFileSync } = await import("node:fs");
+const text = readFileSync(process.argv[2], "utf8");
+writeFileSync(process.argv[3], slice(text, "PROJ-1-PRD-1-US-1"));
+const countOf = (t, id) => { try { slice(t, id); } catch (e) { return e.count; } return "no throw"; };
+for (const [t, id, want] of [[text, "PROJ-1-PRD-1-US-2", 0], [text + "\n## PROJ-1-PRD-1-US-1: Again\n", "PROJ-1-PRD-1-US-1", 2]]) {
+  if (countOf(t, id) !== want) { console.error(`slice(${id}) count: ${countOf(t, id)}, want ${want}`); process.exit(1); }
+}
+' "file://$SLICE" "$CASE/plan.md" "$CASE/api-out"
+cmp "$CASE/out" "$CASE/api-out" || { echo "slice() differs from CLI output" >&2; exit 1; }
+
 if node "$SLICE" "$CASE/plan.md" PROJ-1-PRD-1-US-2 >/dev/null 2>&1; then echo "missing ID accepted" >&2; exit 1; fi
 printf '\n## PROJ-1-PRD-1-US-1: Again\n' >>"$CASE/plan.md"
 if node "$SLICE" "$CASE/plan.md" PROJ-1-PRD-1-US-1 >/dev/null 2>&1; then echo "duplicate ID accepted" >&2; exit 1; fi
