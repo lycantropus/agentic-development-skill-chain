@@ -275,7 +275,7 @@ bash scripts/chain quality <X> <theme> review <report-path>
 bash scripts/chain quality seal <X> <theme>
 ```
 
-Record a review only after its P0/P1 findings are resolved. For an allowed Sonar skip, use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`. The proof script requires both the human-readable gate statuses and valid evidence for current inputs. Sonar submission requires a fresh task receipt; the Sonar reviewer still checks the server's completed analysis and records its disposition.
+Record a review only after its P0/P1 findings are resolved. For an allowed Sonar skip, use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`. Every successful action renders the `### Gate Status` block of the Quality Gate section in `progress.md` from the records (never edit it; `check` re-renders it). `seal` reads only the records: it requires valid evidence for current inputs and a status block that matches it. Sonar submission requires a fresh task receipt; the Sonar reviewer still checks the server's completed analysis and records its disposition.
 
 Exit criteria:
 

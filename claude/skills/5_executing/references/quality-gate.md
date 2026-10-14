@@ -23,13 +23,13 @@ assembled-PROJ coverage, not another run of every wave AC.
 
 ## Gate 0b: Mutation Hardening (optional, `mutation_cmd`)
 
-Runs only when `wave-gate-config.json` has a top-level `mutation_cmd` (contract: `4_writing-plans/references/wave-gate-config.md`); otherwise record `Status: skipped (not configured)`. It runs first, so coverage and Sonar see the hardening tests:
+Runs only when `wave-gate-config.json` has a top-level `mutation_cmd` (contract: `4_writing-plans/references/wave-gate-config.md`); otherwise the status block reads `skipped (not configured)`. It runs first, so coverage and Sonar see the hardening tests:
 
 ```bash
 bash scripts/chain quality <X> <theme> run mutation
 ```
 
-Survivors go to **one tests-only fix round** per round: dispatch a worker whose ownership is test files only, with the tool output verbatim, then commit and rerun. A survivor that needs a production change is not fixed here; the lead logs it as a finding for QA. Maximum three rounds. If survivors remain after round 3, do **not** escalate or block: record them in `5_progress/PROJ-<X>-progress.md` as carried-forward (file, mutant, what the last test added) and set `Status: ran (survivors carried forward)`. Late is safe because this round cannot change production code; QA assigns severity (Skill 6 §1c).
+Survivors go to **one tests-only fix round** per round: dispatch a worker whose ownership is test files only, with the tool output verbatim, then commit and rerun. A survivor that needs a production change is not fixed here; the lead logs it as a finding for QA. Maximum three rounds. If survivors remain after round 3, do **not** escalate or block: record them in `5_progress/PROJ-<X>-progress.md` as carried-forward (file, mutant, what the last test added) (the status block then reads `ran (survivors carried forward)`, derived from the exit-1 record). Late is safe because this round cannot change production code; QA assigns severity (Skill 6 §1c).
 
 ---
 
@@ -149,7 +149,7 @@ Use the existing lead to coordinate these commands; no additional scheduler is n
 4. Run each declared quality command with `bash scripts/chain quality <X> <theme> run 'test:<label>'`, and lint with `... run lint` (`lint_cmd`, default `npm run lint`). These commands run live, require successful exits, and tests require positive selection. Auth-consuming quality entries execute their preflight and command under `chain worktree with-shared-lock`. Retain CI/nightly workflow-wiring checks.
 5. Collect reviewer, build, tests, lint and Sonar reports before editing. A fix worker reads one role file, `context/roles/wave-<N>/<role>.md` (`implementer`, `frontend-implementer` or `backend-implementer` per the touched files) of the wave the touched files belong to, plus the finding in its prompt; its report starts with `Brief: <Finding-ID>`. Batch the round's fixes per wave. A fix that touches several waves (shared files, an atomic contract correction) stays ONE worker and gets the other waves' role files by path in its prompt; never split it by wave. Missing role files: `bash scripts/chain render context compile <X> <theme>` (every wave, no `chain state` entry); stop on a non-zero exit until a rerun exits 0. Batch confirmed findings into one recovery round; dispatch disjoint fixes concurrently, overlapping files serially. After integration/commit, run quality tests, lint, build and coverage once on that revision, re-review the fix diff, rerun mutation once for evidence on the final revision (no new fix rounds; it may only refresh the carried-forward list), then submit one fresh Sonar scan. If no code changed, do not repeat successful commands merely because another stream reported later. Keep per-issue attempt history: non-Sonar blockers escalate after three fixes; Sonar retains its three-round carry-forward policy. An unrelated later review fix does not reset Sonar's budget; refresh analysis on the final revision without starting more Sonar fix rounds.
 6. Save the completed review report in `5_progress/` and bind it with `bash scripts/chain quality <X> <theme> review <report-path>` only after confirmed P0/P1 issues are resolved. For an allowed Sonar skip use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`.
-7. Update the human-readable statuses below, then run `bash scripts/chain quality seal <X> <theme>`. It now requires command evidence as well as statuses: current inputs, exact configured command, exit result, unchanged log, positive test selection and output artifact hashes. Scanner submission also requires a fresh task receipt; the Sonar stream still fetches the completed task's server results and records its disposition before marking `Status: ran`.
+7. Every successful `chain quality` action renders the `### Gate Status` block of the `## Quality Gate` section in `progress.md` from the `quality-*.json` records (never edit it; `... check` re-renders it). Fill in the findings below it, then run `bash scripts/chain quality seal <X> <theme>`. Seal reads the records, not the prose: current inputs, exact configured command, exit result, unchanged log, positive test selection and output artifact hashes, and the rendered block must match them. Scanner submission also requires a fresh task receipt; the Sonar stream still fetches the completed task's server results and records its disposition in the lists below. Seal proves the scan ran, not that its server results were reviewed; that stays the lead's duty.
 
 Evidence is generated in `5_progress/quality-*.json` and logs. Each record retains the verified commit. Evidence-only commits do not invalidate the code proof; code/configuration changes do. Build and coverage reuse is opt-in through artifact lists, not a general cache for external services. Never hand-edit a proof record. Commands are bounded by their configured `<kind>_seconds` timeout (quality tests use `ac_seconds`, fallback 600 seconds; set `timeouts.mutation_seconds` explicitly, mutation runs are slow).
 
@@ -174,13 +174,25 @@ For every gate item except the Sonar and mutation fix loops: if it cannot pass a
 
 ## Progress Tracking
 
-Update `5_progress/PROJ-<X>-progress.md` with a Quality Gate section after running:
+`5_progress/PROJ-<X>-progress.md` carries a Quality Gate section. The `### Gate Status` block is rendered by `chain quality`; the findings below it are yours:
 
 ```markdown
 ## Quality Gate — PROJ-X
 
+<!-- quality-status: rendered by chain quality from 5_progress/quality-*.json, never edit -->
+### Gate Status
+
+| Check | Status |
+|---|---|
+| Code Review | passed |
+| Mutation | ran \| ran (survivors carried forward) \| skipped (not configured) |
+| Build | passed |
+| Tests | passed \| skipped (none declared) |
+| Lint | passed |
+| SonarCloud | ran \| skipped (sonar CLI unavailable) \| skipped (project not configured) |
+<!-- /quality-status -->
+
 ### Code Review
-Status: passed
 Spec: 1 finding (worst: P1 AC-3 only partly implemented)
 Standards: 2 findings (worst: P2 data clump)
 | Severity | Found | Fixed | Deferred |
@@ -190,21 +202,7 @@ Standards: 2 findings (worst: P2 data clump)
 | P2 Medium | 1 | 0 | 1 |
 | P3 Low | 3 | 0 | 3 |
 
-### Mutation
-Status: ran | ran (survivors carried forward) | skipped (not configured)
-
-### Build
-Status: passed
-
-### Tests
-Status: passed
-
-### Lint
-Status: passed
-
 ### SonarCloud
-Status: ran | skipped (sonar CLI unavailable) | skipped (project not configured)
-
 | Severity | Found | Fixed | Deferred |
 |----------|:-----:|:-----:|:--------:|
 | Critical | 0 | 0 | 0 |

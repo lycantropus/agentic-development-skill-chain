@@ -1,0 +1,530 @@
+### caps clean at the cap (exit 0)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+### caps default root (exit 0)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+### caps breach docs/PRODUCT.md (exit 1)
+BREACH  docs/PRODUCT.md 31/30 non-blank lines — curate: shrink before sealing
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach docs/ARCHITECTURE.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+BREACH  docs/ARCHITECTURE.md 201/200 lines — curate: shrink before sealing
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach docs/GUIDELINES.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach docs/security-baseline.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+BREACH  docs/security-baseline.md 61/60 lines — curate: shrink before sealing
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach docs/test-conventions.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+BREACH  docs/test-conventions.md 61/60 lines — curate: shrink before sealing
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach AGENTS.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+BREACH  AGENTS.md 41/40 non-blank lines — curate: shrink before sealing
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach src/feature/agent.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+BREACH  src/feature/agent.md 101/100 lines — curate: shrink before sealing
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps product 31 non-blank (exit 1)
+BREACH  docs/PRODUCT.md 31/30 non-blank lines — curate: shrink before sealing
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps design-system breach (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+BREACH  docs/DESIGN-SYSTEM.md 81/80 lines — curate: shrink before sealing
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps design-system at cap (exit 0)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      docs/DESIGN-SYSTEM.md 80/80 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+### caps second agent.md breach (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+BREACH  src/other/agent.md 101/100 lines — curate: shrink before sealing
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps empty repo warns (exit 0)
+WARN    docs/PRODUCT.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
+WARN    docs/ARCHITECTURE.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
+WARN    AGENTS.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
+✓ curation caps ok
+--- stderr
+### caps empty repo require-baseline (exit 1)
+BREACH  docs/PRODUCT.md missing (required baseline file)
+BREACH  docs/ARCHITECTURE.md missing (required baseline file)
+BREACH  AGENTS.md missing (required baseline file)
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps missing product warns (exit 0)
+WARN    docs/PRODUCT.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+### caps missing product require-baseline (exit 1)
+BREACH  docs/PRODUCT.md missing (required baseline file)
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### intake sealable (exit 0)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+✓ intake baseline is sealable — commit it: docs: intake baseline — initial curated docs
+--- stderr
+### intake default root (exit 0)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+✓ intake baseline is sealable — commit it: docs: intake baseline — initial curated docs
+--- stderr
+### intake missing docs/PRODUCT.md (exit 1)
+MISSING docs/PRODUCT.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+BREACH  docs/PRODUCT.md missing (required baseline file)
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake missing docs/ARCHITECTURE.md (exit 1)
+OK      docs/PRODUCT.md exists
+MISSING docs/ARCHITECTURE.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+BREACH  docs/ARCHITECTURE.md missing (required baseline file)
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake missing docs/GUIDELINES.md (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+MISSING docs/GUIDELINES.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake missing docs/security-baseline.md (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+MISSING docs/security-baseline.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake missing docs/test-conventions.md (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+MISSING docs/test-conventions.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake missing AGENTS.md (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+MISSING AGENTS.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+BREACH  AGENTS.md missing (required baseline file)
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake marker [extracted: src/a.ts] (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+MARKERS residual provenance markers found — resolve them via interview + checkpoint, then strip:
+          docs/GUIDELINES.md:121:[extracted: src/a.ts]
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake marker [assumed] (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+MARKERS residual provenance markers found — resolve them via interview + checkpoint, then strip:
+          docs/GUIDELINES.md:121:[assumed]
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake marker [gap: who owns this] (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+MARKERS residual provenance markers found — resolve them via interview + checkpoint, then strip:
+          docs/GUIDELINES.md:121:[gap: who owns this]
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake no decisions file (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+MISSING specs/intake/decisions.md with D-BOOTSTRAP-<NN> entries — no evidence of the interview/checkpoint reconcile
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake decisions without D-BOOTSTRAP (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+MISSING specs/intake/decisions.md with D-BOOTSTRAP-<NN> entries — no evidence of the interview/checkpoint reconcile
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake components without design system (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+MISSING docs/DESIGN-SYSTEM.md — components exist under src/ but docs/DESIGN-SYSTEM.md was not drafted
+MISSING docs/components.md — components exist under src/ but docs/components.md was not drafted
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake components documented (exit 0)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md exists
+OK      docs/components.md exists
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      docs/DESIGN-SYSTEM.md 1/80 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+✓ intake baseline is sealable — commit it: docs: intake baseline — initial curated docs
+--- stderr
+### intake feature components undocumented (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+MISSING docs/DESIGN-SYSTEM.md — components exist under src/ but docs/DESIGN-SYSTEM.md was not drafted
+MISSING docs/components.md — components exist under src/ but docs/components.md was not drafted
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake cap breach (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+BREACH  docs/ARCHITECTURE.md 201/200 lines — curate: shrink before sealing
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### intake everything wrong (exit 1)
+MISSING docs/PRODUCT.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+MISSING AGENTS.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+MARKERS residual provenance markers found — resolve them via interview + checkpoint, then strip:
+          docs/GUIDELINES.md:121:[gap]
+MISSING specs/intake/decisions.md with D-BOOTSTRAP-<NN> entries — no evidence of the interview/checkpoint reconcile
+BREACH  docs/PRODUCT.md missing (required baseline file)
+OK      docs/ARCHITECTURE.md 200/200 lines
+BREACH  AGENTS.md missing (required baseline file)
+BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first

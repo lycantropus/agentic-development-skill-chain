@@ -13,12 +13,11 @@ const inventory = [
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),
   ["cross-review/templates/cross-review-prompt.md.tmpl", "templates/cross-review-prompt.md.tmpl"],
   ["6_qa/scripts/findings.mjs", "scripts/findings.mjs"],
-  ["7_documentation/scripts/curation-caps.sh", "scripts/curation-caps.sh"],
-  ["0b_intake/scripts/intake-seal-check.sh", "scripts/intake-seal-check.sh"],
+  ["7_documentation/scripts/curation.sh", "scripts/curation.sh"],
   ["5_executing/templates/agent-md-entry.md.tmpl", "templates/agent-md-entry.md.tmpl"],
   ...["delivery.sh"].map(name => [`8_delivery/scripts/${name}`, `scripts/${name}`]),
   ["8_delivery/templates/pr-body.md.tmpl", "templates/pr-body.md.tmpl"],
-  ...["wave-gate.sh", "quality-gate-proof.sh", "quality-evidence.mjs", "gen-component-registry.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
+  ...["wave-gate.sh", "quality.mjs", "gen-component-registry.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
 ];
 
 function safePath(root, relative) {

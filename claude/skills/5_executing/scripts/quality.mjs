@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 // Command evidence for the agent-coordinated PROJ gate; no second scheduler.
+//   quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON]
+//   quality.mjs seal PROJ THEME   refuse to seal P5 unless every record is current and progress.md shows its status block
+// The record actions write 5_progress/quality-*.json and refresh the rendered "### Gate Status" block of the
+// "## Quality Gate" section in progress.md; `seal` only reads (exit 0 sealable, 1 not, 64 usage).
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 
-const [proj, theme, action = 'check', kind, ...args] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const [proj, theme, action = 'check', kind, ...args] = argv[0] === 'seal' ? [argv[1], argv[2], 'seal'] : argv;
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const hash = value => createHash('sha256').update(value).digest('hex');
 const base = `specs/PROJ-${proj}-${theme}`;
 const progress = `${base}/5_progress`;
 const configPath = `${base}/3-4_plan/wave-gate-config.json`;
+const progressFile = `${progress}/PROJ-${proj}-progress.md`;
 const evidencePath = key => `${progress}/quality-${encodeURIComponent(key)}.json`;
 const operational = name => name.startsWith(`${progress}/`) || [`${base}/state.json`, `${base}/findings.json`, `${base}/.findings.lock`].includes(name);
 function snapshotFile(name) {
@@ -71,19 +77,84 @@ function canSkip(reason) {
   if (reason === 'sonar CLI unavailable') return !available('sonar') || !available('sonar-scanner');
   return reason === 'project not configured' && !fs.existsSync('sonar-project.properties');
 }
+const STATUS_BEGIN = '<!-- quality-status: rendered by chain quality from 5_progress/quality-*.json, never edit -->', STATUS_END = '<!-- /quality-status -->';
+// The status block is derived from the records alone; a record that is missing, stale or failed reads "pending".
+function statusBlock(config, fingerprint) {
+  const current = key => { try { return valid(key, config, fingerprint); } catch { return null; } };
+  const passed = keys => keys.every(key => current(key)) ? 'passed' : 'pending';
+  const tests = [...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)];
+  const mutation = !config.mutation_cmd ? 'skipped (not configured)' : current('mutation') ? (current('mutation').rc === 0 ? 'ran' : 'ran (survivors carried forward)') : 'pending';
+  const skip = fs.existsSync(evidencePath('sonar-skip')) ? current('sonar-skip') : null;
+  const sonar = skip ? (canSkip(skip.reason) ? `skipped (${skip.reason})` : 'pending') : current('sonar') ? 'ran' : 'pending';
+  const rows = [['Code Review', passed(['review'])], ['Mutation', mutation], ['Build', passed(['build'])], ['Tests', tests.length ? passed(tests) : 'skipped (none declared)'], ['Lint', passed(['lint'])], ['SonarCloud', sonar]];
+  return [STATUS_BEGIN, '### Gate Status', '', '| Check | Status |', '|---|---|', ...rows.map(([name, status]) => `| ${name} | ${status} |`), STATUS_END].join('\n');
+}
+// The "## Quality Gate —" section: from its heading to the next "## " heading. The status block counts only inside it.
+function qualitySection(text) {
+  const heading = /^## Quality Gate —.*$/m.exec(text);
+  if (!heading) return null;
+  const next = /^## /m.exec(text.slice(heading.index + heading[0].length));
+  return { start: heading.index, end: next ? heading.index + heading[0].length + next.index : text.length, headingEnd: heading.index + heading[0].length };
+}
+const STATUS_BLOCK = /<!-- quality-status:[^\n]*-->[\s\S]*?<!-- \/quality-status -->/g;
+function refreshProgress(config, fingerprint) {
+  if (!fs.existsSync(progressFile)) return;
+  const block = statusBlock(config, fingerprint);
+  let text = fs.readFileSync(progressFile, 'utf8');
+  const section = qualitySection(text);
+  if (!section) text = `${text.replace(STATUS_BLOCK, '').replace(/\n*$/, '\n')}\n## Quality Gate — PROJ-${proj}\n\n${block}\n`;
+  else {
+    let inner = text.slice(section.start, section.end), seen = false;
+    inner = inner.replace(STATUS_BLOCK, () => seen++ ? '' : block); // first block updated, duplicates dropped
+    if (!seen) inner = inner.replace(/^(## Quality Gate —.*)$/m, (line) => `${line}\n\n${block}`);
+    text = text.slice(0, section.start).replace(STATUS_BLOCK, '') + inner + text.slice(section.end).replace(STATUS_BLOCK, '');
+  }
+  fs.writeFileSync(progressFile, text);
+}
+// Same rules as env-local.sh (sourced by every other gate): .env.local fills only unset variables, quotes stripped once per side.
+function loadEnvLocal() {
+  if (!fs.existsSync('.env.local')) return;
+  for (const line of fs.readFileSync('.env.local', 'utf8').split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('='), key = eq < 0 ? line : line.slice(0, eq);
+    const value = (eq < 0 ? line : line.slice(eq + 1)).replace(/"$/, '').replace(/^"/, '').replace(/'$/, '').replace(/^'/, '');
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) && !process.env[key]) process.env[key] = value;
+  }
+}
+function verifyAll(config, fingerprint) {
+  for (const key of ['build', 'lint', 'review', ...(config.mutation_cmd ? ['mutation'] : []), ...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)]) valid(key, config, fingerprint);
+  if (fs.existsSync(evidencePath('sonar-skip'))) {
+    const skip = valid('sonar-skip', config, fingerprint);
+    if (!canSkip(skip.reason)) throw new Error('Sonar skip no longer valid');
+  } else valid('sonar', config, fingerprint);
+}
 function main() {
-  if (!proj || !theme || !/^[\w-]+$/.test(proj) || !/^[\w-]+$/.test(theme)) throw new Error('Usage: quality-evidence.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON]');
+  if (action === 'seal' && (!proj || !theme)) { console.error('Usage: quality.mjs seal PROJ THEME'); process.exit(64); }
+  if (!proj || !theme || !/^[\w-]+$/.test(proj) || !/^[\w-]+$/.test(theme)) throw new Error('Usage: quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON] | seal PROJ THEME');
   if (fs.realpathSync('.') !== fs.realpathSync(git('rev-parse', '--show-toplevel'))) throw new Error('run from the worktree root');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  if (action === 'seal') loadEnvLocal(); // the fingerprint hashes the environment the commands ran in
   const fingerprint = inputs();
+  if (!['snapshot', 'record-build', 'seal'].includes(action)) {
+    act(config, fingerprint); // a failed action leaves the block alone, so a wrong environment cannot overwrite a green report
+    refreshProgress(config, fingerprint);
+  } else act(config, fingerprint);
+}
+function act(config, fingerprint) {
   if (action === 'snapshot') { console.log(fingerprint); return; }
   if (action === 'check') {
-    for (const key of ['build', 'lint', 'review', ...(config.mutation_cmd ? ['mutation'] : []), ...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)]) valid(key, config, fingerprint);
-    if (fs.existsSync(evidencePath('sonar-skip'))) {
-      const skip = valid('sonar-skip', config, fingerprint);
-      if (!canSkip(skip.reason)) throw new Error('Sonar skip no longer valid');
-    } else valid('sonar', config, fingerprint);
+    verifyAll(config, fingerprint);
     console.log('✓ PROJ command evidence matches current inputs, commands, logs and artifacts'); return;
+  }
+  if (action === 'seal') {
+    verifyAll(config, fingerprint);
+    if (!fs.existsSync(progressFile)) throw new Error(`progress file missing: ${progressFile}`);
+    const text = fs.readFileSync(progressFile, 'utf8'), section = qualitySection(text);
+    if (!section) throw new Error('Quality Gate section missing in the progress file');
+    // exactly one block in the whole file, inside the section, identical to the one derived from the records
+    const blocks = text.match(STATUS_BLOCK) ?? [];
+    if (blocks.length !== 1 || !text.slice(section.start, section.end).includes(blocks[0]) || blocks[0] !== statusBlock(config, fingerprint)) throw new Error('Quality Gate status block missing, duplicated, outside the section or edited — run `chain quality <X> <theme> check` to render it');
+    console.log('✓ Quality Gate proof present (code review, build, Sonar disposition)'); return;
   }
   if (action === 'review' || action === 'skip-sonar') {
     const key = action === 'review' ? 'review' : 'sonar-skip';
@@ -151,4 +222,4 @@ function main() {
   if (key === 'sonar') fs.rmSync(evidencePath('sonar-skip'), { force: true });
   console.log(`✓ ${key}: ${log}`);
 }
-try { main(); } catch (error) { console.error(`quality evidence: ${error.message}`); process.exitCode = 1; }
+try { main(); } catch (error) { console.error(`quality: ${error.message}`); process.exitCode = 1; }

@@ -774,7 +774,7 @@ debt section in the PR — not mid-run.
    Codex passes. Review focus: factual accuracy, stale claims,
    cap-gaming. Critical/High findings BLOCK P7 completion
    (fix + one re-review round); Medium/Low → debt per §8. The size
-   caps (`curation-caps.sh`) check form; this step checks truth.
+   caps (`curation.sh caps`) check form; this step checks truth.
 4. Commit everything to the PROJ branch → docs are part of the PR
 
 ### P8 — Delivery (new)
@@ -1229,7 +1229,7 @@ response.
 | `review-with-claude.sh` (cross-review) | rendered prompt + limits | normalized Claude JSON lines | invokes OAuth-preserving isolated `claude -p` read-only with validated JSON Schema; rejects structured API/auth errors; detects the 10 MB stdin ceiling; timeout/cancel as one process group |
 | `review-with-codex.sh` (cross-review) | rendered prompt + limits | normalized Codex JSON lines | invokes `codex exec` read-only; validates output; timeout/cancel as one process group |
 | `findings.mjs harvest` (quality) | repo tree | `ponytail:` markers as ledger records (status `deferred`) | grep-based; links marker → file/line; idempotent |
-| `curation-caps.sh` (7_documentation) | `docs/*`, `src/**/agent.md` | cap report | exit ≠ 0 on any cap breach (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM 80 lines, agent.md 100 lines) — curation must shrink before P7 completes |
+| `curation.sh caps` (7_documentation) | `docs/*`, `src/**/agent.md` | cap report | exit ≠ 0 on any cap breach (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM 80 lines, agent.md 100 lines) — curation must shrink before P7 completes |
 | `delivery.sh probe` (8_delivery) | PROJ branch, `main` | conflict report (JSON: none/trivial/semantic per file) | throwaway worktree, `merge --no-commit`; never touches real branches; classification by file type heuristics |
 | `render.mjs pr` (5_executing) | state.json + findings.json + template | PR body markdown | pure render, no side effects |
 | `delivery.sh poll` (8_delivery) | PR number | check status JSON; failed-check logs verbatim | wraps `gh pr checks --watch`; timeout from config; exit ≠ 0 after timeout |

@@ -6,8 +6,6 @@
 #                        tier matrix over the file contents (frontend vs backend
 #                        scoping, reviewer minimal, micro-fixer/explore no file),
 #                        never-inject (no PRD/progress.md content in any file)
-#   curation caps      — pass + per-cap fail fixtures, --require-baseline
-#   ponytail gate      — parity ok / version mismatch / absent (enforce on+off)
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
 #                        (opposite provider, six-persona parity, auth preflight,
 #                        structured output, ledger attribution, protocol controls,
@@ -80,8 +78,7 @@ printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · 
 
 for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/plan.mjs \
          5_executing/scripts/ponytail-check.sh \
-         6_qa/scripts/findings.mjs 7_documentation/scripts/curation-caps.sh \
-         0b_intake/scripts/intake-seal-check.sh \
+         6_qa/scripts/findings.mjs 7_documentation/scripts/curation.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh; do
   cp "$SKILLS/$s" scripts/
@@ -139,55 +136,6 @@ has() { grep -qF -- "## $2" "$1" 2>/dev/null; }
   && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
 grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
   || ok "never-inject holds: no PRD/progress.md content in any worker file"
-
-# =============================================================================
-step "curation caps + intake seal"
-# =============================================================================
-bash scripts/chain check caps . >/dev/null 2>&1 && ok "caps pass on the clean baseline" || bad "caps failed on clean baseline"
-CAPS_OK=1
-seq 1 31 > docs/PRODUCT.md;      bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/PRODUCT.md
-seq 1 201 > docs/ARCHITECTURE.md; bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/ARCHITECTURE.md
-seq 1 101 > src/feature/agent.md; bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; rm src/feature/agent.md
-seq 1 41 > AGENTS.md;             bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q AGENTS.md
-[ "$CAPS_OK" -eq 1 ] && ok "each cap breach fails (PRODUCT 31, ARCHITECTURE 201, agent.md 101, AGENTS.md 41)" || bad "a cap breach passed"
-bash scripts/chain check intake . >/dev/null 2>&1 && ok "intake seal check passes on the clean baseline" || bad "seal check failed clean"
-echo 'claim [assumed]' >> docs/GUIDELINES.md
-bash scripts/chain check intake . >/dev/null 2>&1 && bad "seal check missed a residual provenance marker" || ok "seal check fails on residual provenance markers"
-git checkout -q docs/GUIDELINES.md
-mv specs/intake/decisions.md specs/intake/decisions.md.bak
-bash scripts/chain check intake . >/dev/null 2>&1 && bad "seal check missed missing reconcile evidence" || ok "seal check fails without D-BOOTSTRAP reconcile evidence (undiscussed drafts never seal)"
-mv specs/intake/decisions.md.bak specs/intake/decisions.md
-
-# =============================================================================
-step "ponytail parity gate (stubbed registries)"
-# =============================================================================
-PT="$WORK/pt"; mkdir -p "$PT/cache/4.8.4/.codex-plugin" "$PT/cfg"
-echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' > "$PT/claude.json"
-echo '{"version":"4.8.4"}' > "$PT/cache/4.8.4/.codex-plugin/plugin.json"
-printf '[plugins."ponytail@ponytail"]\nenabled = true\n' > "$PT/codex.toml"
-echo '{"defaultMode":"full"}' > "$PT/cfg/config.json"
-ptc() { PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
-        PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-        bash scripts/chain check ponytail "$@"; }
-ptc >/dev/null 2>&1 && ok "parity ok -> exit 0" || bad "parity fixture failed"
-mkdir -p "$PT/cache/4.9.0/.codex-plugin"; echo '{"version":"4.9.0"}' > "$PT/cache/4.9.0/.codex-plugin/plugin.json"
-ptc >/dev/null 2>&1 && bad "version mismatch passed" || ok "version mismatch -> exit 1 (blocks P0)"
-rm -rf "$PT/cache/4.9.0"
-echo '{"version":2,"plugins":{}}' > "$PT/claude.json"
-ptc >/dev/null 2>&1 && bad "absent plugin passed with enforce on" || ok "absent plugin + enforce -> exit 1"
-PONYTAIL_ENFORCE=0 ptc --json 2>/dev/null | jq -e '.enforced == false and .parity_ok == false' >/dev/null \
-  && PONYTAIL_ENFORCE=0 ptc >/dev/null 2>&1 \
-  && ok "PONYTAIL_ENFORCE=0: exit 0 but recorded enforced:false (loud escape hatch)" \
-  || bad "enforce-off path wrong"
-echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' > "$PT/claude.json"
-echo '{"defaultMode":"off"}' > "$PT/cfg/config.json"
-ptc >/dev/null 2>&1 && bad "mode 'off' passed the gate" || ok "mode 'off' -> exit 1 (ladder disabled is a failed gate, not parity)"
-echo '{"defaultMode":"full"}' > "$PT/cfg/config.json"
-PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
-  PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-  PONYTAIL_SUBAGENT_MATCHER='implementer|frontend-implementer|backend-implementer|micro-fixer' bash scripts/chain check ponytail >/dev/null 2>&1 \
-  && bad "scoped ladder matcher passed the gate" \
-  || ok "scoped ladder matcher -> exit 1 (generic implementation fallback would be missed)"
 
 # =============================================================================
 step "cross-review mechanics (PATH-shimmed CLIs, deterministic)"

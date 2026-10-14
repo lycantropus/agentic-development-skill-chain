@@ -15,8 +15,8 @@ Every script belongs to exactly one kind. Only Records write state; Renderers wr
 
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
-| **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality-evidence.mjs |
-| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality-gate-proof.sh · `chain check plan` → plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` → curation-caps.sh · `chain check intake` → intake-seal-check.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
+| **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality.mjs |
+| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check plan` → plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
 | **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` and `chain render slice` → plan.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
@@ -36,7 +36,7 @@ The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P
 | **P5** wave start | git tag `wave-N-start-PROJ-X`, `chain render context compile <X> <theme> --wave N` | the wave plan, `progress.md` | `context/workers/wave-N/*.md` |
 | **P5** worker | reads its one file; `chain worktree with-shared-lock -- <cmd>` for migrations and auth commands | its worker file | code and tests |
 | **P5** wave gate | `chain gate wave --ac-only N`, then `chain gate wave N`, then `chain state set … .waves` | code, `wave-gate-config.json` | `ralph-wave-N.json`, the `### Wave N Gate — PASSED` block in `progress.md` |
-| **P5** quality gate | `chain quality <X> <theme> run build\|coverage\|sonar\|lint`, `chain quality <X> <theme> review <report>`, `chain quality seal` | build, tests, Sonar, the integration review | `5_progress/quality-*.json`, the `## Quality Gate` section in `progress.md`, then `chain state transition … P5 done` |
+| **P5** quality gate | `chain quality <X> <theme> run build\|coverage\|sonar\|lint`, `chain quality <X> <theme> review <report>`, `chain quality seal` | build, tests, Sonar, the integration review | `5_progress/quality-*.json`, the rendered `### Gate Status` block of the `## Quality Gate` section in `progress.md`, then `chain state transition … P5 done` |
 | **P6** — QA | `chain review qa`, `chain findings add` | the diff `BASE_SHA..HEAD`, PRDs, architecture | `findings.json`; the runner stores the finder's text report |
 | **P7** — documentation | `chain check caps`, `chain review docs`, `chain state set … .authorship` | `docs/*`, `AGENTS.md`, the QA report | `docs/*` |
 | **P8** — delivery | `chain check conflicts`, `chain findings harvest`, `chain findings auto-defer`, `chain findings stats`, `chain render pr`, `chain check ci`, `chain worktree cleanup` | `state.json`, `findings.json` | the PR body (rendered), `.pr` in `state.json`, the removed worktree |
@@ -80,7 +80,7 @@ The role comes from the `Agent Type` column of the wave plan. Micro-fixer and ex
 |---|---|---|
 | `specs/PROJ-X-theme/state.json` — phase, status, worktree, preflight, cross-review rounds, PR | `chain state` (schema-checked, illegal phase transitions refused) | hand edits, raw `jq` writes |
 | `specs/PROJ-X-theme/findings.json` — the findings ledger | `chain findings` (deduplicates, normalizes severity) | hand edits, raw `jq` writes |
-| `specs/PROJ-X-theme/5_progress/quality-*.json` — command evidence of the quality gate | `chain quality` (records command, commit, input fingerprint, exit result, log hash) | fabricated evidence |
+| `specs/PROJ-X-theme/5_progress/quality-*.json` — command evidence of the quality gate | `chain quality` (records command, commit, input fingerprint, exit result, log hash; renders the status block that `chain quality seal` compares with the records) | fabricated evidence |
 
 Reports and the PR body are rendered from these files by `chain render report` and `chain render pr`, never written or edited by hand. The reading side is free: any skill may read the three files.
 

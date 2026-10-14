@@ -620,7 +620,7 @@ BUILD_LOG="${BASE}/5_progress/build-wave-${WAVE}-attempt-${attempt}.log"
 CR_STDERR="${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}.stderr.log"
 # Only the commands overlap; the coordinator checks results and writes the ledger.
 # Without --foreground, timeout contains each command's children in its own group.
-BUILD_INPUTS=$(node "$SCRIPT_DIR/quality-evidence.mjs" "$PROJ" "$THEME" snapshot)
+BUILD_INPUTS=$(node "$SCRIPT_DIR/quality.mjs" "$PROJ" "$THEME" snapshot)
 started=$(date +%s)
 timeout --kill-after=5s "$BUILD_TIMEOUT" bash -c "$BUILD_CMD" >"$BUILD_LOG" 2>&1 & BUILD_PID=$!
 timeout --kill-after=5s "$CODERABBIT_TIMEOUT" coderabbit review --agent --base-commit "$WAVE_BASE" >"$CR_RAW" 2>"$CR_STDERR" & CR_PID=$!
@@ -631,7 +631,7 @@ echo "   Build exit ${BUILD_RC}; CodeRabbit exit ${CR_RC}; parallel phase $(( $(
 assert_verified_head; assert_clean_worktree
 [[ "$BUILD_RC" -ne 124 ]] || fail "build timed out (log: $BUILD_LOG)"
 [[ "$BUILD_RC" -eq 0 ]] || { cat "$BUILD_LOG" >&2; fail "build failed with exit ${BUILD_RC} (log: $BUILD_LOG)"; }
-node "$SCRIPT_DIR/quality-evidence.mjs" "$PROJ" "$THEME" record-build "$BUILD_LOG" "$VERIFIED_HEAD" "$BUILD_INPUTS"
+node "$SCRIPT_DIR/quality.mjs" "$PROJ" "$THEME" record-build "$BUILD_LOG" "$VERIFIED_HEAD" "$BUILD_INPUTS"
 : >"$CR_NORMALIZED"
 if ! jq -c 'select(.type=="finding") | {source:"coderabbit",severity:((.severity // null)|if type=="string" then ascii_downcase | if .=="blocker" then "critical" elif .=="major" then "high" elif .=="minor" or .=="trivial" or .=="info" then "low" elif .=="moderate" then "medium" else . end else . end),category:(.category // null),summary:((.codegenInstructions // null)|if type=="string" then gsub("^(\\*\\*)?🤖?[[:space:]]*Prompt for AI Agents:?\\*\\*?[[:space:]]*";"") | sub("^Verify each finding against the latest code and only fix it if needed\\.[[:space:]]*";"") else . end),file:(.fileName // null),line:(.line // .startLine // null),anchor:(.anchor // null)}' "$CR_RAW" >"$CR_NORMALIZED"; then
   if [[ "$CR_RC" -eq 124 ]]; then

@@ -194,8 +194,23 @@ Updated after every task, after the initial wave verification and each recovery 
 
 ## Quality Gate — PROJ-X
 
+<!-- quality-status: rendered by chain quality from 5_progress/quality-*.json, never edit -->
+### Gate Status
+
+| Check | Status |
+|---|---|
+| Code Review | pending |
+| Mutation | pending |
+| Build | pending |
+| Tests | pending |
+| Lint | pending |
+| SonarCloud | pending |
+<!-- /quality-status -->
+
+Each `chain quality` action re-renders the block above from the `5_progress/quality-*.json` records (`passed`, `ran`,
+`ran (survivors carried forward)`, `skipped (…)` or `pending`). Never edit it; write only the findings below.
+
 ### Code Review
-Status: pending | passed
 Spec: <findings, worst> — vs PRD/AC/plan
 Standards: <findings, worst> — vs AGENTS.md/conventions
 | Severity | Found | Fixed | Deferred |
@@ -206,24 +221,11 @@ Standards: <findings, worst> — vs AGENTS.md/conventions
 | P3 Low | 0 | 0 | 0 |
 
 ### SonarCloud (once per PROJ, via top-level `sonar_cmd`)
-Status: pending | ran | skipped (sonar CLI unavailable) | skipped (project not configured)
 | Severity | Found | Fixed | Deferred |
 |----------|:-----:|:-----:|:--------:|
 | Critical/Major | 0 | 0 | 0 |
 | Minor | 0 | 0 | 0 |
 | Info | 0 | 0 | 0 |
-
-### Mutation (once per PROJ, via top-level `mutation_cmd`)
-Status: pending | ran | ran (survivors carried forward) | skipped (not configured)
-
-### Build
-Status: pending | passed
-
-### Tests
-Status: pending | passed
-
-### Lint
-Status: pending | passed
 
 ### Fixed Issues
 - [severity]: `file:line` — [issue] → fixed in [commit]
@@ -637,7 +639,7 @@ command -v sonar >/dev/null && command -v sonar-scanner >/dev/null
 ```
 
 - If both CLIs are available, run the Sonar quality-gate stream using the `sonar-cli` skill guidance, executing the top-level `sonar_cmd` from `wave-gate-config.json` as the analysis command.
-- If either CLI is missing, skip Sonar and record `SonarCloud: skipped (sonar CLI unavailable)` in `progress.md`.
+- If either CLI is missing, skip Sonar with `chain quality <X> <theme> skip-sonar 'sonar CLI unavailable'`; the status block then reads `skipped (sonar CLI unavailable)`.
 
 ```
 Create an agent team for Quality Gate of PROJ-X.
@@ -662,10 +664,10 @@ consolidates reviewer, build, integration/quality-phase, and Sonar results. Do n
 - `build_cmd` from `wave-gate-config.json` passes once for the assembled PROJ
 - Every `quality` phase command passes once; CI/nightly workflow wiring is verified
 - If Sonar ran: zero BLOCKER/CRITICAL/MAJOR sonar issues, or every remaining one is documented as carried-forward after the 3-round fix loop (carried-forward Sonar issues do not block this gate)
-- If Sonar was skipped because CLIs or project config were unavailable: the skip reason is logged in `progress.md`
+- If Sonar was skipped because CLIs or project config were unavailable: the skip is recorded with `skip-sonar` and shows in the status block
 - Declared integration/quality-phase tests passing, no new lint errors
 
-Update `progress.md` with Quality Gate results.
+Write the findings (tables, Fixed, Deferred, Carried Forward) under the Quality Gate section of `progress.md`; `chain quality` renders its `### Gate Status` block.
 
 ## 10. Handoff to Skill 6 (QA)
 
@@ -681,9 +683,10 @@ driver: then follow `references/in-session-driver.md` (it runs QA as a read-only
 
 Before Skill 6 (interactive runs):
 
-1. Run `bash scripts/chain quality seal <X> <theme>`; it rejects a missing
-   section, build evidence, or Sonar disposition, and rejects a Sonar skip when
-   the configured scanner was available.
+1. Run `bash scripts/chain quality seal <X> <theme>`; it rejects missing
+   or stale build, test, lint, review, mutation and Sonar evidence, a status block
+   that does not match the records, and a Sonar skip when the configured scanner
+   was available.
 2. Hand off with a context flush: wave plans, agent chatter, Ralph recovery evidence and Quality-Gate output are all on disk in `progress.md`. Tell the user to run `/compact` (or open a fresh session, ideally on a different model than the one that implemented — GPT reviewing Claude-built work or vice versa) and then `/6_qa`, and end the turn. A model cannot compact its own context. Skill 6 follows its own release gate and hands passing or Medium/Low-only work directly to Skill 7.
 
 **Do NOT skip Skill 6.** Step 5 deliberately performs no duplicate QA stage; the persona review and PROJ retrospectives produce `AGENTS.md` candidates and `## PROJ Retrospective` notes that Skill 7 consumes.

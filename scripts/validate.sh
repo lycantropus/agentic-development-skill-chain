@@ -108,15 +108,13 @@ check_identical "$ROOT/runner/prompts/p6-controller.md" "$ROOT/claude/skills/5_e
 check_identical "$ROOT/claude/skills/5_executing/references/in-session-driver.md" "$ROOT/codex/skills/5_executing/references/in-session-driver.md"
 check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/skills/5_executing/scripts/state.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
-check_identical "$ROOT/claude/skills/7_documentation/scripts/curation-caps.sh" \
-  "$ROOT/codex/skills/7_documentation/scripts/curation-caps.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
   "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 # Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
-for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
+for dup in 0b_intake/scripts/curation-caps.sh 7_documentation/scripts/curation-caps.sh 0b_intake/scripts/intake-seal-check.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
          5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/story-slice.mjs 5_executing/scripts/compile-context-bundles.mjs \
          8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh \
-         6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh; do
+         6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh 5_executing/scripts/quality-evidence.mjs 5_executing/scripts/quality-gate-proof.sh; do
   for platform in claude codex; do
     [ ! -e "$ROOT/$platform/skills/$dup" ] || fail "duplicate helper copy must stay deleted: $platform/skills/$dup"
   done
@@ -154,11 +152,11 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
          5_executing/manifests/roles/micro-fixer.md 5_executing/manifests/roles/implementer.md \
          5_executing/manifests/roles/frontend-implementer.md 5_executing/manifests/roles/backend-implementer.md \
          5_executing/manifests/roles/reviewer.md 5_executing/manifests/roles/explore.md \
-         0b_intake/scripts/intake-seal-check.sh \
+         7_documentation/scripts/curation.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh cross-review/templates/cross-review-prompt.md.tmpl \
          5_executing/templates/agent-md-entry.md.tmpl \
-         5_executing/scripts/gen-component-registry.mjs 5_executing/scripts/quality-gate-proof.sh 5_executing/scripts/quality-evidence.mjs \
+         5_executing/scripts/gen-component-registry.mjs 5_executing/scripts/quality.mjs \
          6_qa/scripts/findings.mjs \
          8_delivery/scripts/delivery.sh 5_executing/scripts/render.mjs \
          5_executing/templates/morning-report.md.tmpl 5_executing/templates/stop-report.md.tmpl \
@@ -194,6 +192,8 @@ harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"
 harness chain-refs          node "$ROOT/scripts/check-chain-refs.mjs"
 harness chain-refs-test     bash "$ROOT/scripts/test-chain-refs.sh"
 harness delivery            bash "$ROOT/scripts/test-delivery.sh"
+harness curation            bash "$ROOT/scripts/test-curation.sh"
+harness ponytail-check      bash "$ROOT/scripts/test-ponytail-check.sh"
 harness render              bash "$ROOT/scripts/test-render.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
@@ -207,7 +207,7 @@ harness migration-drift     bash "$ROOT/scripts/test-migration-drift-check.sh"
 harness worktree            bash "$ROOT/scripts/test-worktree.sh"
 harness shared-lock         bash "$ROOT/scripts/test-shared-lock.sh"
 harness wave-gate           bash "$ROOT/scripts/test-wave-gate.sh"
-harness quality-evidence    node "$ROOT/scripts/test-quality-evidence.mjs"
+harness quality             node "$ROOT/scripts/test-quality.mjs"
 harness cross-review        bash "$ROOT/scripts/test-cross-review.sh"
 harness review-with-claude  bash "$ROOT/scripts/test-review-with-claude.sh"
 harness component-registry  node "$ROOT/codex/skills/5_executing/scripts/gen-component-registry.mjs" --selftest

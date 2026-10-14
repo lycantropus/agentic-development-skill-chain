@@ -26,15 +26,15 @@ table() {
   cat <<'EOF'
 state||state.sh|Record
 findings||findings.mjs|Record
-quality||quality-evidence.mjs|Record
-quality|seal|quality-gate-proof.sh|Gate
+quality||quality.mjs|Record
+quality|seal|quality.mjs|Gate|seal
 gate|wave|wave-gate.sh|Gate
 check|plan|plan.mjs|Gate|validate
 check|preflight|preflight.sh|Gate
 check|ponytail|ponytail-check.sh|Gate
 check|migrations|migration-drift-check.sh|Gate
-check|caps|curation-caps.sh|Gate
-check|intake|intake-seal-check.sh|Gate
+check|caps|curation.sh|Gate|caps
+check|intake|curation.sh|Gate|seal
 check|conflicts|delivery.sh|Gate|probe
 check|ci|delivery.sh|Gate|poll
 render|context|plan.mjs|Renderer|context
