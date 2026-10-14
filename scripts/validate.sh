@@ -199,6 +199,7 @@ harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
 harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
 harness unattended-handoff  bash "$ROOT/scripts/test-unattended-handoff.sh"
+harness p7-runner-gate      bash "$ROOT/scripts/test-p7-runner-gate.sh"
 harness in-session-driver   bash "$ROOT/scripts/test-in-session-driver.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
 harness findings            bash "$ROOT/scripts/test-findings.sh"
@@ -209,7 +210,9 @@ harness shared-lock         bash "$ROOT/scripts/test-shared-lock.sh"
 harness wave-gate           bash "$ROOT/scripts/test-wave-gate.sh"
 harness quality             node "$ROOT/scripts/test-quality.mjs"
 harness cross-review        bash "$ROOT/scripts/test-cross-review.sh"
+harness cross-review-routing bash "$ROOT/scripts/test-cross-review-routing.sh"
 harness review-with-claude  bash "$ROOT/scripts/test-review-with-claude.sh"
+harness review-with-codex   bash "$ROOT/scripts/test-review-with-codex.sh"
 harness component-registry  node "$ROOT/codex/skills/5_executing/scripts/gen-component-registry.mjs" --selftest
 for i in "${!HARNESS_PIDS[@]}"; do
   if ! wait "${HARNESS_PIDS[$i]}"; then

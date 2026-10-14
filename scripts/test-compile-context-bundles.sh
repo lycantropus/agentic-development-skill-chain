@@ -103,6 +103,10 @@ cat >"$P/3-4_plan/PROJ-1-wave-2-plan.md" <<'PLAN'
 **Scope:** frontend
 PLAN
 
+# PRD and progress.md never reach a worker file
+mkdir -p "$P/2_PRDs" "$P/5_progress"
+printf '# PRD\nNEVER-INJECT-MARKER-PRD full requirement text.\n' >"$P/2_PRDs/PROJ-1-PRD-1.md"
+printf '# Progress\nNEVER-INJECT-MARKER-PROGRESS wave log.\n' >"$P/5_progress/PROJ-1-progress.md"
 cp "$P/3-4_plan/PROJ-1-architecture.md" "$CASE/arch.keep"
 cd "$CASE"
 run() { node "$COMPILE" context "$@" --roles-dir "$SKILL/manifests/roles"; }
@@ -232,6 +236,10 @@ grep -qF 'Decision 1' "$B" && ! grep -qF 'Decision 2' "$B" && grep -qF 'Decision
 snap >"$CASE/full.snap"
 run compile 1 demo --wave all >/dev/null
 snap | cmp - "$CASE/full.snap" || die "rerun is not byte-identical"
+rm -rf "$CTX" .claude/agents/skillchain-*.md
+run compile 1 demo >/dev/null
+snap | cmp - "$CASE/full.snap" || die "a compile from scratch does not reproduce every byte"
+grep -rq 'NEVER-INJECT-MARKER' "$CTX" .claude && die "never-inject violated: PRD or progress.md content in a worker or agent file"
 
 # budget breach and parser error: exit != 0, nothing written or deleted
 cp -r "$SKILL/manifests/roles" "$CASE/tight"

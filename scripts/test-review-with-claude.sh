@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Regression check for the Claude cross-review adapter's --max-turns handling.
+# Claude cross-review adapter: --max-turns handling and protocol controls
+# (dedupe, review-clean plus findings, false-success, error envelope, 10 MB, timeout).
+# --max-turns regression:
 # --json-schema structured output needs at least 2 model turns (reasoning +
 # the schema-validated tool_use finalization); a one-turn cap can cut a real
 # review off as error_max_turns before any finding forms. Confirmed via a
@@ -42,4 +44,37 @@ for bad in 0 abc; do
   fi
 done
 
-echo "review-with-claude max-turns tests passed"
+# Protocol controls: the adapter consumes Claude Code's structured_output
+# envelope and must fail closed on anything that merely looks like a review.
+stub() { printf '#!/usr/bin/env bash\ncat >/dev/null\n%s\n' "$1" >"$CASE/claude"; chmod +x "$CASE/claude"; }
+fails() { local out; ! out="$(run --timeout 10 2>&1)" && grep -q "$1" <<<"$out"; } # rejected, for this reason
+
+stub "echo '{\"is_error\":false,\"structured_output\":{\"findings\":[{\"severity\":\"medium\",\"category\":\"duplicate\",\"file\":\"a.md\",\"line\":2,\"summary\":\"same\"},{\"severity\":\"medium\",\"category\":\"duplicate\",\"file\":\"a.md\",\"line\":2,\"summary\":\"same\"}]}}'"
+OUT="$(run --timeout 10 2>/dev/null)"
+[ "$(printf '%s\n' "$OUT" | grep -c '^{')" -eq 1 ] && printf '%s\n' "$OUT" | jq -e 'select(.provider == "claude")' >/dev/null \
+  || { echo "FAIL: adapter must stamp the provider and deduplicate identical findings" >&2; exit 1; }
+
+stub "echo '{\"is_error\":false,\"structured_output\":{\"findings\":[{\"severity\":\"low\",\"category\":\"review-clean\",\"summary\":\"clean\"},{\"severity\":\"medium\",\"category\":\"contradiction\",\"summary\":\"not clean\"}]}}'"
+fails "appeared together" || { echo "FAIL: adapter accepted review-clean plus a finding" >&2; exit 1; }
+
+stub "echo '{\"is_error\":false,\"result\":\"review-blocked: sandbox failed\",\"structured_output\":{\"findings\":[{\"severity\":\"medium\",\"category\":\"false-success\",\"summary\":\"must not pass\"}]}}'"
+fails "sandbox/infrastructure failure" || { echo "FAIL: adapter accepted infrastructure false-success output" >&2; exit 1; }
+
+stub "echo '{\"is_error\":true,\"terminal_reason\":\"api_error\",\"result\":\"Not logged in\"}'"
+fails "no validated structured findings" || { echo "FAIL: adapter accepted an rc=0 API/auth error envelope" >&2; exit 1; }
+
+truncate -s 10000001 "$CASE/over-limit.md"
+stub "echo unreachable"
+! out="$(bash "$SCRIPT" --prompt "$CASE/over-limit.md" --timeout 10 2>&1)" && grep -q 'stdin is limited to 10 MB' <<<"$out" \
+  || { echo "FAIL: adapter must name the 10 MB stdin ceiling" >&2; exit 1; }
+
+# Timeout kills the whole process group: neither the stub nor its child survives the adapter.
+stub "echo \$\$ >\"$CASE/pids\"; sleep 300 & echo \$! >>\"$CASE/pids\"; wait"
+if run --timeout 3 >/dev/null 2>&1; then echo "FAIL: timed-out adapter exited 0" >&2; exit 1; fi
+sleep 1
+[ "$(wc -l <"$CASE/pids")" -eq 2 ] || { echo "FAIL: the timeout stub did not start" >&2; exit 1; }
+while read -r pid; do
+  ! kill -0 "$pid" 2>/dev/null || { kill "$pid"; echo "FAIL: adapter timeout left process $pid alive" >&2; exit 1; }
+done <"$CASE/pids"
+
+echo "review-with-claude max-turns and protocol tests passed"

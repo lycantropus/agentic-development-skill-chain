@@ -173,7 +173,7 @@ setup are in [docs/installation.md](docs/installation.md).
 ```bash
 ./scripts/validate.sh          # structure, frontmatter, byte-identical helpers, schemas, syntax
 runner/spike-dual-lane.sh      # Stage 1 release gate: live dual lanes, ledger guarantees, stop policy
-runner/spike-stage2.sh         # Stage 2 release gate: worker context files, caps, cross-review, P7 gates
+runner/spike-stage2.sh         # Stage 2 release gate: live Claude/Codex review adapter smoke (makes real CLI calls)
 ```
 
 The validation script checks that the expected skill folders exist in both
