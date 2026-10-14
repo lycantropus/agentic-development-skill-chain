@@ -89,6 +89,11 @@ run_suite() {
   (cd "$hv" && node "$ledger" harvest 1 test .) >/dev/null
   [[ $(jq '[.findings[] | select(.file | startswith("node_modules") or startswith("specs"))] | length' "$hv/specs/PROJ-1-test/findings.json") -eq 0 ]] \
     || fail "$label: harvest of the repo root must still skip node_modules and specs"
+  before=$(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json")
+  mkdir "$hv/huge"; yes 'x ponytail: filler marker text to make the grep output large' | head -c 60000000 >"$hv/huge/big.txt" || true
+  set +e; (cd "$hv" && node "$ledger" harvest 1 test huge) >/dev/null 2>&1; rc=$?; set -e
+  [[ "$rc" -eq 1 ]] || fail "$label: an oversized harvest must fail instead of truncating (got $rc)"
+  [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/findings.json") -eq "$before" ]] || fail "$label: a failed harvest changed the ledger"
   set +e; (cd "$hv" && node "$ledger" harvest 1) >/dev/null 2>&1; rc=$?; set -e
   [[ "$rc" -eq 64 ]] || fail "$label: harvest without a theme returned $rc, expected 64"
 }

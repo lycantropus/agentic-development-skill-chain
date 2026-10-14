@@ -165,7 +165,11 @@ function harvestLines(root) {
   try {
     matches = execFileSync("grep", ["-R", "-n", "-I", "ponytail:", root, "--exclude-dir=.git", "--exclude-dir=node_modules", "--exclude-dir=specs"],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
-  } catch (error) { matches = error.stdout ?? ""; } // grep exits 1 without a match; either way: what it found
+  } catch (error) {
+    // grep exits 1 without a match, 2 on unreadable files: use what it found; but never a truncated scan
+    if (error.code === "ENOBUFS" || error.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") fail("harvest found more than 64 MiB of markers — narrow the search root");
+    matches = error.stdout ?? "";
+  }
   const found = matches.split("\n").map((l) => /^(.+):(\d+):(.*)$/.exec(l)).filter(Boolean);
   if (found.length === 0) { console.log(`findings.mjs: no ponytail: markers under ${root}`); process.exit(0); }
   return found.map(([, file, line, text]) => {
