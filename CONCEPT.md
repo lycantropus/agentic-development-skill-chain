@@ -285,7 +285,7 @@ never run. Only a full-chain PROJ enters P2d/P3 below. Existing generated
   │     (loop over waves) │  dual-model lanes; single-writer rules (§6)
   └───────────┬───────────┘
   ┌───────────▼───────────┐
-  │ P6  QUALITY & QA      │  findings ledger: collect → dedupe → fix
+  │ P6  QA                │  findings ledger: collect → dedupe → fix
   └───────────┬───────────┘
   ┌───────────▼───────────┐
   │ P7  DOCS & CURATION   │  docs + curation of all long-lived files
@@ -312,24 +312,18 @@ telemetry (Ralph iterations, gate failures, fix spawns), statusline
 The baseline below is reached by extraction because code exists. On a NEW
 product there is nothing to extract, so the same `docs/PRODUCT.md` slot is
 reached by decision instead: `0a_product-vision` interviews the product
-owner (what it is, who uses it, what it deliberately is NOT, when it is a
-success, what is fixed) and cuts the product into a numbered PROJ map in
-`specs/product-roadmap.md` — one sentence of user outcome per PROJ, plus
-`Depends on` and `Status`. That map is where PROJ numbers are allocated,
-where `chain-guide` reads the ordering, and where `1_concept` takes
-its scope boundary from. It is NOT injected into context bundles, so it
-costs no token budget; `docs/PRODUCT.md` keeps its 30-line cap.
-
-`0c_bootstrap` follows on a new build: it decides the stack and records it
-in `docs/ARCHITECTURE.md` § Stack — the single source of truth for
-technology, read by every skill that needs a stack fact and never restated
-— runs the real scaffold, verifies `build` and `test` green, and writes
-root `AGENTS.md` plus the `CLAUDE.md` pointer. `3_architecture` inherits
-that table and documents consequences; it never re-opens the choice.
-
-Run exactly one baseline path — `0a` + `0c` for a new build, `0b` for an
-existing codebase. Neither overwrites the other's output: if `docs/PRODUCT.md`
-already exists, both merge and record retirements.
+owner and cuts the product into the numbered PROJ map in
+`specs/product-roadmap.md` — where PROJ numbers are allocated, where
+`chain-guide` reads the order and `1_concept` takes its scope boundary. The
+map is not injected, so it costs no token budget; `docs/PRODUCT.md` keeps its
+cap. `0c_bootstrap` then decides the stack into `docs/ARCHITECTURE.md`
+§ Stack — the single source of truth for technology, inherited by
+`3_architecture`, which never re-opens the choice — runs the real scaffold
+green and writes root `AGENTS.md` plus the `CLAUDE.md` pointer. Run exactly
+one baseline path (`0a` + `0c` for a new build, `0b` for an existing
+codebase); neither overwrites the other's output. Procedures:
+[0a_product-vision/SKILL.md](claude/skills/0a_product-vision/SKILL.md),
+[0c_bootstrap/SKILL.md](claude/skills/0c_bootstrap/SKILL.md).
 
 ### First Run (Bootstrap) — Skill `0b_intake`
 
@@ -342,49 +336,22 @@ which of two inconsistent code conventions is the rule going forward.
 The intake is therefore a collaborative session with the developer,
 not a batch job.
 
-**Step 1 — Scan & draft (automated; spec-miner principle: Arch Hat +
-QA Hat; `gen-component-registry.mjs` for the registry).** Produce first drafts of
-all curated docs, with every statement carrying a provenance marker:
+**Provenance markers** make the two sources visible: the scan drafts all
+eight baseline files with a marker on every statement — `extracted` (with
+file evidence), `assumed` (needs confirmation), `gap` (must be asked) — and
+every detected inconsistency goes into the interview queue, never silently
+decided. The developer interview works the `gap`/`assumed` items and
+inconsistencies point by point through the checkpoint loop (§4; the
+losing pattern becomes a known-debt note, not a rewrite); the sealed
+baseline carries no markers, passes the file caps (§5) and is committed as
+the initial curation baseline. From then on P7 curation owns every update;
+`0b_intake` is re-run only as a deliberate drift audit. Steps, the eight
+files and the near-greenfield variant (thin extraction, the interview
+carries the weight): [0b_intake/SKILL.md](claude/skills/0b_intake/SKILL.md).
 
-- `extracted` — derived from code/README/git history, with evidence
-  (file references)
-- `assumed` — plausible inference that needs developer confirmation
-- `gap` — cannot be derived from code at all; must be asked
-
-**Step 2 — Developer interview (the "together" part).** Work through
-all `gap` and `assumed` items point by point (AskUserQuestion /
-guided conversation), plus every detected **inconsistency**: "the
-codebase handles errors via X in ~60% of cases and Y in ~40% — which
-is the rule going forward?" The answer becomes a GUIDELINES rule; the
-losing pattern becomes a known-debt note, not silently rewritten.
-
-**Step 3 — Reconcile & seal** via the checkpoint subskill loop (decision
-log; generated docs are hypotheses, not truth). Final docs must pass
-the file caps (§5) — the interview output is curated, not dumped.
-
-**Step 4 — Commit** as the initial curation baseline. From here on,
-P7 curation owns all updates; `0b_intake` is re-run only as a
-deliberate drift audit, never automatically.
-
-**Files produced:** `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`
-(+ `docs/architecture/` details), `docs/GUIDELINES.md`,
-`docs/DESIGN-SYSTEM.md` (brownfield: extract tokens from the code; if
-none exist, record a pointer to `1c_frontend-design` instead of
-inventing one), `docs/components.md` (generated from the doc block above each
-component export; the interview supplies the purpose lines no parser
-can extract), the security baseline and test conventions, and an
-initial `AGENTS.md`.
-
-**Near-greenfield variant:** if there is almost no code yet, the
-extraction step is thin and the interview carries the weight — same
-skill, same output files, sourced from the concept/PRDs plus the
-developer's answers.
-
-**Timing:** The bootstrap happens AS EARLY AS POSSIBLE — the codebase is
-still small today, so the intake is correspondingly cheap and the
-validation manageable. From then on the curated docs grow organically
-with every PROJ (P7 curation) instead of having to be reverse-engineered
-against a large codebase later.
+**Timing:** AS EARLY AS POSSIBLE — while the codebase is small the intake
+is cheap; from then on the curated docs grow with every PROJ (P7 curation)
+instead of being reverse-engineered against a large codebase later.
 
 ### Every Subsequent Run
 
@@ -544,33 +511,19 @@ critical: curated docs are injected into
 every future implementer — a wrong statement there poisons every
 subsequent PROJ. Hence BLOCKING, not advisory.
 
-**Mechanics:** `cross-review.sh` renders the review prompt from a
-template (mode + file list), reads `author_provider` from `state.json`,
-and routes to `review-with-codex.sh` or `review-with-claude.sh`. Each
-adapter normalizes its provider output into the same findings JSON-lines
-contract → `findings.mjs`. The Claude route verifies `claude auth status`
-before launch, requests validated structured output, rejects API/auth error
-envelopes even when the CLI exits zero, and reports Claude Code's 10 MB stdin
-ceiling explicitly. For joint artifacts the runner invokes both adapters
-concurrently and deduplicates only after source attribution is preserved. No
-new severity rules: Critical/High block phase completion. Reconcile findings
-of any severity and re-review automatically for up to three rounds, stopping
-early when clean. Then escalate remaining blockers per §8 and report or defer
-Medium/Low as debt. Additional manually requested rounds have no limit.
-
-**Degraded mode (Codex unavailable):** provider-opposite is the PREFERRED
-reviewer, but Claude-authored work may fall back to MODEL-opposite within the
-surviving Claude provider: the STRONGEST Claude model that is not the author's
-(recorded as `author_model` in `state.json`; rank `CLAUDE_MODEL_RANK`, default
-`fable opus sonnet`) via `claude -p --model` — e.g. Fable reviewing Opus-authored
-artifacts, Opus reviewing Fable-authored ones. The reviewer is never weaker than
-the author. The invariant that survives degradation is: the
-gate is never satisfied by the same model that authored the artifact.
-Every degraded review is logged and flagged in the morning report and
-the PR body ("cross-review: model-opposite fallback") — never silent. For
-six-persona QA, evidence may fall back loudly to six same-vendor workers if
-the opposite provider is unavailable (Claude: its strongest model, even the
-author's; Codex: its default), flagged degraded.
+**Mechanics and degraded mode:** `chain review` routes to the provider
+opposite the recorded author, normalizes both providers into one findings
+JSON-lines contract for the ledger, and re-reviews automatically for up to
+three rounds (manual rounds unlimited); Critical/High block the phase, the
+rest is reported or deferred as debt per §8. Provider-opposite is PREFERRED,
+not hard: without Codex, Claude-authored work falls back to the strongest
+Claude model that is not the author's (rank `fable opus sonnet`), flagged
+in the morning report and PR body — the invariant that survives degradation
+is that the gate is never satisfied by the authoring model. Routing, the
+six-persona QA fallback and the output-integrity rules are in
+[cross-review/SKILL.md](claude/skills/cross-review/SKILL.md#routing-and-output-integrity);
+the pinned writer/review models in
+[runner/README.md](runner/README.md#invariants-the-runner-owns).
 
 ### Focused Bug Repair Skill `bugfixing` (optional)
 
@@ -606,81 +559,47 @@ a recorded explanation of why the previous tests missed the defect.
 
 ### Checkpoint Subskill (`5_executing/subskills/checkpoint.md`)
 
-Runs in subagents (prepare → orchestrator dialogue → apply): subagents
-cannot reach the user, so the point-by-point conversation stays with the
-calling orchestrator (executing for CP1, intake for bootstrap, delivery
-for CP2) while the fast path, review package, cascade and seal run in
-spawned contexts.
-
 Checkpoints are not a "looks good? yes/no" question but a structured
-reconcile loop (generalizing the proven pattern from
-`2c_review-reconcile`):
-
-1. **Present:** a compact review package instead of raw artifacts —
-   decision summary (each decision's Summary line), wave overview with rationales, open risks
-   from the pre-mortem.
-2. **Collect feedback in a structured way:** point by point
-   (AskUserQuestion or guided conversation); every point ends with a
-   decision: `adopt` / `change (how)` / `reject (why)` / `defer`.
-3. **Write the decision log:** `specs/PROJ-<X>-<theme>/decisions.md` — every
-   decision with rationale. The P7 curation reads it (decisions with
-   lasting value migrate into ARCHITECTURE.md/ADRs).
-4. **Cascade updates into artifacts:** one change ("drop US-7, cut
-   Wave 2 differently") touches the PROJ architecture + wave plans +
-   wave-gate-config + api-contracts. The skill propagates the change
-   through ALL affected artifacts and then re-runs the plan self-review
-   (the consistency check from Skill 4).
-5. **Seal the approval:** create the minimal `state.json` if it does not
-   yet exist — using the skill-shipped `state.sh` from
-   `5_executing/scripts/` (the identical helper the setup subskill
-   later copies into the repo at P0) — then transition it to `approved` with
-   a decision-log reference. Only this unlocks the phase runner for P0.
-
-The same loop is used in three places:
-- **CP1** (arch + plan): as above — the main application.
-- **Bootstrap checkpoint** (§3): validation of the intake first drafts
-  (PRODUCT/ARCHITECTURE/GUIDELINES) with the same point-by-point
-  pattern.
-- **CP2** (PR): `8_delivery` uses the same reconcile pattern for PR
-  review comments (via `gh`): classify
-  (`fix now` / `debt` / `reject with rationale`), fix spawns, ledger
-  update, push, re-request review. Principle-level feedback
-  ("I never want to see this again") is harvested as an AGENTS.md/
-  GUIDELINES candidate.
+reconcile loop (generalizing the proven `2c_review-reconcile` pattern):
+present a compact review package instead of raw artifacts, walk it point
+by point, close every point as `adopt` / `change (how)` / `reject (why)` /
+`defer` in a durable decision log, cascade each change through ALL affected
+artifacts (architecture, wave plans, gate config, api-contracts) and re-run
+the plan validator, and only then seal — `CP1:approved` in `state.json` is
+the only thing that unlocks P0. A round whose upstream cross-reviews were
+already clean auto-adopts (fast path); anything a human had to judge gets
+the full loop. The work runs in subagents (prepare → apply) while the
+conversation stays with the calling orchestrator, because subagents cannot
+reach the user. The same loop serves three call sites — CP1 (Step 5 lead),
+the bootstrap checkpoint of `0b_intake` (§3) and CP2 in `8_delivery`
+(PR comments classified `fix now` / `debt` / `reject with rationale`;
+principle-level feedback becomes an AGENTS.md/GUIDELINES candidate).
+Procedure and variants:
+[checkpoint.md](claude/skills/5_executing/subskills/checkpoint.md).
 
 ### P0 — Setup (`5_executing/subskills/setup.md`; replaces the FIRST-ACTION block from Skill 5)
 
-Once per PROJ, fully automatic, in one subagent spawned by the executing
-orchestrator (or the runner's P0 lane):
-
-1. From the clean committed CP1 checkout, create or resume the persistent
-   sibling worktree on `proj/PROJ-X` and tag BASE_SHA. The default path is
-   `<parent>/<repo>-proj<X>`; `SKILLCHAIN_WORKTREE_ROOT` overrides its base.
-   Dependencies install reproducibly inside the worktree. `.env.local` is an
-   ignored symlink to the control checkout; development data and hosted-auth
-   budget remain shared and are recorded as such. Migrations and auth-consuming
-   commands serialize through a lock in the common Git directory.
-2. **Check/update the context pack** (context-curator agent): the
-   baseline from `docs/` is the foundation; PROJ-specific additions are
-   the PROJ architecture (compiled implementer view), api-contracts, ground-file
-3. **Generate the ground file** (common-ground principle): surface
-   assumptions about stack/conventions/data model, validate them against
-   the codebase
-4. **Deliver by path, no hook:** the lead (or the runner's lane prompt)
-   names each worker's compiled file in its spawn prompt —
-   `context/workers/wave-N/<US-ID>.md` per story, `context/roles/wave-N/<role>.md`
-   for roles without a story — and the worker reads it first (its report
-   starts with `Brief: <US-ID>`). The compiled file is canonical for both
-   providers.
-5. **Ponytail preflight on all ACTIVE providers:** plugin installed and
-   mode `full` active? Coding-agent matcher scoped so reviewer and
-   explore lanes do not receive it? Version/mode parity checked when
-   both providers are active.
-6. Preflights: check the CLI/tool list from §7 (including both provider
-   auth states, not just `command -v`), plus `.coderabbit.yaml` and
-   permissions.
-7. Extend the CP1-created `state.json` with preflight results, provider
-   lane IDs, artifact ownership, and the next legal phase.
+Once per PROJ, fully automatic, in one subagent spawned by the Step 5 lead
+(or the runner's P0 lane); script-driven with exactly one judgment step, no
+user questions. In order: gate on `CP1:approved` and the plan validator;
+create or resume the persistent sibling worktree on `proj/PROJ-X`, tag
+`BASE_SHA`, install dependencies there (source isolated; `.env.local`, the
+development database and the hosted-auth budget shared and serialized
+through the common lock); sync the framework helpers into the repo;
+permission and CodeRabbit-config preflight; tool + auth preflight of the §7
+list (both provider auth states, Ponytail parity, migration drift — `codex`
+missing sets `degraded`, never silently); verify the verifier with one
+controlled red gate; suggest static-check commands; write the ground file
+(the judgment step: validated assumptions `docs/` does not already state);
+compile the worker files for every wave once — delivered by path in each
+spawn prompt, no hook, canonical for both providers; seal `P0:done` with one
+setup commit. Procedure: [setup.md](claude/skills/5_executing/subskills/setup.md);
+the sequence diagram and the worker-file layout in
+[how-it-works.md](docs/how-it-works.md#p0-one-setup-run); lock diagnosis
+and worker handover in
+[worker-lifecycle.md](claude/skills/5_executing/references/worker-lifecycle.md);
+the guarded post-merge worktree cleanup in
+[8_delivery/SKILL.md](claude/skills/8_delivery/SKILL.md#5-seal-the-autonomous-part).
 
 ### P5 — Execution (= Skill 5, loop per wave)
 
@@ -708,23 +627,25 @@ for each wave N:
   4. Mode 3 only: MERGE GATE — merge story branches into the PROJ
      branch in dependency order; auto-fix trivial conflicts; semantic
      conflicts = planning error → finding into the ledger + escalate
-  5. WAVE GATE (script, extended):
-     – current structured AC commands + declared broad regressions + build
-     – cached AC proof binds ID, command, positive selection, and committed HEAD
-     – CodeRabbit `--agent --base-commit <wave-start>` with attempt-unique raw
-       and normalized evidence; the cumulative open blocking ledger decides
-     – optional `complexity_cmd` / `arch_rules_cmd` static checks after the
-       ACs; NO Sonar — the top-level `sonar_cmd` runs once at the PROJ-end
-       Quality Gate, never per wave
-     – smoke test (agent-browser) for frontend waves
-     → all findings into the ledger; Critical/High block
+  5. WAVE GATE (`chain gate wave`, one script run): current ACs +
+     declared regressions, optional static checks, smoke, build,
+     CodeRabbit — never Sonar; findings → ledger, Critical/High block
   6. green → next wave without stopping
-after the last wave (still P5, Skill 5 step 9):
+after the last wave (still P5):
   PROJ QUALITY GATE on the assembled diff BASE_SHA..HEAD — integration
-  code review (`skillchain-reviewer`), build, optional `mutation_cmd`,
-  coverage, Sonar via the top-level `sonar_cmd` (once per PROJ), quality
-  tests, lint → `chain quality seal` → P5 done
+  code review, build, optional `mutation_cmd`, coverage, Sonar once per
+  PROJ, quality tests, lint → `chain quality seal` → P5 done
 ```
+
+The wave gate certifies the current wave plus its declared regressions —
+not every earlier AC — and structure is judged by tools that fail
+(optional `complexity_cmd` / `arch_rules_cmd`), not by a cleaner agent. The
+checks, their order, evidence reuse and the config keys are defined once in
+the [Wave Completion Gate](claude/skills/5_executing/SKILL.md#wave-completion-gate)
+and the [gate-config contract](claude/skills/4_writing-plans/references/wave-gate-config.md);
+the four recovery stages in
+[Wave-Scoped Outer Ralph](docs/executing-skill.md#wave-scoped-outer-ralph);
+the quality gate in the [Quality Gate reference](claude/skills/5_executing/references/quality-gate.md).
 
 ### P6 — Quality & QA (= Skill 5 steps 9/10 + Skill 6, reorganized around the ledger)
 
@@ -768,27 +689,21 @@ debt section in the PR — not mid-run.
 ### P7 — Docs & Curation (= Skill 7, moved BEFORE the PR)
 
 1. Generate/update documentation (README, PROJECT.md, TECHNICAL.md)
-2. **Curation step (the brownfield core):**
-   - `docs/ARCHITECTURE.md` ← merge surviving decisions from
-     the PROJ architecture into its current-state sections (Stack ·
-     System shape · Data ownership · Invariants), driven by the
-     `Changes baseline` lines — rewrite in place, never a per-PROJ
-     section; document deviations
-     ("planned X, built Y, because …")
-   - `docs/PRODUCT.md` ← new domain terms/scope changes
-   - `docs/GUIDELINES.md` + merge candidates into project-root
-     `AGENTS.md` through the existing approval pipeline
-   - `docs/components.md` ← regenerate (`gen-component-registry.mjs`);
-     curate the purpose lines in the components, never the table
-   - **Curate folder agent.md files:** keep what is confirmed, delete
-     what is outdated, promote what is project-wide
-3. **Cross-model docs review (`cross-review`, §4):** the provider
-   opposite the curation writer reviews the curated delta against the
-   PROJ diff; jointly curated artifacts receive independent Claude and
-   Codex passes. Review focus: factual accuracy, stale claims,
-   cap-gaming. Critical/High findings BLOCK P7 completion
-   (fix + one re-review round); Medium/Low → debt per §8. The size
-   caps (`curation.sh caps`) check form; this step checks truth.
+2. **Curation step (the brownfield core):** the long-lived docs are
+   rewritten in place as current state — surviving decisions merged into
+   `docs/ARCHITECTURE.md` driven by the `Changes baseline` lines (never a
+   per-PROJ section; deviations recorded as "planned X, built Y,
+   because …"), PRODUCT and GUIDELINES updated, AGENTS.md candidates
+   through the approval pipeline, `docs/components.md` regenerated
+   (`chain render registry`, never hand-edited), folder `agent.md` files
+   curated. Procedure:
+   [7_documentation/SKILL.md § 7](claude/skills/7_documentation/SKILL.md#7-curated-context-curation--p7-gates-framework-runs).
+3. **Two gates:** FORM — `chain check caps` (all caps defined once in the
+   header of [curation.sh](claude/skills/7_documentation/scripts/curation.sh))
+   checks size; TRUTH — a `cross-review` of the docs delta against the PROJ
+   diff (§4) checks factual accuracy, stale claims and cap-gaming. Critical/High
+   findings BLOCK P7 (up to three automatic re-review rounds, manual rounds
+   unlimited); Medium/Low → debt per §8.
 4. Commit everything to the PROJ branch → docs are part of the PR
 
 ### P8 — Delivery (new)
@@ -896,22 +811,18 @@ context a role receives.
 
 ### Context Matrix (Tier 1, type-scoped)
 
-| Context | frontend impl. | backend impl. |
-|---|:---:|:---:|
-| PRODUCT.md | ✅ | ✅ |
-| ARCHITECTURE.md (overview) | ✅ | ✅ |
-| PROJ architecture (compiled: the wave's decision and key-flow Summaries) | ✅ | ✅ |
-| GUIDELINES.md | ✅ | ✅ |
-| Minimalism ladder | via the provider's Ponytail plugin adapter (§7); same mode/version on Claude and Codex ||
-| DESIGN-SYSTEM.md rules (+ `components.md` as a mandatory read-by-path reference, inventory not embedded; full-stack `implementer` too) | ✅ | — |
-| api-contracts.md (ONLY contracts of the own US/wave) | as needed | ✅ |
-| Security baseline | — | ✅ |
-| Test conventions | ✅ | ✅ |
-| ground-file.md | ✅ | ✅ |
-| US + ACs + tasks | verbatim story slice of the own wave plan (`plan.mjs slice`), compiled into the story file under `## Deine Story`; never re-typed by the orchestrator ||
-| "what earlier waves built" | short summary by the orchestrator from progress.md ||
-| Folder agent.md | reading protocol (below), never injected ||
-| PRDs, full wave plans, architecture/* | path reference, on demand ||
+What each tier-1 role receives is its manifest's `inject` list — the
+curated docs by role (design system only for frontend and full-stack
+work, the security baseline only where server code is touched), the
+wave's compiled PROJ-architecture view and own-wave contracts, the ground
+file, and the verbatim story slice under `## Deine Story` — enforced by
+the compiler, so the matrix lives in exactly one place:
+[manifests/roles/](claude/skills/5_executing/manifests/roles/); the
+section order of a compiled file in
+[how-it-works.md](docs/how-it-works.md#what-a-worker-file-contains). The
+minimalism ladder comes from the Ponytail plugin (§7), never from the file;
+prior-wave context is a short orchestrator summary; folder `agent.md`
+follows the reading protocol below and is never injected.
 
 **Redundancy rules (overlap costs double):**
 - `ground-file.md` contains ONLY assumptions that are not yet in
@@ -930,12 +841,12 @@ context a role receives.
 - The context compiler counts the role context of every file (the story
   slice is reported, not capped). `compile` and `check` fail if a role
   exceeds its manifest budget (~2–7k tokens) → condense first, then start.
-- File caps (`curation.sh caps`: PRODUCT 30 non-blank lines = "half page",
-  ARCHITECTURE 200 lines, DESIGN-SYSTEM 80, GUIDELINES 120,
-  security-baseline 60, test-conventions 60, each `agent.md` 100) are
-  checked as a hard gate in the P7 curation —
-  otherwise the curated docs grow unnoticed until every session gets
-  more expensive.
+- File caps (PRODUCT.md "half a page" and the per-file line limits, all
+  defined once in the header of
+  [curation.sh](claude/skills/7_documentation/scripts/curation.sh);
+  `chain check caps --help` prints them) are checked as a hard gate in the
+  P7 curation — otherwise the curated docs grow unnoticed until every
+  session gets more expensive.
 
 **Never injected:** whole PRDs, wave plans of other stories,
 progress.md, complete SKILL.md texts (today's biggest waste in
@@ -1025,10 +936,10 @@ main
 - **Parallelism cap: 3 worktrees** (framework.config; adjust via
   telemetry). Waves with more parallel stories are processed in batches
   of 3.
-- **Order per parallel wave:** per-US Ralph runs IN the worktree
-  (cwd = worktree; the code is not merged yet) → merge gate →
-  wave gate (build, CodeRabbit, smoke) ONCE on the merged PROJ
-  branch. Sonar runs once per PROJ at PROJ end, not per wave (§7).
+- **Order per parallel wave:** Outer Ralph stays wave-scoped; in Mode 3
+  it runs per worktree (cwd = worktree, before the code is merged) →
+  merge gate → wave gate ONCE on the merged PROJ branch. Sonar runs once
+  per PROJ at PROJ end, not per wave (§7).
 - Mode 3 uses a semantic **merge gate**: merge in dependency order, fix
   trivial conflicts, escalate semantic ones. Additionally: **union merge of
   the agent.md files**.
@@ -1131,23 +1042,21 @@ progress.md/state.json. Auth is checked too (`gh auth status`,
 - The `.coderabbit.yaml` preflight (exists in Skill 5) remains.
 
 ### Sonar — One Stage, PROJ end only
-- **`sonar_cmd`**: required project-defined local change analysis + secrets
-  scan, run ONCE per PROJ at the PROJ-end Quality Gate — no wave gate runs
-  it (a wave gate certifies ACs, regressions, optional static checks, build,
-  CodeRabbit, and smoke only). It runs from the persistent PROJ worktree and may call
-  `sonar-scanner`, an npm script, or a wrapper. Missing or non-zero execution
-  blocks; there is no hard-coded `command -v sonar` skip. Because it runs
-  once against the whole assembled PROJ diff, it covers every wave's
-  cumulative changes, not just the latest one.
-- **`sonar-scanner`**: the same PROJ-end run also feeds the full quality-gate
-  CLI/API stream (issues, coverage, duplication). Setup/auth/coverage per the
+- **Decision:** the project-defined `sonar_cmd` (the repo's real scan entry
+  point) runs ONCE per PROJ at the PROJ-end Quality Gate, from the
+  persistent PROJ worktree, against the whole assembled diff — so it covers
+  every wave's cumulative changes; no wave gate runs it. The same run feeds
+  the quality-gate CLI/API stream (issues, coverage, duplication) via the
   `sonar-cli` skill.
 - **Environment: SonarQube Cloud, already set up** (org, token, project
-  config present) — the P0 preflight only verifies auth
-  (`sonar auth status`, `SONAR_TOKEN`) instead of doing setup.
-- Skip is allowed only when `sonar`/`sonar-scanner` are unavailable or the
-  project has no Sonar config; any other skip is rejected. The PROJ-end
-  `sonar_cmd` is otherwise mandatory and fails closed.
+  config present) — the P0 preflight only verifies auth instead of doing
+  setup.
+- Skip is allowed only when the Sonar CLIs are unavailable or the project
+  has no Sonar config; `chain quality seal` rejects any other skip, so the
+  gate fails closed wherever the project is Sonar-configured. Survivors of
+  the bounded fix rounds are carried forward to QA, never blocking. Gate
+  order, preflight, rounds and evidence:
+  [quality-gate.md](claude/skills/5_executing/references/quality-gate.md).
 
 ### Claude + Codex CLI Adapters
 - `claude -p` and `codex exec` are first-class phase lanes. The runner
@@ -1163,8 +1072,8 @@ progress.md/state.json. Auth is checked too (`gh auth status`,
   is hard (it hosts the chain). `codex` missing or unauthenticated does
   NOT block: the run enters degraded single-provider mode — Mode 1's
   peer lane and all cross-reviews fall back to the strongest Claude model
-  that is not the author's (rank `fable opus sonnet`, never weaker than the
-  writer), recorded in `state.json` and
+  that is not the author's (rank `fable opus sonnet`; it must differ from the
+  writer's model), recorded in `state.json` and
   flagged in the morning report and PR body.
 
 ### ponytail (ready-made plugin — DECIDED, do not rebuild ourselves)
@@ -1214,8 +1123,7 @@ its skill's `scripts/` directory, every rendered artifact has a
 template inside the skill's `templates/` directory. P0 setup copies
 both into the repo (`scripts/`, `templates/`) and commits them —
 versioned with the repo, testable outside sessions, identical behavior
-on every machine. Skill 5's `scripts/wave-gate.sh` is the existing
-proof of the pattern.
+on every machine. `chain gate wave` is the existing proof of the pattern.
 
 **Schemas:** `state.schema.json` and `findings.schema.json` ship with
 the framework. `state.sh` and `findings.mjs` validate on every write —
@@ -1229,57 +1137,27 @@ normalized findings, not complete model responses that may carry sensitive
 prompt context. The framework does not indiscriminately archive every external
 response.
 
-#### Script specifications
-
-| Script (skill) | Input | Output | Behavior / exit |
-|---|---|---|---|
-| `preflight.sh` (5_executing) | CLI list §7 (embedded), env | report to stdout; state.json `preflight` block | checks `command -v` + auth per tool; exit ≠ 0 on any missing HARD tool (stop condition); skippable tools → logged skip |
-| `plan.mjs context` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, context matrix §5 | one file per story (`workers/wave-N/<US-ID>.md`) and per story-less role (`roles/wave-N/<role>.md`), plus `.claude/agents/skillchain-*.md` | counts the role tokens; exit ≠ 0 on budget breach, an unassignable story or an outdated manifest |
-| `state.sh` (5_executing) | `get <path>` / `set <path> <value>` / `transition <phase> <status>` | state.json (validated) | sole write path to state.json; schema-validates; illegal phase transitions exit ≠ 0 |
-| `worktree.sh` (5_executing) | PROJ id, control checkout, state | persistent PROJ worktree lifecycle | creates/resumes safely; links ignored `.env.local`; installs from lockfile; reports conservative cleanup eligibility |
-| `plan.mjs slice` (5_executing) | wave plan + US ID | that story's `## <US-ID>` section, verbatim, to stdout | ends at the next `## ` heading outside code fences; exit ≠ 0 when the ID is missing or duplicated |
-| `plan.mjs validate` (5_executing) | wave plans + `wave-gate-config.json` | deterministic consistency verdict | validates unique AC mappings, bidirectional test files, broad regressions, auth budget, and protected-route coverage |
-| `wave-gate.sh` (5_executing, exists) | wave N, PROJ, config | gate verdict; PASSED block in progress.md; findings → ledger | runs current ACs + declared regressions, archives CodeRabbit evidence, checks cumulative blocking ledger, manages frontend readiness; red evidence → exit ≠ 0 |
-| `gen-component-registry.mjs` (5_executing) | every outermost `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`, …), recursive, nested `components/` counted once | `docs/components.md`, or `--out <path>` (relative to the caller) when the app root is nested | reads the doc block above each component export; `--check` exits ≠ 0 on a stale registry, a component without a doc block, or a component without its `id="<kebab-name>"` section on the showcase page (wave-gate step 6). The registry is never hand-written — one source, the component file |
-| `findings.mjs` (quality) | non-empty normalized findings JSONL from all sources | deduped, normalized `findings.json`; fix-queue clusters | dedupe key file/anchor/category, adding a stable summary fingerprint when no location exists; idempotent with reopen support; empty stdin fails |
-| `cross-review.sh` (cross-review) | mode, artifact files, `author_provider` + `author_model`, prompt template | provider-attributed findings JSON lines → `findings.mjs` | routes to opposite provider; for Claude-authored work only, unavailable Codex may fall back model-opposite via `claude -p --model` (logged + flagged); joint artifacts launch both adapters concurrently; up to 3 automatic rounds while findings remain; manual rounds have no limit |
-| `review-with-claude.sh` (cross-review) | rendered prompt + limits | normalized Claude JSON lines | invokes OAuth-preserving isolated `claude -p` read-only with validated JSON Schema; rejects structured API/auth errors; detects the 10 MB stdin ceiling; timeout/cancel as one process group |
-| `review-with-codex.sh` (cross-review) | rendered prompt + limits | normalized Codex JSON lines | invokes `codex exec` read-only; validates output; timeout/cancel as one process group |
-| `findings.mjs harvest` (quality) | repo tree | `ponytail:` markers as ledger records (status `deferred`) | grep-based; links marker → file/line; idempotent |
-| `curation.sh caps` (7_documentation) | `docs/*`, `src/**/agent.md` | cap report | exit ≠ 0 on any cap breach (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM 80 lines, agent.md 100 lines) — curation must shrink before P7 completes |
-| `delivery.sh probe` (8_delivery) | PROJ branch, `main` | conflict report (JSON: none/trivial/semantic per file) | throwaway worktree, `merge --no-commit`; never touches real branches; classification by file type heuristics |
-| `render.mjs pr` (5_executing) | state.json + findings.json + template | PR body markdown | pure render, no side effects |
-| `delivery.sh poll` (8_delivery) | PR number | check status JSON; failed-check logs verbatim | wraps `gh pr checks --watch`; timeout from config; exit ≠ 0 after timeout |
-| `run-phase.sh` (framework root) | phase id, PROJ | launches Claude + Codex lane processes concurrently | validates legal transition, assigns writer/reviewer roles, captures provider outputs, waits/cancels as a unit, records lane start/end in state.json |
-| `render.mjs report` (5_executing) | state.json + findings.json of all PROJs in the run + template | `specs/morning-report-<date>.md` | pure render; also emits the one-liner for the push notification |
-
-#### Template inventory
-
-| Template (skill) | Data source | Rendered artifact | When |
-|---|---|---|---|
-| `pr-body.md.tmpl` (8_delivery) | state.json + findings.json | PR description: built scope, gate/QA results, known gaps, debt section, 📚 doc changes | P8 step 3 |
-| `morning-report.md.tmpl` (framework) | state.json + findings.json (all PROJs) | `specs/morning-report-<date>.md` | run end |
-| `stop-report.md.tmpl` (framework) | state.json + verbatim error capture | `specs/PROJ-<X>-<theme>/5_progress/stop-report.md` | on stop condition |
-| `decisions.md.tmpl` (5_executing) | reconcile-loop results | `specs/PROJ-<X>-<theme>/decisions.md` (append per checkpoint) | CP1/bootstrap/CP2 |
-| `progress-blocks.md.tmpl` (5_executing) | state.json | the structured blocks in progress.md (wave gate PASSED, Ralph iterations, QA results) | after each gate/loop |
-| `jira-comment.md.tmpl` (2d_prd-import, Mode B) | state.json + findings.json | status/PR-link/debt comments on tickets | sync-back (TODO) |
-| `agent-md-entry.md.tmpl` (5_executing) | learning (free text) + date + commit SHA | uniform agent.md entry block | on write — the one place where LLM content flows in, but inside a fixed frame |
-| `cross-review-prompt.md.tmpl` (cross-review) | mode + artifact list + author provider | provider-neutral adversarial prompt rendered for either CLI | concept, requirements, architecture, plan, QA, docs |
-
-Free-form LLM text still exists — analysis, findings verification,
-architecture prose, agent.md learnings — but it always lands INSIDE a
-template frame or a schema field, never as an unstructured document of
-its own. The `state.sh` helpers matter most: one tested write path
-instead of dozens of ad-hoc jq calls. Agent definitions themselves stay
-declarative (frontmatter: model, tools); their lifecycle scripting
-lives in hooks, which are scripts anyway (ponytail, wave-gate-enforcer).
+**Inventory:** every script is reached through one dispatcher, `chain
+<verb> [<sub>]`, and belongs to exactly one of five kinds — Record (the only
+writer of one machine file), Gate (exit code + report), Renderer (data →
+document, never writes state), Environment (worktree, helper sync), Review
+(opposite-provider reviewer). `chain --list` prints the current table and
+[how-it-works.md](docs/how-it-works.md#the-five-script-kinds) explains it;
+the templates ship next to their scripts in each skill's `templates/`
+directory. Free-form LLM text still exists — analysis, findings
+verification, architecture prose, agent.md learnings — but it always lands
+INSIDE a template frame or a schema field, never as an unstructured
+document of its own.
 
 ### Findings Ledger (`findings.json`)
-One record per finding: source (coderabbit/sonar/review/qa/merge-gate),
-file/line, category, normalized severity, status
-(open/fixed/deferred/false-positive), fix commit, debt-marker reference.
-The PR body and progress.md are generated FROM this, not maintained by
-hand.
+One record per finding — source, location, category, normalized severity,
+status (`open` / `fixed` / `deferred` / `false-positive`), fix commit,
+debt-marker reference — written only through `chain findings`, which
+deduplicates across sources. The PR body and progress.md are generated FROM
+this, not maintained by hand. Contract:
+[findings.schema.json](runner/schemas/findings.schema.json); the three
+machine files and their single writers in
+[how-it-works.md](docs/how-it-works.md#three-files-three-writers).
 
 ---
 
@@ -1306,43 +1184,39 @@ sequentially).
 ### Stop Behavior ("bad problems")
 
 On a stop condition the run is NOT simply aborted but parked in a
-controlled way:
-
-1. **Secure:** commit all uncommitted changes to a
-   `rescue/PROJ-X-<timestamp>` branch; document open worktrees and dev
-   servers (do not delete — evidence)
-2. **`state.json` → `blocked`** with the exact stop cause
-3. **Write the stop report** (`specs/PROJ-<X>-<theme>/5_progress/stop-report.md`):
-   - What happened (verbatim error output, last 3 attempts)
-   - State: which waves are done, what is half-finished, which
-     branches/worktrees are open
-   - **Cleanup list:** what the human/the next run must clean up
-   - Recommended next action
-4. Retain the persistent PROJ worktree and report its exact path plus the safe
-   P8 resume command. Retention dirties state deliberately, so P8 must reseal,
-   push, and obtain exact-head green CI before guarded cleanup can retry. Only
-   successful P8 may auto-remove the worktree, after final CI is green,
-   upstream equals local HEAD, and the worktree is clean.
-5. If more PROJs are queued and the failure is PROJ-local: start the
-   next PROJ. On environment failures (env/tools): end the whole run.
+controlled way: uncommitted work is secured on a `rescue/PROJ-X-<timestamp>`
+branch, `state.json` goes to `blocked` with the exact cause, and a stop
+report is rendered (what happened verbatim, state when parked, cleanup
+list, recommended next action). Open worktrees and dev servers are
+documented, not deleted — they are evidence; the persistent PROJ worktree
+is retained with its path and the safe P8 resume command, and only a
+successful P8 may remove it after exact-head green CI. If more PROJs are
+queued and the failure is PROJ-local, the next PROJ starts; an environment
+failure (env/tools) ends the whole run. The stop policy is in
+[runner/README.md](runner/README.md#invariants-the-runner-owns), the report
+frame in
+[stop-report.md.tmpl](claude/skills/5_executing/templates/stop-report.md.tmpl),
+the guarded cleanup in
+[8_delivery/SKILL.md](claude/skills/8_delivery/SKILL.md#5-seal-the-autonomous-part).
 
 ### Morning Report
 
-The cross-PROJ report is rendered from `state.json` + `findings.json` by a
-**template script** (`chain render report morning specs`)
-(`specs/morning-report-<date>.md`): per PROJ status, PR link, gate/QA
-summary, deferred debt, known gaps, provider/model degradations
-(cross-review fallbacks), stop reports, cleanup list. It is
-the first thing the human reads in the morning — before the PRs.
+The cross-PROJ report (`specs/morning-report-<date>.md`) is rendered from
+`state.json` + `findings.json` by `chain render report morning specs` —
+per PROJ status, PR link, gate/QA summary, deferred debt, known gaps,
+provider/model degradations, stop reports, cleanup list — and is the first
+thing the human reads in the morning, before the PRs.
 
-**Delivery:** a successful run ends in P8 with the PR open (waiting for
-merge) or the worktree removed; in both cases the runner does NOT render the
-report, because the filesystem must stay clean for post-merge cleanup. It
-prints and best-effort notifies a one-line summary instead (final CI head,
-PR, post-merge rerun command); the durable state is on the retained PROJ
-branch and in the PR body. The morning report file is rendered at run end only
-when neither applies, and otherwise on demand. A stopped run always renders
-its stop report. Notification failure never loses state.
+**Delivery decision:** a successful run ends in P8 with the PR open
+(waiting for merge) or the worktree removed; in both cases the runner does
+NOT render the report, because the filesystem must stay clean for the
+post-merge cleanup. It prints and best-effort notifies a one-line summary
+instead (final CI head, PR, post-merge rerun command); the durable state is
+on the retained PROJ branch and in the PR body. The file is rendered at run
+end only when neither applies, and otherwise on demand. A stopped run always
+renders its stop report; notification failure never loses state. Handoff
+and launch:
+[unattended-handoff.md](claude/skills/5_executing/references/unattended-handoff.md).
 
 ---
 
@@ -1447,8 +1321,8 @@ agent-browser smoke tests.
 | Context pack manifest | schema following the claude-skills frontmatter taxonomy, defined when building the compiler (Stage 2) |
 | Cross-model review | symmetric provider-opposite review via our thin `cross-review`: Claude-authored → Codex, Codex-authored → authenticated isolated Claude with validated structured output, joint → both independently; required for Requirements/P6/P7 and automatic on saved concept/architecture/plan outputs; conservative default input cap, explicit diff omissions and Claude 10 MB stdin failure; any permitted model-opposite fallback is flagged, and same-model review never satisfies the gate; findings → ledger, blocking per §8 |
 | Focused bug repair | `bugfixing` stays outside the feature chain: reproduce first (real browser for UI), trace code cause + test escape, prove a regression test red before the fix, dispatch a micro-fixer, and stop after at most three Ralph repair attempts; CodeRabbit/Sonar are proportional existing gates, not new dependencies |
-| Structure quality | Gate-driven, no "cleaner" agent: a check that fails beats a prompt that dilutes. Optional project-supplied `complexity_cmd` / `arch_rules_cmd` run last in the wave gate's AC pass, before build + CodeRabbit; failures go verbatim through the existing four Outer Ralph stages and the rerun re-proves the ACs. Thresholds live in the tool's config; absent = skipped. When configured, the Quality Gate reviewer and the matching QA personas are told not to re-flag what the tool measures. Per-story checks and trimming `GUIDELINES.md` wait for run data (`Variant Notes`). Contract: `wave-gate-config.md` |
-| Test quality | Optional `mutation_cmd` runs once per PROJ in the Quality Gate, scoped to the feature diff, before coverage and Sonar. Late is safe because survivors only get tests-only fix rounds, which cannot change production code; structure must be early because it compounds. Survivors left after three rounds are carried forward like Sonar's; QA assigns severity |
+| Structure quality | Gate-driven, no "cleaner" agent: a check that fails beats a prompt that dilutes. Optional project-supplied `complexity_cmd` / `arch_rules_cmd` are wave-gate checks whose failures take the Outer Ralph recovery path; thresholds live in the tool's config, absent = skipped, and reviewers do not re-flag what the tool measures. Contract: [wave-gate-config.md](claude/skills/4_writing-plans/references/wave-gate-config.md) |
+| Test quality | Optional `mutation_cmd` runs once per PROJ in the Quality Gate, scoped to the feature diff. Late is safe because survivors only get tests-only fix rounds, which cannot change production code; structure must be early because it compounds. Survivors are carried forward like Sonar's; QA assigns severity. Contract: [quality-gate.md](claude/skills/5_executing/references/quality-gate.md) |
 | P6 QA/fix ownership | Skill 6 is a strictly read-only finder. The P6 phase controller deduplicates and verifies findings, dispatches tier-0 fix lanes, and requires fresh provider-opposite QA re-verification; three failed Critical/High repair attempts trigger the stop policy |
 
 New questions arise during the detailed planning of each stage and are
