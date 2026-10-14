@@ -16,7 +16,7 @@ const inventory = [
   ["7_documentation/scripts/curation-caps.sh", "scripts/curation-caps.sh"],
   ["0b_intake/scripts/intake-seal-check.sh", "scripts/intake-seal-check.sh"],
   ["5_executing/templates/agent-md-entry.md.tmpl", "templates/agent-md-entry.md.tmpl"],
-  ...["conflict-probe.sh", "ci-poll.sh"].map(name => [`8_delivery/scripts/${name}`, `scripts/${name}`]),
+  ...["delivery.sh"].map(name => [`8_delivery/scripts/${name}`, `scripts/${name}`]),
   ["8_delivery/templates/pr-body.md.tmpl", "templates/pr-body.md.tmpl"],
   ...["wave-gate.sh", "quality-gate-proof.sh", "quality-evidence.mjs", "gen-component-registry.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
 ];

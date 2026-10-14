@@ -216,7 +216,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 | `7_documentation/scripts/curation-caps.sh` | `scripts/` |
 | `0b_intake/scripts/intake-seal-check.sh` | `scripts/` |
 | `5_executing/templates/agent-md-entry.md.tmpl` | `templates/` |
-| `8_delivery/scripts/conflict-probe.sh`, `ci-poll.sh` | `scripts/` |
+| `8_delivery/scripts/delivery.sh` | `scripts/` |
 | `8_delivery/templates/pr-body.md.tmpl` | `templates/` |
 | `5_executing/scripts/wave-gate.sh`, `quality-gate-proof.sh`, `quality-evidence.mjs`, `gen-component-registry.mjs` | `scripts/` (as today) |
 

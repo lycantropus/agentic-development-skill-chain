@@ -36,8 +36,8 @@ check|ponytail|ponytail-check.sh|Gate
 check|migrations|migration-drift-check.sh|Gate
 check|caps|curation-caps.sh|Gate
 check|intake|intake-seal-check.sh|Gate
-check|conflicts|conflict-probe.sh|Gate
-check|ci|ci-poll.sh|Gate
+check|conflicts|delivery.sh|Gate|probe
+check|ci|delivery.sh|Gate|poll
 render|context|compile-context-bundles.mjs|Renderer
 render|slice|story-slice.mjs|Renderer
 render|registry|gen-component-registry.mjs|Renderer

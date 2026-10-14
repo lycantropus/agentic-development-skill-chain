@@ -553,7 +553,7 @@ grep -F 'SKILLCHAIN_RUNNER_DIR' "$ROOT/claude/skills/5_executing/scripts/render.
 if grep -F 'git -C "${s.worktree.control_path}" worktree remove' "$ROOT/claude/skills/5_executing/scripts/render.mjs" >/dev/null; then fail "report still recommends raw worktree removal"; fi
 ok "reports render a target-cwd P8 resume through the actual runner path"
 
-CI_POLL="$ROOT/codex/skills/8_delivery/scripts/ci-poll.sh"
+CI_POLL="$ROOT/codex/skills/8_delivery/scripts/delivery.sh"
 ci_bin="$TMP_ROOT/ci-bin"
 mkdir -p "$ci_bin"
 printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$1 $2" = "pr view" ]; then\n  if [[ " $* " = *" --json state "* ]]; then printf "%%s\\n" "${GH_PR_STATE:-MERGED}"; exit 0; fi\n  count=0; [ ! -f "$GH_PR_COUNT" ] || count="$(cat "$GH_PR_COUNT")"\n  count=$((count + 1)); printf "%%s" "$count" >"$GH_PR_COUNT"\n  if [ "$count" -eq 1 ]; then printf "%%s\\n" "$GH_HEAD_FIRST"; else printf "%%s\\n" "$GH_HEAD_SECOND"; fi\nelif [ "$1 $2" = "run list" ]; then\n  cat "$GH_RUNS_FILE"\nelif [ "$1 $2" = "pr checks" ]; then\n  if [[ " $* " = *" --json "* ]]; then printf "%%s\\n" "[]"; else exit 0; fi\nelse\n  exit 9\nfi\n' >"$ci_bin/gh"
@@ -561,9 +561,9 @@ chmod +x "$ci_bin/gh"
 jq -cn '[{databaseId:1,status:"completed",conclusion:"success",name:"ci"}]' >"$TMP_ROOT/gh-runs.json"
 head_a=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 head_b=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-1" GH_HEAD_FIRST="$head_b" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a pre-poll expected-head mismatch"; fi
-if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-2" GH_HEAD_FIRST="$head_a" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a PR-head change during polling"; fi
-cmp "$CI_POLL" "$ROOT/claude/skills/8_delivery/scripts/ci-poll.sh" || fail "ci-poll provider copies differ"
+if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-1" GH_HEAD_FIRST="$head_b" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" poll 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a pre-poll expected-head mismatch"; fi
+if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-2" GH_HEAD_FIRST="$head_a" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" poll 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a PR-head change during polling"; fi
+cmp "$CI_POLL" "$ROOT/claude/skills/8_delivery/scripts/delivery.sh" || fail "delivery.sh provider copies differ"
 ok "final CI polling binds and rechecks the exact expected PR head"
 
 # A third-party check (CodeRabbit, Vercel, ...) has no GitHub Actions run, so
@@ -573,7 +573,7 @@ pending_bin="$TMP_ROOT/ci-bin-pending"
 mkdir -p "$pending_bin"
 printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$1 $2" = "pr view" ]; then\n  printf "%%s\\n" "%s"\nelif [ "$1 $2" = "run list" ]; then\n  cat "$GH_RUNS_FILE"\nelif [ "$1 $2" = "pr checks" ]; then\n  if [[ " $* " = *" --json "* ]]; then printf "%%s\\n" "[{\\"bucket\\":\\"pending\\",\\"name\\":\\"CodeRabbit\\"}]"; else exit 0; fi\nelse\n  exit 9\nfi\n' "$head_a" >"$pending_bin/gh"
 chmod +x "$pending_bin/gh"
-if PATH="$pending_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" bash "$CI_POLL" 1 0 "$head_a" >/dev/null 2>"$TMP_ROOT/ci-poll-pending.out"; then
+if PATH="$pending_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" bash "$CI_POLL" poll 1 0 "$head_a" >/dev/null 2>"$TMP_ROOT/ci-poll-pending.out"; then
   fail "ci-poll declared green while a third-party check was still pending"
 fi
 grep -q "TIMEOUT" "$TMP_ROOT/ci-poll-pending.out" || fail "ci-poll did not report the pending third-party check as the wait reason"
@@ -587,8 +587,9 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 28 psi absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 28 psi)"
 cp "$HELPER" "$wt/scripts/worktree.sh"
-cp "$CI_POLL" "$wt/scripts/ci-poll.sh"
-chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/ci-poll.sh"
+cp "$CI_POLL" "$wt/scripts/delivery.sh"
+cp "$ROOT/codex/skills/5_executing/scripts/chain" "$wt/scripts/chain"
+chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/delivery.sh" "$wt/scripts/chain"
 advance_to_p8_done "$wt" 28 psi
 head="$(git -C "$wt" rev-parse HEAD)"
 resume_out="$TMP_ROOT/p8-resume.out"
