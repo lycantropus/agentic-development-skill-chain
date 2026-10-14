@@ -184,7 +184,7 @@ fi
 # `sonar` (the operator CLI) can exit 0 while running a no-op local scan with
 # no language analyzer installed — it "checks off" every file without ever
 # analyzing it. sonar-scanner is the actual analysis engine; wave-gate.sh's
-# sonar_cmd is mandatory (validate-wave-plan.mjs requires it non-empty), so a
+# sonar_cmd is mandatory (plan.mjs validate requires it non-empty), so a
 # broken scanner/auth setup must stop P0 here instead of surfacing later as a
 # false-green wave gate. sonar_cmd is commonly wrapped (`npm run sonar`), so
 # this checks the real prerequisites (binary + token in the environment) —
@@ -238,7 +238,7 @@ const { execFileSync } = require("child_process");
 const path = "biome.json";
 const raw = fs.readFileSync(path, "utf8");
 const config = JSON.parse(raw);
-const ignored = [".claude/settings.json", "scripts/compile-context-bundles.mjs", "scripts/gen-component-registry.mjs", "scripts/ledger.mjs", "scripts/render-pr-body.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"];
+const ignored = [".claude/settings.json", "scripts/plan.mjs", "scripts/gen-component-registry.mjs", "scripts/findings.mjs", "scripts/render.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"];
 config.files ??= {};
 // Biome 2 removed `files.ignore` in favour of negated patterns in
 // `files.includes`, and rejects the old key outright — writing it makes
@@ -268,7 +268,7 @@ fs.writeFileSync(path, JSON.stringify(config, null, indent) + "\n");
 NODE
   say "✓ Biome ignores merged for framework-owned files"
 elif [ ! -f biome.jsonc ]; then
-  printf '%b\n' '{' '\t"files": {' '\t\t"includes": [' '\t\t\t"**",' '\t\t\t"!.claude/settings.json",' '\t\t\t"!scripts/compile-context-bundles.mjs",' '\t\t\t"!scripts/gen-component-registry.mjs",' '\t\t\t"!scripts/ledger.mjs",' '\t\t\t"!scripts/render-pr-body.mjs"' '\t\t]' '\t}' '}' > biome.json
+  printf '%b\n' '{' '\t"files": {' '\t\t"includes": [' '\t\t\t"**",' '\t\t\t"!.claude/settings.json",' '\t\t\t"!scripts/plan.mjs",' '\t\t\t"!scripts/gen-component-registry.mjs",' '\t\t\t"!scripts/findings.mjs",' '\t\t\t"!scripts/render.mjs"' '\t\t]' '\t}' '}' > biome.json
   say "✓ Biome ignores created for framework-owned files"
 else
   say "⚠ biome.jsonc detected — add framework-owned scripts + .claude/settings.json to files.ignore before the setup commit"
@@ -308,11 +308,11 @@ fi
 
 # --- worker context: compile check once a plan folder exists (HARD) -------
 if [ -d "$BASE/3-4_plan" ] || [ -d "$BASE/6_plan" ]; then
-  if COMPILER="$(resolve_helper compile-context-bundles.mjs)" \
-     && node "$COMPILER" check "$PROJ" "$THEME" >/dev/null 2>&1; then
+  if COMPILER="$(resolve_helper plan.mjs)" \
+     && node "$COMPILER" context check "$PROJ" "$THEME" >/dev/null 2>&1; then
     say "✓ worker context check (every story maps to a role, budgets hold)"
   else
-    say "❌ worker context check FAILED (budget breach, unassignable story, outdated manifest, or compiler missing — hard) — run: node scripts/compile-context-bundles.mjs check $PROJ $THEME"
+    say "❌ worker context check FAILED (budget breach, unassignable story, outdated manifest, or compiler missing — hard) — run: bash scripts/chain render context check $PROJ $THEME"
     HARD_MISSING+=("context-check")
   fi
 else

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Execute the mechanical blocks of the in-session driver against real
-# state.sh / ledger.mjs, and prove the QA persona panel is six concurrent
+# state.sh / findings.mjs, and prove the QA persona panel is six concurrent
 # processes with six distinct personas. No provider calls.
 set -euo pipefail
 export SKILLCHAIN_POLL_SECONDS=0.1
@@ -19,7 +19,7 @@ block stop   >"$CASE/stop.sh";   [ -s "$CASE/stop.sh" ]   || die 'stop block mis
 
 # --- fixture: a PROJ sitting at P5:running (quality gate passed) -----------
 mkdir -p "$CASE/repo/scripts" "$CASE/repo/specs/PROJ-1-demo/5_progress" "$CASE/bin"
-cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/ledger.mjs" "$CASE/repo/scripts/"
+cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$CASE/repo/scripts/"
 cd "$CASE/repo"
 S="bash scripts/chain state"
 $S init 1 demo >/dev/null
@@ -57,9 +57,9 @@ Production-ready recommendation: NO
 {"source":"qa","severity":"high","category":"bug","summary":"login drops session","file":"src/a.ts","line":3}
 {"source":"qa","severity":"low","summary":"typo in empty state","file":"src/b.ts","line":9}
 EOF2
-cp scripts/ledger.mjs "$CASE/ledger.real"; printf 'process.exit(1)\n' >scripts/ledger.mjs
+cp scripts/findings.mjs "$CASE/ledger.real"; printf 'process.exit(1)\n' >scripts/findings.mjs
 ingest_fails 'a failing ledger' "$CASE/finder.out"
-cp "$CASE/ledger.real" scripts/ledger.mjs
+cp "$CASE/ledger.real" scripts/findings.mjs
 OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1 || die 'ingest block failed on a well-formed report'
 [ "$(jq '.findings | length' specs/PROJ-1-demo/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 findings'
 rep="$(recorded)"

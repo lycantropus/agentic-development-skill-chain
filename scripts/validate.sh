@@ -110,12 +110,13 @@ check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
 check_identical "$ROOT/claude/skills/7_documentation/scripts/curation-caps.sh" \
   "$ROOT/codex/skills/7_documentation/scripts/curation-caps.sh"
-check_identical "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs" \
-  "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs"
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
   "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
-# These helpers have exactly one copy per tree; a second one would drift silently.
-for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh; do
+# Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
+for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
+         5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/story-slice.mjs 5_executing/scripts/compile-context-bundles.mjs \
+         8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh \
+         6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh; do
   for platform in claude codex; do
     [ ! -e "$ROOT/$platform/skills/$dup" ] || fail "duplicate helper copy must stay deleted: $platform/skills/$dup"
   done
@@ -148,9 +149,8 @@ check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
 check_identical "$ROOT/claude/skills/1a_clarification/SKILL.md" \
   "$ROOT/codex/skills/1a_clarification/SKILL.md"
 for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/scripts/sync-framework.mjs 5_executing/templates/decisions.md.tmpl \
-         5_executing/scripts/ponytail-check.sh 5_executing/scripts/compile-context-bundles.mjs \
+         5_executing/scripts/ponytail-check.sh 5_executing/scripts/plan.mjs \
          5_executing/scripts/migration-drift-check.sh \
-         5_executing/scripts/story-slice.mjs \
          5_executing/manifests/roles/micro-fixer.md 5_executing/manifests/roles/implementer.md \
          5_executing/manifests/roles/frontend-implementer.md 5_executing/manifests/roles/backend-implementer.md \
          5_executing/manifests/roles/reviewer.md 5_executing/manifests/roles/explore.md \
@@ -159,9 +159,10 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
          cross-review/scripts/review-with-codex.sh cross-review/templates/cross-review-prompt.md.tmpl \
          5_executing/templates/agent-md-entry.md.tmpl \
          5_executing/scripts/gen-component-registry.mjs 5_executing/scripts/quality-gate-proof.sh 5_executing/scripts/quality-evidence.mjs \
-         6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh \
-         8_delivery/scripts/conflict-probe.sh 8_delivery/scripts/render-pr-body.mjs \
-         8_delivery/scripts/ci-poll.sh 8_delivery/templates/pr-body.md.tmpl; do
+         6_qa/scripts/findings.mjs \
+         8_delivery/scripts/delivery.sh 5_executing/scripts/render.mjs \
+         5_executing/templates/morning-report.md.tmpl 5_executing/templates/stop-report.md.tmpl \
+         8_delivery/templates/pr-body.md.tmpl; do
   check_identical "$ROOT/claude/skills/$f" "$ROOT/codex/skills/$f"
 done
 
@@ -192,13 +193,15 @@ harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"
 harness chain-refs          node "$ROOT/scripts/check-chain-refs.mjs"
 harness chain-refs-test     bash "$ROOT/scripts/test-chain-refs.sh"
+harness delivery            bash "$ROOT/scripts/test-delivery.sh"
+harness render              bash "$ROOT/scripts/test-render.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
 harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
 harness unattended-handoff  bash "$ROOT/scripts/test-unattended-handoff.sh"
 harness in-session-driver   bash "$ROOT/scripts/test-in-session-driver.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
-harness ledger              bash "$ROOT/scripts/test-ledger.sh"
+harness findings            bash "$ROOT/scripts/test-findings.sh"
 harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"
 harness migration-drift     bash "$ROOT/scripts/test-migration-drift-check.sh"
 harness worktree            bash "$ROOT/scripts/test-worktree.sh"

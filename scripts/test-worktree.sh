@@ -471,14 +471,14 @@ init_repo "$repo" 12 runner absent
 runner_bin="$TMP_ROOT/runner-bin"
 mkdir -p "$runner_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$runner_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nwt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\ncp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\ncp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\nchmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs"\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\ngit -C "$wt" add -A\ngit -C "$wt" commit -qm "seal P0"\n' >"$runner_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nwt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\ncp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\ncp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/plan.mjs"\nchmod +x "$wt/scripts/worktree.sh" "$wt/scripts/plan.mjs"\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n(cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\ngit -C "$wt" add -A\ngit -C "$wt" commit -qm "seal P0"\n' >"$runner_bin/claude"
 chmod +x "$runner_bin/codex" "$runner_bin/claude"
 runner_out="$TMP_ROOT/runner.out"
 (cd "$repo" && \
   PATH="$runner_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   "$ROOT/runner/run-phase.sh" P0 12 runner --timeout 30 >"$runner_out" 2>&1) || { cat "$runner_out" >&2; fail "runner P0 exited non-zero"; }
 [ "$(grep -c 're-entering persistent PROJ worktree exactly once' "$runner_out")" -eq 1 ] || { cat "$runner_out" >&2; fail "runner did not re-exec exactly once"; }
 wt="$TMP_ROOT/runner/control-proj12"
@@ -494,7 +494,7 @@ restart_out="$TMP_ROOT/runner-restart.out"
   PATH="$runner_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   "$ROOT/runner/run-phase.sh" P0 12 runner --timeout 30 >"$restart_out" 2>&1)
 grep -F "registered PROJ worktree is already P0:done before runner restart" "$restart_out" >/dev/null || { cat "$restart_out" >&2; fail "P0 crash-window restart launched another writer"; }
 ok "runner restart discovers an already sealed P0 target before spawning"
@@ -505,14 +505,14 @@ init_repo "$repo" 27 omega absent
 auto_bin="$TMP_ROOT/runner-auto-bin"
 mkdir -p "$auto_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$auto_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\n  printf "#!/usr/bin/env bash\\nexit 0\\n" >"$wt/scripts/quality-gate-proof.sh"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs" "$wt/scripts/quality-gate-proof.sh"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/plan.mjs"\n  printf "#!/usr/bin/env bash\\nexit 0\\n" >"$wt/scripts/quality-gate-proof.sh"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/plan.mjs" "$wt/scripts/quality-gate-proof.sh"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
 chmod +x "$auto_bin/codex" "$auto_bin/claude"
 set +e
 (cd "$repo" && \
   PATH="$auto_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   RUNNER_TEST_P5_PWD="$TMP_ROOT/p5-pwd" \
   "$ROOT/runner/run-phase.sh" auto 27 omega --timeout 30 >"$TMP_ROOT/runner-auto.out" 2>&1)
 auto_rc=$?
@@ -528,7 +528,7 @@ set +e
   PATH="$auto_bin:$PATH" \
   RUNNER_TEST_CONTROL="$repo" \
   RUNNER_TEST_HELPER="$HELPER" \
-  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  RUNNER_TEST_VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs" \
   RUNNER_TEST_P5_PWD="$TMP_ROOT/p5-pwd" \
   "$ROOT/runner/run-phase.sh" auto 27 omega --timeout 30 >"$TMP_ROOT/runner-advanced-restart.out" 2>&1)
 advanced_rc=$?
@@ -549,11 +549,11 @@ grep -F '[.waves[]?.frontend_routes[]?, .frontend.routes[]?] | length > 0' "$PRE
 cmp "$PREFLIGHT" "$ROOT/claude/skills/5_executing/scripts/preflight.sh" || fail "preflight provider copies differ"
 ok "preflight hard-checks worktree tools and detects structured frontend routes"
 
-grep -F 'join(here, "run-phase.sh")' "$ROOT/runner/render-report.mjs" >/dev/null || fail "report resume command does not resolve the actual runner"
-if grep -F 'git -C "${s.worktree.control_path}" worktree remove' "$ROOT/runner/render-report.mjs" >/dev/null; then fail "report still recommends raw worktree removal"; fi
+grep -F 'SKILLCHAIN_RUNNER_DIR' "$ROOT/claude/skills/5_executing/scripts/render.mjs" >/dev/null || fail "report resume command does not resolve the actual runner"
+if grep -F 'git -C "${s.worktree.control_path}" worktree remove' "$ROOT/claude/skills/5_executing/scripts/render.mjs" >/dev/null; then fail "report still recommends raw worktree removal"; fi
 ok "reports render a target-cwd P8 resume through the actual runner path"
 
-CI_POLL="$ROOT/codex/skills/8_delivery/scripts/ci-poll.sh"
+CI_POLL="$ROOT/codex/skills/8_delivery/scripts/delivery.sh"
 ci_bin="$TMP_ROOT/ci-bin"
 mkdir -p "$ci_bin"
 printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$1 $2" = "pr view" ]; then\n  if [[ " $* " = *" --json state "* ]]; then printf "%%s\\n" "${GH_PR_STATE:-MERGED}"; exit 0; fi\n  count=0; [ ! -f "$GH_PR_COUNT" ] || count="$(cat "$GH_PR_COUNT")"\n  count=$((count + 1)); printf "%%s" "$count" >"$GH_PR_COUNT"\n  if [ "$count" -eq 1 ]; then printf "%%s\\n" "$GH_HEAD_FIRST"; else printf "%%s\\n" "$GH_HEAD_SECOND"; fi\nelif [ "$1 $2" = "run list" ]; then\n  cat "$GH_RUNS_FILE"\nelif [ "$1 $2" = "pr checks" ]; then\n  if [[ " $* " = *" --json "* ]]; then printf "%%s\\n" "[]"; else exit 0; fi\nelse\n  exit 9\nfi\n' >"$ci_bin/gh"
@@ -561,9 +561,9 @@ chmod +x "$ci_bin/gh"
 jq -cn '[{databaseId:1,status:"completed",conclusion:"success",name:"ci"}]' >"$TMP_ROOT/gh-runs.json"
 head_a=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 head_b=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-1" GH_HEAD_FIRST="$head_b" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a pre-poll expected-head mismatch"; fi
-if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-2" GH_HEAD_FIRST="$head_a" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a PR-head change during polling"; fi
-cmp "$CI_POLL" "$ROOT/claude/skills/8_delivery/scripts/ci-poll.sh" || fail "ci-poll provider copies differ"
+if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-1" GH_HEAD_FIRST="$head_b" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" poll 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a pre-poll expected-head mismatch"; fi
+if PATH="$ci_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" GH_PR_COUNT="$TMP_ROOT/gh-count-2" GH_HEAD_FIRST="$head_a" GH_HEAD_SECOND="$head_b" bash "$CI_POLL" poll 1 1 "$head_a" >/dev/null 2>&1; then fail "ci-poll accepted a PR-head change during polling"; fi
+cmp "$CI_POLL" "$ROOT/claude/skills/8_delivery/scripts/delivery.sh" || fail "delivery.sh provider copies differ"
 ok "final CI polling binds and rechecks the exact expected PR head"
 
 # A third-party check (CodeRabbit, Vercel, ...) has no GitHub Actions run, so
@@ -573,7 +573,7 @@ pending_bin="$TMP_ROOT/ci-bin-pending"
 mkdir -p "$pending_bin"
 printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$1 $2" = "pr view" ]; then\n  printf "%%s\\n" "%s"\nelif [ "$1 $2" = "run list" ]; then\n  cat "$GH_RUNS_FILE"\nelif [ "$1 $2" = "pr checks" ]; then\n  if [[ " $* " = *" --json "* ]]; then printf "%%s\\n" "[{\\"bucket\\":\\"pending\\",\\"name\\":\\"CodeRabbit\\"}]"; else exit 0; fi\nelse\n  exit 9\nfi\n' "$head_a" >"$pending_bin/gh"
 chmod +x "$pending_bin/gh"
-if PATH="$pending_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" bash "$CI_POLL" 1 0 "$head_a" >/dev/null 2>"$TMP_ROOT/ci-poll-pending.out"; then
+if PATH="$pending_bin:$PATH" GH_RUNS_FILE="$TMP_ROOT/gh-runs.json" bash "$CI_POLL" poll 1 0 "$head_a" >/dev/null 2>"$TMP_ROOT/ci-poll-pending.out"; then
   fail "ci-poll declared green while a third-party check was still pending"
 fi
 grep -q "TIMEOUT" "$TMP_ROOT/ci-poll-pending.out" || fail "ci-poll did not report the pending third-party check as the wait reason"
@@ -587,8 +587,9 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 28 psi absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 28 psi)"
 cp "$HELPER" "$wt/scripts/worktree.sh"
-cp "$CI_POLL" "$wt/scripts/ci-poll.sh"
-chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/ci-poll.sh"
+cp "$CI_POLL" "$wt/scripts/delivery.sh"
+cp "$ROOT/codex/skills/5_executing/scripts/chain" "$wt/scripts/chain"
+chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/delivery.sh" "$wt/scripts/chain"
 advance_to_p8_done "$wt" 28 psi
 head="$(git -C "$wt" rev-parse HEAD)"
 resume_out="$TMP_ROOT/p8-resume.out"

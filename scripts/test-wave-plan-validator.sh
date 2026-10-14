@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES="$ROOT/scripts/fixtures/wave-plan-validator"
-VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs"
+VALIDATOR="$ROOT/codex/skills/5_executing/scripts/plan.mjs"
 CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
 
@@ -16,7 +16,7 @@ prepare_case() {
   cp "$FIXTURES/$config_fixture" "$CASE/plan/wave-gate-config.json"
 }
 
-run_validator() { node "$VALIDATOR" "$CASE/plan" "$CASE"; }
+run_validator() { node "$VALIDATOR" validate "$CASE/plan" "$CASE"; }
 
 expect_failure() {
   local expected="$1"
@@ -192,8 +192,8 @@ assert.deepEqual(parseStories(read("stories-duplicate.md")).map((story) => [stor
 
 # --stories: role per story from the Agent Type column, fail-closed (exit 2 naming story and plan)
 stories_fail() { # fixture expected-message
-  if node "$VALIDATOR" --stories "$FIXTURES/$1" >"$CASE/output" 2>&1; then echo "--stories accepted $1" >&2; exit 1; fi
-  node "$VALIDATOR" --stories "$FIXTURES/$1" >/dev/null 2>&1 || [ $? -eq 2 ] || { echo "--stories $1: exit must be 2" >&2; exit 1; }
+  if node "$VALIDATOR" validate --stories "$FIXTURES/$1" >"$CASE/output" 2>&1; then echo "--stories accepted $1" >&2; exit 1; fi
+  node "$VALIDATOR" validate --stories "$FIXTURES/$1" >/dev/null 2>&1 || [ $? -eq 2 ] || { echo "--stories $1: exit must be 2" >&2; exit 1; }
   grep -F "$1: PROJ-1-PRD-1-US-" "$CASE/output" | grep -F "$2" >/dev/null || { echo "--stories $1: expected '$2' with story and plan" >&2; cat "$CASE/output" >&2; exit 1; }
 }
 stories_fail stories-duplicate-row.md "duplicate row in the story table"
@@ -206,8 +206,8 @@ stories_fail stories-split-conflict.md "Split: contract contradicts"
 stories_fail stories-split-invalid.md "unsupported **Split:**"
 stories_fail stories-duplicate.md "duplicate story section"
 printf '# PROJ-1 Wave 1\n\nNo stories.\n' >"$CASE/empty.md"
-if node "$VALIDATOR" --stories "$CASE/empty.md" >/dev/null 2>&1 || [ $? -ne 2 ]; then echo "--stories accepted a plan without table and stories" >&2; exit 1; fi
-node "$VALIDATOR" --stories "$FIXTURES/stories-aliases.md" | jq -e '
+if node "$VALIDATOR" validate --stories "$CASE/empty.md" >/dev/null 2>&1 || [ $? -ne 2 ]; then echo "--stories accepted a plan without table and stories" >&2; exit 1; fi
+node "$VALIDATOR" validate --stories "$FIXTURES/stories-aliases.md" | jq -e '
   map([.id, .role, .split, (.fallback // false)]) == [
     ["PROJ-1-PRD-1-US-1", "backend-implementer", "none", false],
     ["PROJ-1-PRD-1-US-2", "implementer", "contract", false],
@@ -215,12 +215,12 @@ node "$VALIDATOR" --stories "$FIXTURES/stories-aliases.md" | jq -e '
     ["PROJ-1-PRD-1-US-4", "implementer", "none", false]]
   and .[1].agentType == "full-stack-implementer" and .[0].scope == "backend (test-only)"' >/dev/null \
   || { echo "--stories alias normalization wrong" >&2; exit 1; }
-node "$VALIDATOR" --stories "$FIXTURES/stories-legacy.md" | jq -e '
+node "$VALIDATOR" validate --stories "$FIXTURES/stories-legacy.md" | jq -e '
   map([.id, .role, .split, .fallback]) == [["PROJ-1-PRD-1-US-1", "implementer", "none", true], ["PROJ-1-PRD-1-US-2", "implementer", "contract", true]]' >/dev/null \
   || { echo "--stories legacy fallback wrong" >&2; exit 1; }
 stories_fail stories-empty-table.md "story section has no row" # Agent Type header, no rows: not legacy
 stories_fail stories-short-row.md "unsupported Agent Type '(missing cell)'"
-node "$VALIDATOR" --stories "$FIXTURES/stories-legacy-table.md" | jq -e '
+node "$VALIDATOR" validate --stories "$FIXTURES/stories-legacy-table.md" | jq -e '
   map([.id, .role, .complexity, .canStart, .fallback]) == [
     ["PROJ-1-PRD-1-US-1", "implementer", "sonnet", "immediately", true],
     ["PROJ-1-PRD-1-US-2", "implementer", null, null, true]]' >/dev/null \
@@ -233,9 +233,9 @@ const { parseStories } = await import(process.argv[1]);
 const [story] = parseStories(readFileSync(process.argv[2], "utf8"));
 assert.deepEqual([story.scope, story.agent], ["full-stack", "frontend-implementer"]); // ASCII arrow splits like →
 ' "file://$VALIDATOR" "$FIXTURES/stories-ascii-arrow.md"
-node "$VALIDATOR" --stories "$FIXTURES/stories-agent-trailing.md" | jq -e 'map(.role) == ["implementer", "frontend-implementer", "backend-implementer"]' >/dev/null \
+node "$VALIDATOR" validate --stories "$FIXTURES/stories-agent-trailing.md" | jq -e 'map(.role) == ["implementer", "frontend-implementer", "backend-implementer"]' >/dev/null \
   || { echo "--stories: prose after the section agent (or no role token) must not be compared" >&2; exit 1; }
-node "$VALIDATOR" --stories "$FIXTURES/stories-valid.md" | jq -e 'map(.role) == ["backend-implementer", "implementer"] and .[1].split == "fan-out"' >/dev/null \
+node "$VALIDATOR" validate --stories "$FIXTURES/stories-valid.md" | jq -e 'map(.role) == ["backend-implementer", "implementer"] and .[1].split == "fan-out"' >/dev/null \
   || { echo "--stories valid fixture wrong" >&2; exit 1; }
 
 # AC wording, plan against ../2_PRDs (byte-exact after the checkbox/ID prefix)
@@ -318,7 +318,7 @@ prepare_case plan-valid.md config-valid.json # no 2_PRDs/ (legacy): note, exit 0
 run_validator >"$CASE/output" 2>&1
 expect_output "1 wave(s), 1 AC(s)" "note: AC wording not compared against PRDs: $CASE/2_PRDs is not a directory"
 
-for copy in "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs"; do
+for copy in "$ROOT/claude/skills/5_executing/scripts/plan.mjs"; do
   cmp "$VALIDATOR" "$copy"
 done
 

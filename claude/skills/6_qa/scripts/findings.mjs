@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ledger.mjs — the SOLE write path to specs/PROJ-<X>-<theme>/findings.json.
+// findings.mjs — the SOLE write path to specs/PROJ-<X>-<theme>/findings.json.
 //
 // ONE deduplicated findings ledger per PROJ (CONCEPT.md §7): CodeRabbit,
 // Sonar, code review, QA, merge gate, cross-review, CI, and debt markers
@@ -7,12 +7,15 @@
 // FROM this file — never maintained by hand. Plain node, no dependencies.
 //
 // Usage:
-//   node ledger.mjs add            <proj-x> <theme> [--wave N]    read raw findings as JSON lines on stdin, dedupe + merge
-//   node ledger.mjs set-status     <proj-x> <theme> <id> <status> [fix-commit]
-//   node ledger.mjs record-attempt <proj-x> <theme> <id>          count a fix ATTEMPT (before dispatch; basis of the 3-attempt stop rule)
-//   node ledger.mjs auto-defer     <proj-x> <theme>               open medium/low -> deferred (autonomy policy §8)
-//   node ledger.mjs queue          <proj-x> <theme>               open critical/high clustered by file (fix queue, JSON)
-//   node ledger.mjs stats          <proj-x> <theme>               counts by severity/status (JSON)
+//   node findings.mjs add            <proj-x> <theme> [--wave N]    read raw findings as JSON lines on stdin, dedupe + merge
+//   node findings.mjs set-status     <proj-x> <theme> <id> <status> [fix-commit]
+//   node findings.mjs record-attempt <proj-x> <theme> <id>          count a fix ATTEMPT (before dispatch; basis of the 3-attempt stop rule)
+//   node findings.mjs auto-defer     <proj-x> <theme>               open medium/low -> deferred (autonomy policy §8)
+//   node findings.mjs queue          <proj-x> <theme>               open critical/high clustered by file (fix queue, JSON)
+//   node findings.mjs stats          <proj-x> <theme>               counts by severity/status (JSON)
+//   node findings.mjs harvest        <proj-x> <theme> [search-root] record `ponytail:` markers (the debt-marker convention, CONCEPT.md §7)
+//                                    as `deferred` debt findings; same dedupe as add. search-root defaults to src
+//                                    (pass . for the whole repo); zero markers or a missing root is not an error.
 //
 // Raw input record (one JSON object per line):
 //   required: source, severity, summary
@@ -36,6 +39,7 @@
 import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 
 const SEVERITY_MAP = {
   blocker: "critical", critical: "critical",
@@ -49,8 +53,9 @@ const SOURCES = ["coderabbit", "sonar", "review", "qa", "merge-gate", "cross-rev
 
 function usage() {
   console.error(
-    "Usage: ledger.mjs <add|set-status|record-attempt|auto-defer|queue|stats> <proj-x> <theme> [args]\n" +
+    "Usage: findings.mjs <add|set-status|record-attempt|auto-defer|queue|stats|harvest> <proj-x> <theme> [args]\n" +
     "  add            [--wave N]   (raw findings as JSON lines on stdin)\n" +
+    "  harvest        [search-root]   (ponytail: markers -> deferred debt findings)\n" +
     "  set-status     <id> <open|fixed|deferred|false-positive> [fix-commit]\n" +
     "  record-attempt <id>\n" +
     "  auto-defer | queue | stats",
@@ -66,7 +71,7 @@ const base = `specs/${proj}-${theme}`;
 const file = join(base, "findings.json");
 const now = new Date().toISOString();
 
-function fail(msg) { console.error(`ledger.mjs: ${msg}`); process.exit(1); }
+function fail(msg) { console.error(`findings.mjs: ${msg}`); process.exit(1); }
 
 const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
@@ -100,7 +105,7 @@ function withLock(fn) {
 
 function load({ mustExist = false } = {}) {
   if (!existsSync(file)) {
-    if (mustExist) { console.error(`ledger.mjs: ${file} missing`); process.exit(2); }
+    if (mustExist) { console.error(`findings.mjs: ${file} missing`); process.exit(2); }
     return { proj, updated_at: now, findings: [] };
   }
   return JSON.parse(readFileSync(file, "utf8"));
@@ -153,12 +158,36 @@ function findOrFail(ledger, id) {
   return f;
 }
 
-if (cmd === "add") {
-  const waveIdx = rest.indexOf("--wave");
+// One raw debt finding per `ponytail:` marker; the summary is the marker text after it.
+function harvestLines(root) {
+  if (!(existsSync(root) && statSync(root).isDirectory())) { console.log(`findings.mjs: search root '${root}' does not exist — nothing to harvest`); process.exit(0); }
+  let matches = "";
+  try {
+    matches = execFileSync("grep", ["-R", "-n", "-I", "ponytail:", root, "--exclude-dir=.git", "--exclude-dir=node_modules", "--exclude-dir=specs"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
+  } catch (error) {
+    // grep exits 1 without a match, 2 on unreadable files: use what it found; but never a truncated scan
+    if (error.code === "ENOBUFS" || error.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") fail("harvest found more than 64 MiB of markers — narrow the search root");
+    matches = error.stdout ?? "";
+  }
+  const found = matches.split("\n").map((l) => /^(.+):(\d+):(.*)$/.exec(l)).filter(Boolean);
+  if (found.length === 0) { console.log(`findings.mjs: no ponytail: markers under ${root}`); process.exit(0); }
+  return found.map(([, file, line, text]) => {
+    const note = /ponytail:\s*(.*)/.exec(text)?.[1] ?? text;
+    return JSON.stringify({
+      source: "debt", severity: "low", status: "deferred", category: "debt",
+      summary: `ponytail: ${note.startsWith(" ") ? note.slice(1) : note}`, file, line: Number(line), debt_marker: note,
+    });
+  });
+}
+
+if (cmd === "add" || cmd === "harvest") {
+  const waveIdx = cmd === "add" ? rest.indexOf("--wave") : -1;
   const wave = waveIdx >= 0 ? Number(rest[waveIdx + 1]) : undefined;
   if (waveIdx >= 0 && !Number.isInteger(wave)) fail("--wave must be an integer — nothing written");
-  const raw = readFileSync(0, "utf8");
-  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = cmd === "harvest"
+    ? harvestLines(rest[0] ?? "src")
+    : readFileSync(0, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) fail("add requires at least one JSON finding on stdin — nothing written");
 
   // Parse and validate BEFORE taking the lock, so bad input cannot stall writers.
@@ -179,7 +208,7 @@ if (cmd === "add") {
     if (rec.line != null && !Number.isInteger(rec.line)) fail(`optional field 'line' must be an integer or null: ${line}`);
     if (!SOURCES.includes(rec.source)) fail(`unknown source '${rec.source}' (known: ${SOURCES.join(", ")})`);
     const severity = SEVERITY_MAP[String(rec.severity).toLowerCase()];
-    if (!severity) fail(`unknown severity '${rec.severity}' (mapping table in ledger.mjs)`);
+    if (!severity) fail(`unknown severity '${rec.severity}' (mapping table in findings.mjs)`);
     const status = rec.status ?? "open";
     if (!STATUSES.includes(status)) fail(`unknown status '${rec.status}'`);
     if (rec.provider != null && !["claude", "codex"].includes(rec.provider)) fail(`unknown provider '${rec.provider}'`);
@@ -234,7 +263,7 @@ if (cmd === "add") {
 
     if (changed) save(ledger);
     const reopenNote = reopened > 0 ? `, ${reopened} REOPENED (fix did not survive re-report)` : "";
-    console.log(`ledger.mjs: ${added} added, ${merged} deduped${reopenNote} (${ledger.findings.length} total)`);
+    console.log(`findings.mjs: ${added} added, ${merged} deduped${reopenNote} (${ledger.findings.length} total)`);
   });
 } else if (cmd === "set-status") {
   const [id, status, fixCommit] = rest;
@@ -246,7 +275,7 @@ if (cmd === "add") {
     f.updated_at = now;
     if (fixCommit) f.fix_commit = fixCommit;
     save(ledger);
-    console.log(`ledger.mjs: ${id} -> ${status}`);
+    console.log(`findings.mjs: ${id} -> ${status}`);
   });
 } else if (cmd === "record-attempt") {
   const [id] = rest;
@@ -257,7 +286,7 @@ if (cmd === "add") {
     f.fix_attempts = (f.fix_attempts ?? 0) + 1;
     f.updated_at = now;
     save(ledger);
-    console.log(`ledger.mjs: ${id} fix_attempts=${f.fix_attempts}${f.fix_attempts >= 3 ? " — 3-attempt cap reached: stop condition on next failure (§8)" : ""}`);
+    console.log(`findings.mjs: ${id} fix_attempts=${f.fix_attempts}${f.fix_attempts >= 3 ? " — 3-attempt cap reached: stop condition on next failure (§8)" : ""}`);
   });
 } else if (cmd === "auto-defer") {
   withLock(() => {
@@ -271,7 +300,7 @@ if (cmd === "add") {
       }
     }
     if (n > 0) save(ledger);
-    console.log(`ledger.mjs: ${n} medium/low findings auto-deferred (decided at Checkpoint 2, not mid-run)`);
+    console.log(`findings.mjs: ${n} medium/low findings auto-deferred (decided at Checkpoint 2, not mid-run)`);
   });
 } else if (cmd === "queue") {
   const ledger = load({ mustExist: true });

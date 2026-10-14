@@ -7,7 +7,7 @@ Start here if you have not used the chain before. This page explains the part th
 - **Skills** are written procedures an agent follows (concept, requirements, architecture, plans, executing, QA, docs, delivery). They decide things.
 - **Scripts** are small deterministic programs the skills call. They record state, check gates, render documents and manage the worktree. They never decide anything; they either succeed or refuse.
 
-Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. Two routes need the installed dispatcher rather than the repo copy: `chain render report` (the report renderer ships with the runner, which is not synchronized into repos) and anything run before the first sync. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
+Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. Before the first sync, use the installed dispatcher instead of the repo copy. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
 
 ## The five script kinds
 
@@ -15,9 +15,9 @@ Every script belongs to exactly one kind. Only Records write state; Renderers wr
 
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
-| **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` → ledger.mjs · `chain findings harvest` → harvest-debt.sh (feeds `findings add`) · `chain quality` → quality-evidence.mjs |
-| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality-gate-proof.sh · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` → curation-caps.sh · `chain check intake` → intake-seal-check.sh · `chain check conflicts` → conflict-probe.sh · `chain check ci` → ci-poll.sh |
-| **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` → compile-context-bundles.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` → render-pr-body.mjs · `chain render report` → render-report.mjs |
+| **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality-evidence.mjs |
+| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality-gate-proof.sh · `chain check plan` → plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` → curation-caps.sh · `chain check intake` → intake-seal-check.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
+| **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` and `chain render slice` → plan.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
 
@@ -52,13 +52,12 @@ flowchart TD
   B --> C["3 · chain sync<br/>scripts/*, templates/*, .skillchain-helpers.json"]
   C --> D["4 · chain check preflight<br/>tools, auth, ponytail, migrations<br/>state: .preflight .degraded .context.ponytail"]
   D --> E["5 · verify the verifier<br/>chain gate wave --auth-budget-negative-control,<br/>or one safe controlled failure"]
-  E --> F["6 · chain render context compile<br/>worker files for every wave"]
-  F --> G["7 · ground-file.md<br/>the one judgment step"]
-  G --> H["8 · chain render context compile<br/>again, so the files carry the ground file"]
-  H --> I["9 · chain state transition … P0 done<br/>one setup commit"]
+  E --> F["6 · ground-file.md<br/>the one judgment step"]
+  F --> G["7 · chain render context compile<br/>worker files for every wave, once"]
+  G --> H["8 · chain state transition … P0 done<br/>one setup commit"]
 ```
 
-The permission setup (`merge-project-settings.sh`, Claude only) is a separate manual one-time step. Steps 6 and 8 compile twice today because the ground file is written between them.
+The permission setup (`merge-project-settings.sh`, Claude only) is a separate manual one-time step.
 
 ## What a worker file contains
 

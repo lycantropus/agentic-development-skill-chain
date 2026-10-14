@@ -548,7 +548,7 @@ subsequent PROJ. Hence BLOCKING, not advisory.
 template (mode + file list), reads `author_provider` from `state.json`,
 and routes to `review-with-codex.sh` or `review-with-claude.sh`. Each
 adapter normalizes its provider output into the same findings JSON-lines
-contract → `ledger.mjs`. The Claude route verifies `claude auth status`
+contract → `findings.mjs`. The Claude route verifies `claude auth status`
 before launch, requests validated structured output, rejects API/auth error
 envelopes even when the CLI exits zero, and reports Claude Code's 10 MB stdin
 ceiling explicitly. For joint artifacts the runner invokes both adapters
@@ -894,7 +894,7 @@ context a role receives.
 | Security baseline | — | ✅ |
 | Test conventions | ✅ | ✅ |
 | ground-file.md | ✅ | ✅ |
-| US + ACs + tasks | verbatim story slice of the own wave plan (`story-slice.mjs`), compiled into the story file under `## Deine Story`; never re-typed by the orchestrator ||
+| US + ACs + tasks | verbatim story slice of the own wave plan (`plan.mjs slice`), compiled into the story file under `## Deine Story`; never re-typed by the orchestrator ||
 | "what earlier waves built" | short summary by the orchestrator from progress.md ||
 | Folder agent.md | reading protocol (below), never injected ||
 | PRDs, full wave plans, architecture/* | path reference, on demand ||
@@ -1201,7 +1201,7 @@ on every machine. Skill 5's `scripts/wave-gate.sh` is the existing
 proof of the pattern.
 
 **Schemas:** `state.schema.json` and `findings.schema.json` ship with
-the framework. `state.sh` and `ledger.mjs` validate on every write —
+the framework. `state.sh` and `findings.mjs` validate on every write —
 an agent writing a malformed record fails loudly at write time, not
 silently at render time.
 
@@ -1217,24 +1217,24 @@ response.
 | Script (skill) | Input | Output | Behavior / exit |
 |---|---|---|---|
 | `preflight.sh` (5_executing) | CLI list §7 (embedded), env | report to stdout; state.json `preflight` block | checks `command -v` + auth per tool; exit ≠ 0 on any missing HARD tool (stop condition); skippable tools → logged skip |
-| `compile-context-bundles.mjs` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, context matrix §5 | one file per story (`workers/wave-N/<US-ID>.md`) and per story-less role (`roles/wave-N/<role>.md`), plus `.claude/agents/skillchain-*.md` | counts the role tokens; exit ≠ 0 on budget breach, an unassignable story or an outdated manifest |
+| `plan.mjs context` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, context matrix §5 | one file per story (`workers/wave-N/<US-ID>.md`) and per story-less role (`roles/wave-N/<role>.md`), plus `.claude/agents/skillchain-*.md` | counts the role tokens; exit ≠ 0 on budget breach, an unassignable story or an outdated manifest |
 | `state.sh` (5_executing) | `get <path>` / `set <path> <value>` / `transition <phase> <status>` | state.json (validated) | sole write path to state.json; schema-validates; illegal phase transitions exit ≠ 0 |
 | `worktree.sh` (5_executing) | PROJ id, control checkout, state | persistent PROJ worktree lifecycle | creates/resumes safely; links ignored `.env.local`; installs from lockfile; reports conservative cleanup eligibility |
-| `story-slice.mjs` (5_executing) | wave plan + US ID | that story's `## <US-ID>` section, verbatim, to stdout | ends at the next `## ` heading outside code fences; exit ≠ 0 when the ID is missing or duplicated |
-| `validate-wave-plan.mjs` (5_executing) | wave plans + `wave-gate-config.json` | deterministic consistency verdict | validates unique AC mappings, bidirectional test files, broad regressions, auth budget, and protected-route coverage |
+| `plan.mjs slice` (5_executing) | wave plan + US ID | that story's `## <US-ID>` section, verbatim, to stdout | ends at the next `## ` heading outside code fences; exit ≠ 0 when the ID is missing or duplicated |
+| `plan.mjs validate` (5_executing) | wave plans + `wave-gate-config.json` | deterministic consistency verdict | validates unique AC mappings, bidirectional test files, broad regressions, auth budget, and protected-route coverage |
 | `wave-gate.sh` (5_executing, exists) | wave N, PROJ, config | gate verdict; PASSED block in progress.md; findings → ledger | runs current ACs + declared regressions, archives CodeRabbit evidence, checks cumulative blocking ledger, manages frontend readiness; red evidence → exit ≠ 0 |
 | `gen-component-registry.mjs` (5_executing) | every outermost `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`, …), recursive, nested `components/` counted once | `docs/components.md`, or `--out <path>` (relative to the caller) when the app root is nested | reads the doc block above each component export; `--check` exits ≠ 0 on a stale registry, a component without a doc block, or a component without its `id="<kebab-name>"` section on the showcase page (wave-gate step 6). The registry is never hand-written — one source, the component file |
-| `ledger.mjs` (quality) | non-empty normalized findings JSONL from all sources | deduped, normalized `findings.json`; fix-queue clusters | dedupe key file/anchor/category, adding a stable summary fingerprint when no location exists; idempotent with reopen support; empty stdin fails |
-| `cross-review.sh` (cross-review) | mode, artifact files, `author_provider` + `author_model`, prompt template | provider-attributed findings JSON lines → `ledger.mjs` | routes to opposite provider; for Claude-authored work only, unavailable Codex may fall back model-opposite via `claude -p --model` (logged + flagged); joint artifacts launch both adapters concurrently; up to 3 automatic rounds while findings remain; manual rounds have no limit |
+| `findings.mjs` (quality) | non-empty normalized findings JSONL from all sources | deduped, normalized `findings.json`; fix-queue clusters | dedupe key file/anchor/category, adding a stable summary fingerprint when no location exists; idempotent with reopen support; empty stdin fails |
+| `cross-review.sh` (cross-review) | mode, artifact files, `author_provider` + `author_model`, prompt template | provider-attributed findings JSON lines → `findings.mjs` | routes to opposite provider; for Claude-authored work only, unavailable Codex may fall back model-opposite via `claude -p --model` (logged + flagged); joint artifacts launch both adapters concurrently; up to 3 automatic rounds while findings remain; manual rounds have no limit |
 | `review-with-claude.sh` (cross-review) | rendered prompt + limits | normalized Claude JSON lines | invokes OAuth-preserving isolated `claude -p` read-only with validated JSON Schema; rejects structured API/auth errors; detects the 10 MB stdin ceiling; timeout/cancel as one process group |
 | `review-with-codex.sh` (cross-review) | rendered prompt + limits | normalized Codex JSON lines | invokes `codex exec` read-only; validates output; timeout/cancel as one process group |
-| `harvest-debt.sh` (quality) | repo tree | `ponytail:` markers as ledger records (status `deferred`) | grep-based; links marker → file/line; idempotent |
+| `findings.mjs harvest` (quality) | repo tree | `ponytail:` markers as ledger records (status `deferred`) | grep-based; links marker → file/line; idempotent |
 | `curation-caps.sh` (7_documentation) | `docs/*`, `src/**/agent.md` | cap report | exit ≠ 0 on any cap breach (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM 80 lines, agent.md 100 lines) — curation must shrink before P7 completes |
-| `conflict-probe.sh` (8_delivery) | PROJ branch, `main` | conflict report (JSON: none/trivial/semantic per file) | throwaway worktree, `merge --no-commit`; never touches real branches; classification by file type heuristics |
-| `render-pr-body.mjs` (8_delivery) | state.json + findings.json + template | PR body markdown | pure render, no side effects |
-| `ci-poll.sh` (8_delivery) | PR number | check status JSON; failed-check logs verbatim | wraps `gh pr checks --watch`; timeout from config; exit ≠ 0 after timeout |
+| `delivery.sh probe` (8_delivery) | PROJ branch, `main` | conflict report (JSON: none/trivial/semantic per file) | throwaway worktree, `merge --no-commit`; never touches real branches; classification by file type heuristics |
+| `render.mjs pr` (5_executing) | state.json + findings.json + template | PR body markdown | pure render, no side effects |
+| `delivery.sh poll` (8_delivery) | PR number | check status JSON; failed-check logs verbatim | wraps `gh pr checks --watch`; timeout from config; exit ≠ 0 after timeout |
 | `run-phase.sh` (framework root) | phase id, PROJ | launches Claude + Codex lane processes concurrently | validates legal transition, assigns writer/reviewer roles, captures provider outputs, waits/cancels as a unit, records lane start/end in state.json |
-| `render-report.mjs` (framework root) | state.json + findings.json of all PROJs in the run + template | `specs/morning-report-<date>.md` | pure render; also emits the one-liner for the push notification |
+| `render.mjs report` (5_executing) | state.json + findings.json of all PROJs in the run + template | `specs/morning-report-<date>.md` | pure render; also emits the one-liner for the push notification |
 
 #### Template inventory
 
@@ -1312,7 +1312,7 @@ controlled way:
 ### Morning Report
 
 The cross-PROJ report is rendered from `state.json` + `findings.json` by a
-**template script** (`node runner/render-report.mjs morning specs`)
+**template script** (`chain render report morning specs`)
 (`specs/morning-report-<date>.md`): per PROJ status, PR link, gate/QA
 summary, deferred debt, known gaps, provider/model degradations
 (cross-review fallbacks), stop reports, cleanup list. It is

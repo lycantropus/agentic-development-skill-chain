@@ -7,16 +7,16 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
 const inventory = [
-  ...["chain", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "compile-context-bundles.mjs", "worktree.sh", "validate-wave-plan.mjs", "migration-drift-check.sh", "story-slice.mjs", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
+  ...["chain", "render.mjs", "plan.mjs", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "worktree.sh", "migration-drift-check.sh", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
   ...["backend-implementer", "explore", "frontend-implementer", "implementer", "micro-fixer", "reviewer"].map(name => [`5_executing/manifests/roles/${name}.md`, `templates/roles/${name}.md`]),
-  ["5_executing/templates/decisions.md.tmpl", "templates/decisions.md.tmpl"],
+  ...["decisions", "morning-report", "stop-report"].map(name => [`5_executing/templates/${name}.md.tmpl`, `templates/${name}.md.tmpl`]),
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),
   ["cross-review/templates/cross-review-prompt.md.tmpl", "templates/cross-review-prompt.md.tmpl"],
-  ...["ledger.mjs", "harvest-debt.sh"].map(name => [`6_qa/scripts/${name}`, `scripts/${name}`]),
+  ["6_qa/scripts/findings.mjs", "scripts/findings.mjs"],
   ["7_documentation/scripts/curation-caps.sh", "scripts/curation-caps.sh"],
   ["0b_intake/scripts/intake-seal-check.sh", "scripts/intake-seal-check.sh"],
   ["5_executing/templates/agent-md-entry.md.tmpl", "templates/agent-md-entry.md.tmpl"],
-  ...["conflict-probe.sh", "render-pr-body.mjs", "ci-poll.sh"].map(name => [`8_delivery/scripts/${name}`, `scripts/${name}`]),
+  ...["delivery.sh"].map(name => [`8_delivery/scripts/${name}`, `scripts/${name}`]),
   ["8_delivery/templates/pr-body.md.tmpl", "templates/pr-body.md.tmpl"],
   ...["wave-gate.sh", "quality-gate-proof.sh", "quality-evidence.mjs", "gen-component-registry.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
 ];
