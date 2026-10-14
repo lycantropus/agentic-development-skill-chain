@@ -23,14 +23,12 @@ for provider in claude codex; do
   [ -x "$repo/scripts/chain" ] || fail "$provider sync did not install an executable scripts/chain"
 
   for row in "${rows[@]}"; do
-    IFS='|' read -r verb sub script kind <<<"$row"
+    IFS='|' read -r verb sub script kind lead <<<"$row"
     [ -n "$verb" ] && [ -n "$script" ] && [ -n "$kind" ] || fail "malformed row: $row"
     for entry in "source:$CHAIN" "installed:$inst/skills/5_executing/scripts/chain"; do
       where="$(bash "${entry#*:}" --where "$verb" $sub)" || fail "$provider ${entry%%:*}: '$verb $sub' does not resolve"
       [ -f "$where" ] && [ "$(basename "$where")" = "$script" ] || fail "$provider ${entry%%:*}: '$verb $sub' -> $where, expected $script"
     done
-    # render-report.mjs ships with the runner, not in the synchronized helper set
-    if [ "$script" = render-report.mjs ]; then continue; fi
     where="$(bash "$repo/scripts/chain" --where "$verb" $sub)" || fail "$provider repo: '$verb $sub' does not resolve"
     [ "$where" = "$repo/scripts/$script" ] || fail "$provider repo: '$verb $sub' -> $where, expected scripts/$script"
   done
@@ -38,13 +36,13 @@ for provider in claude codex; do
   # 3. passthrough: stub scripts echo their name, args and stdin; chain must not alter any of it
   stub="$TMP/$provider-stub"; mkdir -p "$stub"; cp "$CHAIN" "$stub/chain"
   for row in "${rows[@]}"; do
-    IFS='|' read -r verb sub script kind <<<"$row"
+    IFS='|' read -r verb sub script kind lead <<<"$row"
     case "$script" in
       *.mjs) printf 'let i="";process.stdin.on("data",d=>i+=d).on("end",()=>{console.log("%s|"+process.argv.slice(2).join(" ")+"|"+i.trim());process.exit(Number(process.env.STUB_EXIT||0))})\n' "$script" >"$stub/$script" ;;
       *) printf 'echo "%s|$*|$(cat)"\nexit "${STUB_EXIT:-0}"\n' "$script" >"$stub/$script" ;;
     esac
     got="$(echo payload | bash "$stub/chain" "$verb" $sub 'a b' --flag)" || fail "$provider stub '$verb $sub' failed"
-    [ "$got" = "$script|a b --flag|payload" ] || fail "$provider '$verb $sub' altered the call: $got"
+    [ "$got" = "$script|${lead:+$lead }a b --flag|payload" ] || fail "$provider '$verb $sub' altered the call: $got"
   done
   rc=0; STUB_EXIT=7 bash "$stub/chain" state get </dev/null >/dev/null || rc=$?
   [ "$rc" = 7 ] || fail "$provider exit code not passed through (got $rc)"

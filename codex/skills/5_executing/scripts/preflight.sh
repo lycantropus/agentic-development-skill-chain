@@ -238,7 +238,7 @@ const { execFileSync } = require("child_process");
 const path = "biome.json";
 const raw = fs.readFileSync(path, "utf8");
 const config = JSON.parse(raw);
-const ignored = [".claude/settings.json", "scripts/compile-context-bundles.mjs", "scripts/gen-component-registry.mjs", "scripts/ledger.mjs", "scripts/render-pr-body.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"];
+const ignored = [".claude/settings.json", "scripts/compile-context-bundles.mjs", "scripts/gen-component-registry.mjs", "scripts/ledger.mjs", "scripts/render.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"];
 config.files ??= {};
 // Biome 2 removed `files.ignore` in favour of negated patterns in
 // `files.includes`, and rejects the old key outright — writing it makes
@@ -268,7 +268,7 @@ fs.writeFileSync(path, JSON.stringify(config, null, indent) + "\n");
 NODE
   say "✓ Biome ignores merged for framework-owned files"
 elif [ ! -f biome.jsonc ]; then
-  printf '%b\n' '{' '\t"files": {' '\t\t"includes": [' '\t\t\t"**",' '\t\t\t"!.claude/settings.json",' '\t\t\t"!scripts/compile-context-bundles.mjs",' '\t\t\t"!scripts/gen-component-registry.mjs",' '\t\t\t"!scripts/ledger.mjs",' '\t\t\t"!scripts/render-pr-body.mjs"' '\t\t]' '\t}' '}' > biome.json
+  printf '%b\n' '{' '\t"files": {' '\t\t"includes": [' '\t\t\t"**",' '\t\t\t"!.claude/settings.json",' '\t\t\t"!scripts/compile-context-bundles.mjs",' '\t\t\t"!scripts/gen-component-registry.mjs",' '\t\t\t"!scripts/ledger.mjs",' '\t\t\t"!scripts/render.mjs"' '\t\t]' '\t}' '}' > biome.json
   say "✓ Biome ignores created for framework-owned files"
 else
   say "⚠ biome.jsonc detected — add framework-owned scripts + .claude/settings.json to files.ignore before the setup commit"

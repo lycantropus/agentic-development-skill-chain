@@ -214,16 +214,16 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 
 | From (installed skill) | To |
 |---|---|
-| `5_executing/scripts/chain`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `render.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
-| `5_executing/templates/decisions.md.tmpl` | `templates/` |
+| `5_executing/templates/decisions.md.tmpl`, `morning-report.md.tmpl`, `stop-report.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
 | `cross-review/templates/cross-review-prompt.md.tmpl` | `templates/` |
 | `6_qa/scripts/ledger.mjs`, `harvest-debt.sh` | `scripts/` |
 | `7_documentation/scripts/curation-caps.sh` | `scripts/` |
 | `0b_intake/scripts/intake-seal-check.sh` | `scripts/` |
 | `5_executing/templates/agent-md-entry.md.tmpl` | `templates/` |
-| `8_delivery/scripts/conflict-probe.sh`, `render-pr-body.mjs`, `ci-poll.sh` | `scripts/` |
+| `8_delivery/scripts/conflict-probe.sh`, `ci-poll.sh` | `scripts/` |
 | `8_delivery/templates/pr-body.md.tmpl` | `templates/` |
 | `5_executing/scripts/wave-gate.sh`, `quality-gate-proof.sh`, `quality-evidence.mjs`, `gen-component-registry.mjs` | `scripts/` (as today) |
 

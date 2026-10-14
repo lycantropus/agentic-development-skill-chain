@@ -73,7 +73,7 @@ unset PONYTAIL_SUBAGENT_MATCHER
 
 # Pin helper scripts to THIS run's PROJ (no guessing the most recently modified
 # specs/PROJ-* with parallel PROJs).
-export SKILLCHAIN_PROJ="$PROJ" SKILLCHAIN_THEME="$THEME"
+export SKILLCHAIN_PROJ="$PROJ" SKILLCHAIN_THEME="$THEME" SKILLCHAIN_RUNNER_DIR="$RUNNER_DIR"
 
 # Model-opposite is only real if the models actually differ (review fix #4).
 if [ "$WRITER_MODEL" = "$REVIEW_MODEL" ]; then
@@ -374,7 +374,7 @@ stop_run() { # reason error_file
   if ! chain state transition "$PROJ" "$THEME" "$cur_ph" blocked >/dev/null 2>&1; then
     step "WARNING: could not transition ${cur_ph}:${cur_st} -> blocked — state remains '${cur_st}'; the stop cause is recorded in .stop and the stop report. Do NOT trust '${cur_st}' for this phase."
   fi
-  node "$RUNNER_DIR/render-report.mjs" stop "$PROJ" "$THEME" --reason "$reason" ${err:+--error-file "$err"} || true
+  chain render report stop "$PROJ" "$THEME" --reason "$reason" ${err:+--error-file "$err"} || true
   chain state set "$PROJ" "$THEME" .stop.report "$BASE/5_progress/stop-report.md" >/dev/null 2>&1 || true
   exit 1
 }
@@ -687,7 +687,7 @@ if [ "$PHASE_ARG" = "auto" ]; then
     # must stay clean for post-merge cleanup, so the renderer cannot write.
     ONELINER="$WORKTREE_REMOVAL_SUMMARY"
   else
-    ONELINER="$(node "$RUNNER_DIR/render-report.mjs" morning specs | head -n 1)"
+    ONELINER="$(chain render report morning specs | head -n 1)"
   fi
   command -v notify-send >/dev/null 2>&1 && notify-send "SkillChain run" "$ONELINER" || true
   echo "$ONELINER"

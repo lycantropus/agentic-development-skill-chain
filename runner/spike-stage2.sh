@@ -78,7 +78,7 @@ EOF
 mkdir -p specs/intake
 printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · Decision: adopt\n' > specs/intake/decisions.md
 
-for s in 5_executing/scripts/chain 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
+for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
          5_executing/scripts/story-slice.mjs 5_executing/scripts/validate-wave-plan.mjs \
          5_executing/scripts/ponytail-check.sh \
          6_qa/scripts/ledger.mjs 7_documentation/scripts/curation-caps.sh \
@@ -88,7 +88,7 @@ for s in 5_executing/scripts/chain 5_executing/scripts/state.sh 5_executing/scri
   cp "$SKILLS/$s" scripts/
 done
 mkdir -p templates
-cp "$SKILLS/cross-review/templates/cross-review-prompt.md.tmpl" templates/
+cp "$SKILLS/cross-review/templates/cross-review-prompt.md.tmpl" "$SKILLS"/5_executing/templates/{morning,stop}-report.md.tmpl templates/
 cp "$SKILLS"/5_executing/manifests/roles/*.md templates/roles/
 chmod +x scripts/*.sh scripts/chain
 git add -A; git commit -qm base
@@ -417,7 +417,7 @@ fi
 # degraded flag renders in the morning report
 bash scripts/chain state set 96 stage2 .degraded true >/dev/null
 bash scripts/chain state set 96 stage2 .degraded_reason '"codex unavailable at P7 (spike)"' >/dev/null
-node "$SPIKE_DIR/render-report.mjs" morning specs >/dev/null 2>&1
+bash scripts/chain render report morning specs >/dev/null 2>&1
 grep -rq "cross-review: model-opposite fallback" specs/morning-report-*.md 2>/dev/null \
   && ok "degradation rendered in the morning report (cross-review: model-opposite fallback)" \
   || bad "morning report missing the degradation flag"

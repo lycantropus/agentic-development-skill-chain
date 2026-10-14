@@ -94,7 +94,7 @@ out="$(bash probe.sh 2>&1)"; printf '%s\n' "$out" | grep -q '^runner: NOT FOUND'
 CLAUDE_HOME="$CASE/.claude" bash "$ROOT/scripts/install-claude.sh" >/dev/null
 CODEX_HOME="$CASE/codexhome" bash "$ROOT/scripts/install-codex.sh" >/dev/null
 for h in "$CASE/.claude" "$CASE/codexhome"; do
-  [ -x "$h/skills/5_executing/runner/run-phase.sh" ] && [ -f "$h/skills/5_executing/runner/render-report.mjs" ] \
+  [ -x "$h/skills/5_executing/runner/run-phase.sh" ] \
     && [ -d "$h/skills/5_executing/runner/prompts" ] || die "installer must ship the runner into $h"
   ls "$h"/skills/5_executing/runner/spike-*.sh >/dev/null 2>&1 && die 'spikes are dev-only and must not be installed'
 done

@@ -549,8 +549,8 @@ grep -F '[.waves[]?.frontend_routes[]?, .frontend.routes[]?] | length > 0' "$PRE
 cmp "$PREFLIGHT" "$ROOT/claude/skills/5_executing/scripts/preflight.sh" || fail "preflight provider copies differ"
 ok "preflight hard-checks worktree tools and detects structured frontend routes"
 
-grep -F 'join(here, "run-phase.sh")' "$ROOT/runner/render-report.mjs" >/dev/null || fail "report resume command does not resolve the actual runner"
-if grep -F 'git -C "${s.worktree.control_path}" worktree remove' "$ROOT/runner/render-report.mjs" >/dev/null; then fail "report still recommends raw worktree removal"; fi
+grep -F 'SKILLCHAIN_RUNNER_DIR' "$ROOT/claude/skills/5_executing/scripts/render.mjs" >/dev/null || fail "report resume command does not resolve the actual runner"
+if grep -F 'git -C "${s.worktree.control_path}" worktree remove' "$ROOT/claude/skills/5_executing/scripts/render.mjs" >/dev/null; then fail "report still recommends raw worktree removal"; fi
 ok "reports render a target-cwd P8 resume through the actual runner path"
 
 CI_POLL="$ROOT/codex/skills/8_delivery/scripts/ci-poll.sh"

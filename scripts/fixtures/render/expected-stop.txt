@@ -1,0 +1,33 @@
+# Stop Report — PROJ-1 (demo)
+
+**Stopped:** 
+**Phase:** P5:running
+**Stop cause:** boom
+
+## What happened (verbatim, last output)
+
+```
+(no captured output)
+```
+
+## State when parked
+
+- Phase/status: P5:running
+- Branch: `—` (base —)
+- Worktree: `/nonexistent/wt` from control `/nonexistent/repo` (retained — ci red)
+- Isolation: dependencies installed; .env.local linked; database/auth infrastructure shared; dev port 3001
+- Waves: 1/2; stories: PROJ-1-PRD-1-US-1=[object Object], PROJ-1-PRD-1-US-2=gap
+- lane claude/writer (P5): exit 1 — output: o.out
+- External prerequisite (declaration, not a pass): AC-1 / wave 1 — needs sso; decided by me at 2026. Readiness: `curl x`; evidence: 5_progress/ralph-wave-1.json.
+
+## Cleanup list
+
+- Lane output files under `specs/PROJ-1-demo/5_progress/lanes/`: review, then remove
+- Retained PROJ worktree `/nonexistent/wt`: after resolving the stop, resume P8 (reseal, push, exact-head CI, guarded cleanup) with `(cd '/nonexistent/wt' && '@RUNNER@/run-phase.sh' P8 '1' 'demo')`
+
+## Recommended next action
+
+Fix the stop cause, then resume with `bash scripts/chain state transition 1 demo P5 running` and re-run `runner/run-phase.sh P5 1 demo`.
+
+---
+_Rendered by `chain render report stop` from `state.json` — do not edit by hand. Worktrees and dev servers are documented, not deleted: they are evidence._

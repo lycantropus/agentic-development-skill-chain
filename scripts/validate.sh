@@ -160,7 +160,8 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
          5_executing/templates/agent-md-entry.md.tmpl \
          5_executing/scripts/gen-component-registry.mjs 5_executing/scripts/quality-gate-proof.sh 5_executing/scripts/quality-evidence.mjs \
          6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh \
-         8_delivery/scripts/conflict-probe.sh 8_delivery/scripts/render-pr-body.mjs \
+         8_delivery/scripts/conflict-probe.sh 5_executing/scripts/render.mjs \
+         5_executing/templates/morning-report.md.tmpl 5_executing/templates/stop-report.md.tmpl \
          8_delivery/scripts/ci-poll.sh 8_delivery/templates/pr-body.md.tmpl; do
   check_identical "$ROOT/claude/skills/$f" "$ROOT/codex/skills/$f"
 done
@@ -192,6 +193,7 @@ harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"
 harness chain-refs          node "$ROOT/scripts/check-chain-refs.mjs"
 harness chain-refs-test     bash "$ROOT/scripts/test-chain-refs.sh"
+harness render              bash "$ROOT/scripts/test-render.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
 harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"

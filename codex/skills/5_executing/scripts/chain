@@ -15,9 +15,10 @@
 # merge-project-settings.sh (Claude-only, manual one-time step).
 set -euo pipefail
 
-# The one place that maps verb -> script. Columns: verb | sub | script | kind.
+# The one place that maps verb -> script. Columns: verb | sub | script | kind | lead (optional).
 # A row with a sub matches when the first argument equals it (and is consumed);
 # a row without a sub takes every other call and passes all arguments through.
+# lead, when set, is passed to the script as its first argument (a folded script's own subcommand).
 # kind is one of the five script kinds: Record (sole writer of a file), Gate
 # (exit 0/1 plus report), Renderer (data to document), Environment (lifecycle,
 # setup) and Review (reviewer adapter).
@@ -40,8 +41,8 @@ check|ci|ci-poll.sh|Gate
 render|context|compile-context-bundles.mjs|Renderer
 render|slice|story-slice.mjs|Renderer
 render|registry|gen-component-registry.mjs|Renderer
-render|pr|render-pr-body.mjs|Renderer
-render|report|render-report.mjs|Renderer
+render|pr|render.mjs|Renderer|pr
+render|report|render.mjs|Renderer|report
 worktree||worktree.sh|Environment
 sync||sync-framework.mjs|Environment
 review||cross-review.sh|Review
@@ -86,10 +87,10 @@ row="$(table | awk -F'|' -v v="$verb" -v s="$sub" '$1 == v && $2 == s && s != ""
 if [ -n "$row" ]; then shift; else row="$(table | awk -F'|' -v v="$verb" '$1 == v && $2 == "" { print; exit }')"; fi
 [ -n "$row" ] || { echo "chain: unknown verb '$verb${sub:+ $sub}'" >&2; usage; }
 
-script="$(cut -d'|' -f3 <<<"$row")"
+script="$(cut -d'|' -f3 <<<"$row")"; lead="$(cut -d'|' -f5 <<<"$row")"
 path="$(find_script "$script")" || { echo "chain: $script not found (looked next to $here and in the installed skill tree)" >&2; exit 127; }
 [ "$where" = 0 ] || { echo "$path"; exit 0; }
 case "$script" in
-  *.mjs) exec node "$path" "$@" ;;
-  *) exec bash "$path" "$@" ;;
+  *.mjs) exec node "$path" ${lead:+"$lead"} "$@" ;;
+  *) exec bash "$path" ${lead:+"$lead"} "$@" ;;
 esac
