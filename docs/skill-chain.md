@@ -146,8 +146,8 @@ Stage 2 adds the bootstrap and the full context system:
   reconcile → sealed baseline commit (`chain check intake`; no state.json —
   concept (1) creates one per PROJ). See
   [0b_intake/SKILL.md](../claude/skills/0b_intake/SKILL.md).
-- **Worker context files:** every worker reads exactly one compiled file named
-  by path in its spawn prompt — nothing is pasted, no hook, no lock — so a
+- **Worker context files:** every story or role worker reads exactly one compiled file named
+  by path in its spawn prompt (micro-fixer and explore spawns get none) — nothing is pasted, no hook, no lock — so a
   story's context is bounded by its role's token budget and the plan hash on
   the file's first line. The P0 sequence and the file layout are in
   [how-it-works.md](how-it-works.md#p0-one-setup-run) and
