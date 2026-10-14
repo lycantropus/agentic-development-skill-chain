@@ -29,13 +29,12 @@ flowchart LR
   S7 --> S8[8 delivery + CP2]
 ```
 
-**Before the first PROJ, once.** A new product runs `product-vision` (0a) —
-`docs/PRODUCT.md` plus the numbered PROJ map in `specs/product-roadmap.md` —
-then `bootstrap` (0c), which decides the stack into `docs/ARCHITECTURE.md`
-§ Stack, runs the real scaffold, and writes root `AGENTS.md` + the
-`CLAUDE.md` pointer. An existing codebase runs `intake` (0b) instead, which
-reaches the same curated baseline by extraction. Run one path, not both;
-the discovery track skips 0c because there is no codebase.
+**Before the first PROJ, once.** A new product runs
+[`product-vision` (0a)](../claude/skills/0a_product-vision/SKILL.md) and then
+[`bootstrap` (0c)](../claude/skills/0c_bootstrap/SKILL.md); an existing codebase
+runs [`intake` (0b)](../claude/skills/0b_intake/SKILL.md) instead, which reaches
+the same curated baseline by extraction. Run one path, not both; the discovery
+track skips 0c because there is no codebase.
 
 The chain serves two delivery tracks: the full in-repo build (Steps 1–7) and a **product discovery** track that stops at Step 2 and hands a PRD to a developer via Linear. See [PM / Product Discovery Chain](pm-chain.md).
 
@@ -84,162 +83,111 @@ After decomposition:
 | 2c | review-reconcile | Resolve PRD review gaps point by point; defer engineering items to a developer meeting (discovery endpoint or requested full-chain export) |
 | 3 | architecture | Produce the PROJ technical architecture for developers |
 | 4 | writing-plans | Split independently verifiable stories into dependency-ordered waves; use expand–contract for wide migrations |
-| 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through the subskills below, then the waves with the same `chain state`, wave tag, wave gate, Outer Ralph recovery, Quality Gate proof and Skill 6 handoff as `5_executing`; TDD choreography and persona reviews replaced by intent and invariants, workers tiered by `Complexity`, the strongest model leads |
-| 5 | executing | Full-procedure alternative for weaker writer models. Hosts the subskills: run Checkpoint 1 and P0 in subagents — `subskills/checkpoint.md` (structured reconcile loop: decision log, cascaded plan updates, seal `CP1:approved`; the user dialogue stays with the orchestrator; the same loop serves CP2 via delivery and bootstrap via intake) and `subskills/setup.md` (persistent PROJ worktree + branch/BASE_SHA, tool/auth preflight, reproducible dependency install, framework helpers synchronized from installed skills with an adaptation-protecting hash manifest) — then delegate code/test/fix edits to workers, run TDD plus one wave-scoped Ralph pass and hard wave gates, then an integration-focused PROJ gate and direct Skill 6 handoff |
+| 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through `5_executing`'s subskills, then the waves under the same gate and state contracts, with procedure reduced to intent and invariants ([SKILL.md](../claude/skills/5b_executing-large-model/SKILL.md)) |
+| 5 | executing | Full-procedure alternative for weaker writer models; hosts the checkpoint and setup subskills, the framework scripts and the shared references ([SKILL.md](../claude/skills/5_executing/SKILL.md)) |
 | 6 | qa | Run E2E QA, security, the required opposite-provider six-persona review (the only persona panel), simplicity review (what the Step 5 static and mutation gates cannot decide), and mutation-survivor input; strictly read-only finder in framework runs |
 | 7 | documentation | Curate feature and technical docs, then merge approved AGENTS.md candidates |
 | 8 | delivery | Conflict probe against main, PR body rendered from state.json + findings.json and declared external prerequisites in wave-gate-config.json, bounded CI fix loop, Checkpoint 2 comment reconcile |
 
 ## Framework Runs (Agent Workflow, Stage 1 + Stage 2)
 
-The script map (`chain <verb>`), the P0–P8 phases and which gate is a script or a review are on one page: [how-it-works.md](how-it-works.md). This section keeps the runner mechanics.
+The script map (`chain <verb>`), the P0–P8 phases and which gate is a script or a review are on one page: [how-it-works.md](how-it-works.md). This section keeps the runner mechanics and points to the one source of each contract.
 
-Once Step 5 has sealed P0 (`P0:done`), it asks once whether to run P5 to a PR unattended, drive it
-to the PR in the current session (the lead plays the runner's role; `/goal` keeps the session
-turning), or continue interactively. On unattended it starts the host-neutral phase runner detached
-(`runner/run-phase.sh auto <X> <theme>`), which drives P5 → P6 → P7 → P8
-unattended — dual Claude + Codex lanes with a single writer-orchestrator per phase,
-`state.json`/`findings.json` as the only handoff, and a stop policy: a failed
-writer, timeout, unsealed phase, or red gate parks the run — rescue branch
-for uncommitted work, state moved to `blocked` with the exact cause, a
-rendered stop report — instead of continuing degraded. A successful run ends
-in P8 with a one-line summary (final CI head, open PR or removed worktree, post-merge rerun command); the
-renderer is skipped there because the worktree must stay clean for post-merge
-cleanup. The cross-PROJ morning report is rendered on demand with
-`bash ~/.claude/skills/5_executing/scripts/chain render report morning specs`. If the `codex` CLI is missing or unauthenticated,
-the run degrades to single-provider with a model-opposite review lane —
-flagged in the morning report and PR body, never silent. See
-[runner/README.md](../runner/README.md) and CONCEPT.md for the full model.
+**Unattended runs, stop policy, morning report.** Once Step 5 has sealed P0,
+it asks once whether to run P5 to the PR unattended, drive it in the current
+session, or continue interactively
+([unattended-handoff.md](../claude/skills/5_executing/references/unattended-handoff.md)).
+The detached runner drives P5 → P6 → P7 → P8 with dual Claude + Codex lanes, one
+writer-orchestrator per phase and `state.json`/`findings.json` as the only
+handoff; a failed writer, timeout, unsealed phase or red gate parks the run with
+a rescue branch and a rendered stop report instead of continuing degraded, and a
+missing or unauthenticated `codex` degrades to a model-opposite review lane,
+flagged, never silent. The invariants, the pinned models and the stop policy are
+in [runner/README.md](../runner/README.md#invariants-the-runner-owns); the stop
+report is rendered from
+[stop-report.md.tmpl](../claude/skills/5_executing/templates/stop-report.md.tmpl)
+and the cross-PROJ morning report on demand with
+`bash ~/.claude/skills/5_executing/scripts/chain render report morning specs`.
 
-The writer lane owns decomposition, dispatch, integration, deterministic
-verification, gates, commits, and operational records. When delegation is
-available and permitted, it delegates every covered code, test, fix, and
-documentation edit to workers under its authority: disjoint ownership runs in
-parallel, dependencies or overlap run serially, and corrections return to a
-follow-up worker. Local editing is allowed only as an explicitly reported
-unavailable/prohibited fallback; the peer lane remains read-only.
+**Worktree and shared resources.** P0 creates or resumes a persistent sibling
+worktree for `proj/PROJ-X` that the runner re-enters for every later phase;
+source and dependencies are isolated, while `.env.local`, the development
+database and the hosted-auth budget are explicitly shared. Migrations and
+auth-consuming commands run under `chain worktree with-shared-lock`
+(exclusive by default; proven independent fixture lifecycles may opt into
+`--shared`), and `chain check preflight` plus every `chain gate wave` run
+`chain check migrations` on Supabase projects. The worktree contract is in
+[setup.md §1](../claude/skills/5_executing/subskills/setup.md), lock diagnosis
+and worker handover in
+[worker-lifecycle.md](../claude/skills/5_executing/references/worker-lifecycle.md),
+and the guarded post-merge cleanup in
+[8_delivery/SKILL.md](../claude/skills/8_delivery/SKILL.md) (the worktree stays
+while the PR is open and is removed only after an authoritative `MERGED` state
+with green CI on that exact head).
 
-P0 creates or resumes a persistent sibling worktree for `proj/PROJ-X`; the
-runner re-enters it before P5 and keeps it through P8. Source and dependencies
-are isolated. `.env.local` is an ignored symlink to the control checkout, while
-the development database and hosted-auth budget are explicitly shared. P8
-removes the worktree only once the PR is `MERGED` (authoritative `gh pr view`
-state), with green final CI on that exact head, an identical pushed upstream
-commit, and a clean tree. While the PR is open, P8 is done and waits: the
-worktree is kept for review follow-up and the summary prints the post-merge
-rerun command. Any other refusal retains its path, cleanup reason,
-and the safe P8 resume command that reseals before retrying cleanup.
-
-`chain worktree with-shared-lock` is exclusive by default across worktrees for
-commands that acquire it, including auth-consuming gate commands. Proven
-independent fixture lifecycles may opt into `--shared` on the same lock file;
-migrations, resets and overlapping mutable fixtures remain exclusive. This
-preserves migration exclusion without automatically parallelizing the gate or
-isolating test data/auth budgets. Neither mode prevents a worktree advancing
-the schema before a sibling next uses its older `supabase/migrations/`. For a
-project on Supabase, `chain check preflight` (P0) and `chain gate wave` (every wave) both
-run `chain check migrations`, hard-failing with the exact drifted migration
-version(s) and the `supabase db reset` fix. See the `supabase-local-dev`
-skill for the same check outside the chain's P0/wave-gate flow.
-
-Wave plans carry structured AC/test-file mappings, targeted regressions,
-auth-budget metadata, and deterministic frontend route expectations. Planning,
-Checkpoint 1, and P0 run the same consistency validator. A green wave gate
-reuses exact same-HEAD evidence produced by its `--ac-only` pass, then certifies
-current ACs plus declared regressions—not every earlier AC command.
-Projects may add `complexity_cmd` and `arch_rules_cmd` to the gate config: the wave gate runs
-them last in the AC pass (ACs green first), so structure is judged by tools that fail and the
-failure goes back to fresh workers through the existing recovery stages, not by a cleaner agent.
-`mutation_cmd` is the PROJ-end counterpart for test quality: mutation testing scoped to the feature
-diff runs once in the Quality Gate before coverage and Sonar, survivors get a tests-only fix round, and
-unresolved survivors are carried forward to QA instead of blocking.
-Legacy string AC entries are rejected by the current wave gate. Upgrade them to
-structured AC metadata in Writing Plans and reapprove before execution; the
-runtime does not infer AC identity from an old array position.
-
-Browser scenarios have a named owner and files per wave or cohesive feature;
-the execution closure checklist covers every story's smoke behavior in both
-sequential and parallel modes. Optional `selection_check_cmd` hooks prove a
-positive scenario count in Phase 0 before AC execution; test files over 800
-lines produce an advisory warning. An authorized `external_dependency` retains
-the AC and test while recording `blocked_external` when its prerequisite is
-absent. Exit 76 grants no wave certificate or next-wave permission; rendered
-PR, stop and morning reports include the declared prerequisites. See
-[Executing Skill](executing-skill.md) for these contracts and worker handover
-rules, and [Installation](installation.md) before enabling new fields or shared
-mode in an existing project copy.
+**Wave gate.** Wave plans carry structured AC/test-file mappings, targeted
+regressions, auth-budget metadata and deterministic route expectations, and
+`chain gate wave` certifies the current wave's ACs plus declared regressions —
+not every earlier AC — so structure and quality are judged by tools that fail
+(optional `complexity_cmd`, `arch_rules_cmd`, `selection_check_cmd`) and fed
+back through the existing recovery stages, not by a cleaner agent. An
+authorized `external_dependency` keeps the AC and test and parks the wave as
+`blocked_external` (exit 76) without a certificate. The gate contract is the
+[Wave Completion Gate](../claude/skills/5_executing/SKILL.md#wave-completion-gate),
+the config fields and judgment rules are in
+[wave-gate-config.md](../claude/skills/4_writing-plans/references/wave-gate-config.md),
+and the recovery stages in
+[Wave-Scoped Outer Ralph](executing-skill.md#wave-scoped-outer-ralph).
 
 Stage 2 adds the bootstrap and the full context system:
 
 - **`intake` (0b), once per repo:** scan → provenance-marked drafts of the
-  curated docs baseline (PRODUCT, ARCHITECTURE, GUIDELINES, DESIGN-SYSTEM,
-  components, security-baseline, test-conventions, root AGENTS.md) →
-  developer interview → checkpoint-subskill bootstrap reconcile → sealed
-  baseline commit (`chain check intake`; no state.json — concept (1)
-  creates one per PROJ).
-- **Worker context files:** P0 compiles one file per worker from the
-  baseline (`chain render context`): `context/workers/wave-N/<US-ID>.md`
-  per story — role rules, project context, the PROJ architecture filtered to
-  the wave, the wave's API contracts and `## Deine Story` with the story's
-  wave-plan section verbatim (`chain render slice`) — and
-  `context/roles/wave-N/<role>.md` for roles without a story (reviewer,
-  Quality-Gate fix workers). The story's role is the `Agent Type` column of the
-  plan table; every wave compiles on its own, there is no cross-wave view. Per-role
-  token budgets cover the role context (the story size is reported, not capped);
-  a role over budget aborts `compile`. No hook, no lock, no hash bookkeeping (a file's first line carries the plan hash): the lead
-  names the file by path in the spawn prompt and the worker reports
-  `Brief: <US-ID>` plus the test file per AC. micro-fixer and explore spawns get
-  nothing by design.
-  The PROJ architecture reaches implementers as a compiled view of the one
-  `PROJ-<X>-architecture.md`: each decision's and key flow's Summary line
-  (plus an override note when it `Changes baseline`), filtered to the PRDs of
-  the running wave (projects planned before Summary lines existed get
-  `architecture-delta.md`, else the whole file unfiltered — fallback, no
-  migration required); the files are recompiled at every wave start
-  (`compile --wave N`). `chain render context check` runs in
-  writing-plans and at CP1, so a role over budget or a story without a role
-  surfaces before approval. Running projects pick up changes with `sync` → `compile --wave N`.
-  The lead reads only the wave shape (each plan's `User Stories in this Wave` and
-  `Execution` sections) plus the current wave's plan.
-- **Ponytail parity:** the minimalism ladder comes from the Ponytail
-  plugin on both providers — same version and mode, gated in the P0
-  preflight. P0 leaves its matcher unset so generic implementation
-  fallbacks receive the same ladder.
-- **P7 curation + gates:** `documentation` (7) curates docs/ and
-  `src/**/agent.md` — `docs/ARCHITECTURE.md` stays a current-state
-  description (Stack · System shape · Data ownership · Invariants), edited in
-  place from the PROJ's `Changes baseline` lines, never a per-PROJ
-  chronicle — then must pass FORM (`chain check caps`: PRODUCT
-  ≤30 non-blank lines, ARCHITECTURE ≤200 lines, agent.md ≤100 lines,
-  GUIDELINES ≤120, security-baseline and test-conventions ≤60) and
-  TRUTH (`cross-review`: the provider opposite the curation author
-  reviews the docs delta against the PROJ diff; Critical/High block the
-  phase, up to 3 automatic rounds while findings remain; manual rounds have no limit). The runner re-verifies both gates after the seal.
-- **`cross-review`:** symmetric opposite-provider review mechanism
-  (Claude-authored → `codex exec`, Codex-authored → authenticated, isolated
-  `claude -p` with validated structured output; degraded fallback =
-  model-opposite, always flagged). Active call sites:
-  required PRD review in Step 2, automatic concept/architecture/plan reviews,
-  required P6 QA opposite-provider six-persona review, and the P7 docs truth gate. Review prompts
-  have a 900,000-byte default embedded-material cap; large diffs use explicit
-  pathspecs and name every omitted changed path.
-  The Claude adapter reports Claude Code's hard 10 MB stdin ceiling rather
-  than truncating review material. The QA gate launches one isolated worker per
-  persona: when the opposite provider is unavailable, QA falls back loudly to six
-  same-vendor workers (Claude: strongest model; Codex: default), flagged degraded.
-- **Integration-focused PROJ gate:** once every wave passes, the PROJ
-  quality gate reviews only the assembled cross-wave diff from `BASE_SHA`
-  (contracts, shared state, authorization boundaries, unresolved wave
-  findings) rather than replaying wave ACs — plus a verified `build_cmd`,
-  Sonar once at PROJ end with a bounded 3-round fix/rescan loop, and
-  declared quality-phase tests/lint. The reviewer, build and coverage can
-  run concurrently where resources allow; Sonar waits for coverage. See
-  [Executing Skill](executing-skill.md#proj-quality-gate).
+  curated docs baseline → developer interview → checkpoint-subskill bootstrap
+  reconcile → sealed baseline commit (`chain check intake`; no state.json —
+  concept (1) creates one per PROJ). See
+  [0b_intake/SKILL.md](../claude/skills/0b_intake/SKILL.md).
+- **Worker context files:** every story or role worker reads exactly one compiled file named
+  by path in its spawn prompt (micro-fixer and explore spawns get none) — nothing is pasted, no hook, no lock — so a
+  story's context is bounded by its role's token budget and the plan hash on
+  the file's first line. The P0 sequence and the file layout are in
+  [how-it-works.md](how-it-works.md#p0-one-setup-run) and
+  [What a worker file contains](how-it-works.md#what-a-worker-file-contains);
+  the compile step in
+  [setup.md §6](../claude/skills/5_executing/subskills/setup.md); what each
+  role gets (`inject` lists and budgets) in the
+  [role manifests](../claude/skills/5_executing/manifests/roles/).
+- **Ponytail parity:** the minimalism ladder comes from the Ponytail plugin on
+  both providers, with version and mode parity gated in the P0 preflight
+  ([setup.md §6d](../claude/skills/5_executing/subskills/setup.md)).
+- **P7 curation + gates:** `documentation` (7) curates `docs/` and
+  `src/**/agent.md` in place, then must pass FORM (`chain check caps`; all
+  caps are defined once in that script's header — `chain check caps --help`
+  prints them) and
+  TRUTH (a `cross-review` of the docs delta against the PROJ diff; Critical/High
+  block the phase). The runner re-verifies both gates after the seal.
+- **`cross-review`:** symmetric opposite-provider review mechanism — a Claude
+  author is reviewed by Codex and the reverse; without Codex the strongest
+  non-author model takes over, flagged degraded (the six-persona QA fallback
+  runs on the strongest Claude model even when it is the author's). Active call sites: required
+  PRD review in Step 2, automatic concept/architecture/plan reviews, the required
+  P6 QA six-persona review, and the P7 docs truth gate. Routing, rounds and
+  size limits are in
+  [cross-review/SKILL.md](../claude/skills/cross-review/SKILL.md#routing-and-output-integrity);
+  the pinned writer/review models in
+  [runner/README.md](../runner/README.md#invariants-the-runner-owns).
+- **Integration-focused PROJ gate:** once every wave passes, the PROJ quality
+  gate reviews only the assembled cross-wave diff from `BASE_SHA` rather than
+  replaying wave ACs, plus build, declared quality-phase tests, lint, optional
+  mutation hardening and Sonar once at PROJ end; Sonar and mutation survivors
+  that outlive their bounded fix rounds are carried forward to QA instead of
+  blocking. The gate sequence, status lines and carry-forward rules are in
+  [quality-gate.md](../claude/skills/5_executing/references/quality-gate.md);
+  the overview in [PROJ Quality Gate](executing-skill.md#proj-quality-gate).
 - **Hard gates:** P6 cannot seal with an open Critical/High finding. P7
-  cannot seal unless the curated docs pass both FORM (`chain check caps`,
-  caps above) and TRUTH (a `cross-review` that actually ran this P7 with
-  no blocking findings left). The runner independently re-verifies every
-  gate after its seal.
+  cannot seal unless the curated docs pass both FORM (`chain check caps`)
+  and TRUTH (a `cross-review` that actually ran this P7 with no blocking
+  findings left). The runner independently re-verifies every gate after its
+  seal.
 - **Bounded evidence retention:** CodeRabbit's raw output is kept because
   the local gate parses it; CI and Sonar reports stay in their source
   systems, while the PROJ gate retains only command logs and task-receipt
