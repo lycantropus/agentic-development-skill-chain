@@ -29,7 +29,7 @@ Runs only when `wave-gate-config.json` has a top-level `mutation_cmd` (contract:
 bash scripts/chain quality <X> <theme> run mutation
 ```
 
-Survivors go to **one tests-only fix round** per round: dispatch a worker whose ownership is test files only, with the tool output verbatim, then commit and rerun. A survivor that needs a production change is not fixed here; the lead logs it as a finding for QA. Maximum three rounds. If survivors remain after round 3, do **not** escalate or block: record them in `5_progress/PROJ-<X>-progress.md` as carried-forward (file, mutant, what the last test added) (the status block then reads `ran (survivors carried forward)`, derived from the exit-1 record). Late is safe because this round cannot change production code; QA assigns severity (Skill 6 §1c).
+Survivors go to **one tests-only fix round** per round: dispatch a worker whose ownership is test files only, with the tool output verbatim, then commit and rerun. A survivor that needs a production change is not fixed here; the lead logs it as a finding for QA. Maximum three rounds. If survivors remain after round 3, do **not** escalate or block: record them in `5_progress/PROJ-<X>-progress.md` as carried-forward (file, mutant, what the last test added) (the status block then reads `ran (N survivors carried forward)`, N from the wrapper's `Survivors: N` line; exit 1 without that line, or with `Survivors: 0`, is not valid evidence, so the wrapper must print it next to `Mutants: N`). `chain quality seal` requires at least one bullet under `### Carried Forward (Mutation` in that case. Late is safe because this round cannot change production code; QA assigns severity (Skill 6 §1c).
 
 ---
 
@@ -104,10 +104,11 @@ command -v sonar >/dev/null && command -v sonar-scanner >/dev/null
    (only `sonar-scanner` writes this) with an mtime at or after this step's
    start.
 
-3. Fetch current Sonar issues, measures, and quality-gate status:
+3. Fetch current Sonar issues, measures, and quality-gate status. Save the issue list under `5_progress/` and record it; `sonar-issues` binds that file to the current scan, rejects an incomplete list (every page must be in it, `paging.total` equal to the number of issues) and keeps the open BLOCKER/CRITICAL/MAJOR issues in files changed since the base tag (step 4's filter). Fetch the list after the scan has finished and again after every rescan (a file older than the current scan record is rejected; moving the base tag invalidates the record):
    ```bash
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-   sonar list issues --project <project-key> --branch "$BRANCH" --page-size 500
+   sonar list issues --project <project-key> --branch "$BRANCH" --page-size 500 > 5_progress/sonar-issues.json
+   bash scripts/chain quality <X> <theme> sonar-issues 5_progress/sonar-issues.json
    sonar api get "/api/measures/component?component=<project-key>&metricKeys=bugs,vulnerabilities,code_smells,security_hotspots,coverage,duplicated_lines_density,ncloc"
    sonar api get "/api/qualitygates/project_status?projectKey=<project-key>"
    ```
@@ -121,9 +122,10 @@ command -v sonar >/dev/null && command -v sonar-scanner >/dev/null
    - **INFO** → log only
 
 6. Return BLOCKER/CRITICAL/MAJOR findings to the coordinator's combined recovery round below, up to three Sonar fix/rescan rounds. Do not independently rerun tests or dispatch fixes from the Sonar stream.
+   - `chain quality seal` accepts open issues only with at least four recorded scans (the initial one plus three fix rounds, `5_progress/quality-sonar-rounds.json`) and every open issue key in that section; the status then reads `ran (N carried forward)`.
    - Each round's scan must independently satisfy step 2's no-silent-no-op check — a round that produces no fresh `.scannerwork/report-task.txt` did not run and cannot count toward the 3.
    - Update `scripts/sonar-tracker.md` if it exists (mark fixed items `[x]`) after every round.
-   - **If BLOCKER/CRITICAL/MAJOR issues remain after round 3:** document each one in `5_progress/PROJ-<X>-progress.md` (file, line, rule, severity, what the last fix attempt changed and why the issue persisted). Do **not** escalate, do **not** stop the run, and do **not** block this gate on it — record it as carried-forward and continue to QA handoff. This differs from every other Quality Gate item: a code-review or build failure that survives 3 iterations escalates to the user; a Sonar finding that survives 3 rounds is documented and carried forward instead.
+   - **If BLOCKER/CRITICAL/MAJOR issues remain after round 3:** document each one under `### Carried Forward (Sonar` in `5_progress/PROJ-<X>-progress.md` (issue key, file, line, rule, severity, what the last fix attempt changed and why the issue persisted). Do **not** escalate, do **not** stop the run, and do **not** block this gate on it — record it as carried-forward and continue to QA handoff. This differs from every other Quality Gate item: a code-review or build failure that survives 3 iterations escalates to the user; a Sonar finding that survives 3 rounds is documented and carried forward instead.
 
 7. Log MINOR/INFO, and any BLOCKER/CRITICAL/MAJOR still open after round 3, to `5_progress/PROJ-<X>-progress.md`.
 
@@ -185,11 +187,11 @@ For every gate item except the Sonar and mutation fix loops: if it cannot pass a
 | Check | Status |
 |---|---|
 | Code Review | passed |
-| Mutation | ran \| ran (survivors carried forward) \| skipped (not configured) |
+| Mutation | ran \| ran (2 survivors carried forward) \| skipped (not configured) |
 | Build | passed |
 | Tests | passed \| skipped (none declared) |
 | Lint | passed |
-| SonarCloud | ran \| skipped (sonar CLI unavailable) \| skipped (project not configured) |
+| SonarCloud | ran \| ran (1 carried forward) \| skipped (sonar CLI unavailable) \| skipped (project not configured) |
 <!-- /quality-status -->
 
 ### Code Review
@@ -222,5 +224,5 @@ Standards: 2 findings (worst: P2 data clump)
 - `src/features/foo/price.ts:31` — mutant `>` → `>=` survives; the boundary needs a production-visible contract, not a test
 
 ### Carried Forward (Sonar, 3 fix rounds exhausted)
-- Major: `src/features/foo/legacy-parser.ts:120` — Cognitive complexity 24 (limit 15); round 3 refactor reduced it to 18, still over limit — needs a structural split, not a local fix
+- Major `AZabc123`: `src/features/foo/legacy-parser.ts:120` — Cognitive complexity 24 (limit 15); round 3 refactor reduced it to 18, still over limit — needs a structural split, not a local fix
 ```

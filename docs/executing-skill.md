@@ -255,7 +255,7 @@ It focuses on assembled cross-wave risks and does not replay wave ACs. It includ
 
 - Cross-wave contracts, shared state, authorization boundaries and unresolved wave findings. The reviewer follows affected interfaces and callers instead of repeating the wave review or QA's opposite-provider persona review.
 - A verified PROJ build using `build_cmd`, with conservative final-wave artifact reuse.
-- Mutation hardening (optional `mutation_cmd`), first, scoped to the feature diff: at most three tests-only fix rounds (a survivor needing a production change becomes a finding), then survivors are carried forward like Sonar's, never blocking; QA assigns their severity.
+- Mutation hardening (optional `mutation_cmd`), first, scoped to the feature diff: at most three tests-only fix rounds (a survivor needing a production change becomes a finding), then survivors (the wrapper prints `Survivors: N`) are carried forward like Sonar's, never blocking; QA assigns their severity.
 - Sonar at PROJ end: an initial scan and bounded fix/rescans. If the configured wrapper also generates coverage, split it into `coverage_cmd` plus a scanner-only `sonar_cmd`, retaining the ordinary combined wrapper entry point for other callers. Coverage failures block; uploading partial coverage is not a passing test result.
 - Declared `quality` phase tests and lint. CI/nightly commands are checked for workflow wiring, not replayed locally. Wave ACs are not replayed here.
 
@@ -275,7 +275,7 @@ bash scripts/chain quality <X> <theme> review <report-path>
 bash scripts/chain quality seal <X> <theme>
 ```
 
-Record a review only after its P0/P1 findings are resolved. For an allowed Sonar skip, use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`. Every successful action renders the `### Gate Status` block of the Quality Gate section in `progress.md` from the records (never edit it; `check` re-renders it). `seal` reads only the records: it requires valid evidence for current inputs and a status block that matches it. Sonar submission requires a fresh task receipt; the Sonar reviewer still checks the server's completed analysis and records its disposition.
+Record a review only after its P0/P1 findings are resolved. For an allowed Sonar skip, use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`. Every successful action renders the `### Gate Status` block of the Quality Gate section in `progress.md` from the records (never edit it; `check` re-renders it). `seal` reads only the records: it requires valid evidence for current inputs and a status block that matches it. Sonar submission requires a fresh task receipt, and the saved `sonar list issues` output is recorded with `sonar-issues` (bound to that scan; open BLOCKER/CRITICAL/MAJOR in changed files need at least four recorded scans and their keys under `### Carried Forward (Sonar` for `seal`); the Sonar reviewer still checks the server's completed analysis and records its disposition.
 
 Exit criteria:
 

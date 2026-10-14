@@ -165,7 +165,7 @@ Read the `SonarCloud` row of the `### Gate Status` table and the `### SonarCloud
 
 Read the `Mutation` row of the `### Gate Status` table in `5_progress/PROJ-<X>-progress.md` (rendered from the evidence records).
 
-- `ran (survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
+- `ran (N survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
 - `ran`: the tool's own threshold was met; record it and continue.
 - `skipped (not configured)`: record Mutation as skipped; not a QA blocker.
 - Never run `mutation_cmd` during QA. The run belongs to Skill 5's Quality Gate; QA consumes its result.

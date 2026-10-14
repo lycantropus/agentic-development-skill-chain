@@ -279,7 +279,7 @@ Standards: <findings, worst> — vs AGENTS.md/conventions
 ## Variant Notes
 - Complexity column present: yes/no; worker models used per story.
 - Recovery stage reached per wave: …
-- Mutation (when `mutation_cmd` set): rounds used, survivors carried forward.
+- Mutation (when `mutation_cmd` set): rounds used, survivors carried forward (`Survivors: N`, bullets under `### Carried Forward (Mutation`).
 - Static checks (when `complexity_cmd`/`arch_rules_cmd` set): first-attempt
   failures per wave, parallel vs sequential, and the rules that fired
   (input for deciding on per-story checks and on trimming `GUIDELINES.md`).

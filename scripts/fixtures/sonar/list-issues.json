@@ -1,0 +1,82 @@
+{
+  "total": 6,
+  "p": 1,
+  "ps": 500,
+  "paging": {
+    "pageIndex": 1,
+    "pageSize": 500,
+    "total": 6
+  },
+  "issues": [
+    {
+      "key": "AaDeRWSeAduN7hzMwYiT",
+      "rule": "typescript:S6759",
+      "severity": "MINOR",
+      "component": "silviobeer_logofuchs:src/app/(app)/(workspace)/faelle/[referenz]/test-tile.tsx",
+      "project": "silviobeer_logofuchs",
+      "line": 166,
+      "status": "OPEN",
+      "message": "Mark the props of the component as read-only.",
+      "type": "CODE_SMELL",
+      "issueStatus": "OPEN"
+    },
+    {
+      "key": "AaDisztTfrtgx8ebpCZQ",
+      "rule": "typescript:S6481",
+      "severity": "MAJOR",
+      "component": "silviobeer_logofuchs:src/app/(app)/(workspace)/faelle/[referenz]/kontext-board.tsx",
+      "project": "silviobeer_logofuchs",
+      "line": 37,
+      "status": "OPEN",
+      "message": "The object passed as the value prop to the Context provider changes every render. To fix this consider wrapping it in a useMemo hook.",
+      "type": "CODE_SMELL",
+      "issueStatus": "OPEN"
+    },
+    {
+      "key": "AaDaXFaCq4W2fLIy8jM4",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "component": "silviobeer_logofuchs:src/lib/case/base-data.ts",
+      "project": "silviobeer_logofuchs",
+      "line": 113,
+      "status": "OPEN",
+      "message": "Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.",
+      "type": "CODE_SMELL",
+      "issueStatus": "OPEN"
+    },
+    {
+      "key": "AZ_6TYNI7oE_tdhorVGw",
+      "rule": "typescript:S2187",
+      "severity": "BLOCKER",
+      "component": "silviobeer_logofuchs:tests/integration/test-result-locking.test.ts",
+      "project": "silviobeer_logofuchs",
+      "status": "OPEN",
+      "message": "Add some tests to this file or delete it.",
+      "type": "CODE_SMELL",
+      "issueStatus": "OPEN"
+    },
+    {
+      "key": "AaDdwET3AduN7hzMs0Sq",
+      "rule": "typescript:S3776",
+      "severity": "CRITICAL",
+      "component": "silviobeer_logofuchs:src/app/(app)/(workspace)/faelle/[referenz]/views/assistent-view.tsx",
+      "project": "silviobeer_logofuchs",
+      "status": "CLOSED",
+      "message": "Refactor this function to reduce its Cognitive Complexity from 18 to the 15 allowed.",
+      "type": "CODE_SMELL",
+      "issueStatus": "FIXED"
+    },
+    {
+      "key": "AZ_x2QIwxzD3XMBc2Qmj",
+      "rule": "typescript:S1607",
+      "severity": "MAJOR",
+      "component": "silviobeer_logofuchs:e2e/fall.spec.ts",
+      "project": "silviobeer_logofuchs",
+      "line": 522,
+      "status": "RESOLVED",
+      "message": "Remove this unit test or explain why it is ignored.",
+      "type": "CODE_SMELL",
+      "issueStatus": "FALSE_POSITIVE"
+    }
+  ]
+}

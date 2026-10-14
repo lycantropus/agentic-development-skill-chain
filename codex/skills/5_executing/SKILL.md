@@ -207,7 +207,7 @@ Updated after every task, after the initial wave verification and each recovery 
 <!-- /quality-status -->
 
 Each `chain quality` action re-renders the block above from the `5_progress/quality-*.json` records (`passed`, `ran`,
-`ran (survivors carried forward)`, `skipped (…)` or `pending`). Never edit it; write only the findings below.
+`ran (N survivors carried forward)`, `ran (N carried forward)` (Sonar), `skipped (…)` or `pending`). Never edit it; write only the findings below.
 
 ### Code Review
 Spec: <findings, worst> — vs PRD/AC/plan
@@ -659,10 +659,10 @@ consolidates reviewer, build, integration/quality-phase, and Sonar results. Do n
 
 **Exit criteria:**
 - Zero P0/P1 code review findings
-- If `mutation_cmd` is configured: mutation evidence is current; survivors after three tests-only rounds are carried forward in `progress.md`, never blocking
+- If `mutation_cmd` is configured: mutation evidence is current; survivors after three tests-only rounds are carried forward as bullets under `### Carried Forward (Mutation` in `progress.md`, never blocking (the wrapper must print `Survivors: N`)
 - `build_cmd` from `wave-gate-config.json` passes once for the assembled PROJ
 - Every `quality` phase command passes once; CI/nightly workflow wiring is verified
-- If Sonar ran: zero BLOCKER/CRITICAL/MAJOR sonar issues, or every remaining one is documented as carried-forward after the 3-round fix loop (carried-forward Sonar issues do not block this gate)
+- If Sonar ran: zero BLOCKER/CRITICAL/MAJOR sonar issues, or every remaining one is listed by issue key under `### Carried Forward (Sonar` after the 3-round fix loop (at least four recorded scans; carried-forward Sonar issues do not block this gate). Record the saved `sonar list issues` output with `chain quality <X> <theme> sonar-issues 5_progress/<file>` after every scan
 - If Sonar was skipped because CLIs or project config were unavailable: the skip is recorded with `skip-sonar` and shows in the status block
 - Declared integration/quality-phase tests passing, no new lint errors
 
