@@ -137,7 +137,7 @@ done
 for platform in claude codex; do
   for ref in "$ROOT/$platform/skills/5_executing/references/"*; do
     name="$(basename "$ref")"
-    grep -rqF --exclude="$name" -- "$name" "$ROOT/$platform/skills" "$ROOT/runner" || \
+    grep -rqF --exclude="$name" -- "$name" "$ROOT/$platform/skills/5_executing" "$ROOT/$platform/skills/5b_executing-large-model" "$ROOT/runner" || \
       fail "orphan reference, cited by nothing: $platform/skills/5_executing/references/$name"
   done
 done
