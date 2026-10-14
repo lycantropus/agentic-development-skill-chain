@@ -79,6 +79,10 @@ names, the roadmap and version notes keep the historical ones;
 - Infrastructure is rudimentary at first (CI optional), the codebase will
   potentially become large → do the intake bootstrap NOW while it is
   cheap; context budgets and curation are designed for growth.
+- 5b (`5b_executing-large-model`) stays lean: shared rules live once in
+  `5_executing/references/`, both skills point to them, 5b is updated
+  rather than regenerated from 5, and `validate.sh` caps it (350 lines)
+  and rejects orphaned references.
 
 ---
 
