@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # spike-stage2.sh — Stage 2 verification spike / release gate (CONCEPT.md §10.2).
 #
-# Proves, on disposable fixtures:
-#   context compiler   — worker files: determinism, a budget breach writes nothing,
-#                        tier matrix over the file contents (frontend vs backend
-#                        scoping, reviewer minimal, micro-fixer/explore no file),
-#                        never-inject (no PRD/progress.md content in any file)
+# Proves, on disposable fixtures (the context compiler moved to
+# scripts/test-compile-context-bundles.sh):
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
 #                        (opposite provider, six-persona parity, auth preflight,
 #                        structured output, ledger attribution, protocol controls,
@@ -92,50 +89,6 @@ BASE_SHA="$(git rev-parse HEAD)"
 
 bash scripts/chain state init 96 stage2 >/dev/null
 bash scripts/chain state set 96 stage2 .base_sha "\"$BASE_SHA\"" >/dev/null
-
-# =============================================================================
-step "context compiler (worker files, tier matrix + never-inject)"
-# =============================================================================
-CTX=specs/PROJ-96-stage2/context
-ctxsum() { find "$CTX" .claude -type f | sort | xargs cat | sha1sum; }
-bash scripts/chain render context compile 96 stage2 >/dev/null 2>&1 \
-  && ok "compile succeeds on the baseline fixture" || bad "compile failed"
-S1="$(ctxsum)"
-bash scripts/chain render context compile 96 stage2 --wave 1 >/dev/null 2>&1
-[ "$S1" = "$(ctxsum)" ] && ok "deterministic: two compiles are byte-identical" || bad "compiles differ"
-rm -rf "$CTX" .claude/agents
-bash scripts/chain render context compile 96 stage2 >/dev/null 2>&1
-[ "$S1" = "$(ctxsum)" ] && ok "deterministic: a compile from scratch reproduces every byte" || bad "compile from scratch differs"
-
-# A budget breach aborts before anything is written (a budget of 40 tokens).
-sed -i 's/^budget_tokens: .*/budget_tokens: 40/' templates/roles/reviewer.md
-bash scripts/chain render context compile 96 stage2 >/dev/null 2>&1
-RC=$?
-git checkout -q templates/roles/reviewer.md
-[ "$RC" -eq 1 ] && [ "$S1" = "$(ctxsum)" ] \
-  && ok "budget breach: exit 1, existing files unchanged" || bad "budget breach rc=$RC or files changed"
-
-FE="$CTX/workers/wave-1/PROJ-96-PRD-1-US-1.md"
-BE="$CTX/workers/wave-1/PROJ-96-PRD-1-US-2.md"
-RV="$CTX/roles/wave-1/reviewer.md"
-IM="$CTX/roles/wave-1/implementer.md"
-# sections are told apart by their titles; the preambles mention "design system" and "security baseline" in prose
-has() { grep -qF -- "## $2" "$1" 2>/dev/null; }
-[ -z "$(find "$CTX" -name 'micro-fixer*' -o -name 'explore*')" ] && ! grep -q 'Spawn-Prompt' .claude/agents/skillchain-micro-fixer.md \
-  && ok "tier 0/explore get NO file (micro-fixer agent file without path pointer)" || bad "tier-0 class received a file"
-{ has "$FE" "Design system (docs/DESIGN-SYSTEM.md)" && has "$FE" "Component registry (docs/components.md)" && ! has "$FE" "Security baseline" \
-  && has "$BE" "Security baseline (docs/security-baseline.md)" && ! has "$BE" "Design system" && ! has "$BE" "Component registry" \
-  && has "$IM" "Design system (docs/DESIGN-SYSTEM.md)" && has "$IM" "Component registry" && has "$IM" "Security baseline (docs/security-baseline.md)"; } \
-  && ok "tier 1 type-scoping: frontend gets design-system (no security), backend the inverse, full-stack both" \
-  || bad "tier-1 scoping wrong"
-{ has "$FE" "Deine Story" && has "$BE" "Deine Story" && ! has "$RV" "Deine Story"; } \
-  && ok "story files end in '## Deine Story', role files carry none" || bad "story section wrong"
-{ has "$RV" "Product (docs/PRODUCT.md)" && has "$RV" "Review criteria" && has "$RV" "Diff scope" \
-  && ! has "$RV" "Architecture overview" && ! has "$RV" "PROJ architecture" && ! has "$RV" "Guidelines" && ! has "$RV" "Design system" \
-  && ! has "$RV" "Security baseline" && ! has "$RV" "Test conventions" && ! has "$RV" "API contracts"; } \
-  && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
-grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
-  || ok "never-inject holds: no PRD/progress.md content in any worker file"
 
 # =============================================================================
 step "cross-review mechanics (PATH-shimmed CLIs, deterministic)"
