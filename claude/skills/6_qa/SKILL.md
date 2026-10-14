@@ -309,7 +309,7 @@ Also document `### Sonar Quality Input`:
 - Any Sonar findings promoted to QA bugs, with BUG-IDs
 - Explicit statement when Sonar was skipped and therefore not considered release-blocking
 
-**Findings ledger (framework runs):** when `scripts/chain findings` exists,
+**Findings ledger (framework runs):** when `bash scripts/chain --where findings` succeeds,
 additionally emit every bug as a ledger record — one JSON line per bug
 piped to `bash scripts/chain findings add <X> <theme>` with
 `source: "qa"`, the normalized severity, the file plus symbol **anchor**

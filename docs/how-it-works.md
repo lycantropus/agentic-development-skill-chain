@@ -11,13 +11,13 @@ Every script is reached through one entry point, **`chain <verb> [<sub>] [args�
 
 ## The five script kinds
 
-Every script belongs to exactly one kind. Only Records write state; Renderers never have side effects; Gates answer with an exit code and a report.
+Every script belongs to exactly one kind. Only Records write state; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files and removes a retired hook from `.claude/settings.json`); Gates answer with an exit code and a report.
 
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
 | **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` → ledger.mjs · `chain findings harvest` → harvest-debt.sh (feeds `findings add`) · `chain quality` → quality-evidence.mjs |
 | **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality-gate-proof.sh · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` → curation-caps.sh · `chain check intake` → intake-seal-check.sh · `chain check conflicts` → conflict-probe.sh · `chain check ci` → ci-poll.sh |
-| **Renderer** | Turns data into a document. No side effects on state. | `chain render context` → compile-context-bundles.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` → render-pr-body.mjs · `chain render report` → render-report.mjs |
+| **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` → compile-context-bundles.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` → render-pr-body.mjs · `chain render report` → render-report.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
 

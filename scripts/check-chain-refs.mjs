@@ -41,7 +41,9 @@ const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const namedScript = new RegExp(`(?<![\\w.-])(${routed.map(escape).join("|")})(?![\\w-])`);
 const problems = [];
 for (const file of files) {
+  let fenced = false;
   fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
     const at = `${path.relative(root, file)}:${i + 1}`;
     const isTableRow = line.trimStart().startsWith("|");
     if (isTableRow) for (const m of line.matchAll(/(?<![\w./-])([\w-]+\.(?:sh|mjs))(?![\w-])/g)) {
@@ -56,7 +58,9 @@ for (const file of files) {
     for (const m of line.matchAll(/(?<![\w$./-])scripts\/([\w-]+\.(?:sh|mjs))/g)) {
       if (!scriptFiles.has(m[1])) problems.push(`${at}: scripts/${m[1]} does not exist in any skill, runner/ or scripts/`);
     }
-    for (const m of line.matchAll(/(?:scripts\/chain|`chain)\s+([a-z]+)(?:\s+([a-z][a-z-]*))?/g)) {
+    // inside a code fence a command may also start with a bare `chain` or run through "$CHAIN"
+    const lead = fenced ? "scripts/chain|`chain|(?:^\\s*|[;&|(]\\s*)chain|\\$\\{?CHAIN\\}?\"?" : "scripts/chain|`chain";
+    for (const m of line.matchAll(new RegExp(`(?:${lead})\\s+([a-z]+)(?:\\s+([a-z][a-z-]*))?`, "g"))) {
       const [, verb, sub] = m;
       if (!rows.some(r => r[0] === verb)) problems.push(`${at}: 'chain ${verb}' is not a chain verb`);
       else if (!sub && !hasRow(verb, "")) problems.push(`${at}: 'chain ${verb}' needs a sub (see chain --list)`);
