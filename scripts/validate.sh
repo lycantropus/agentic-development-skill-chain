@@ -109,17 +109,17 @@ check_identical "$ROOT/claude/skills/5_executing/references/in-session-driver.md
 check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/skills/5_executing/scripts/state.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
 check_identical "$ROOT/claude/skills/7_documentation/scripts/curation-caps.sh" \
-  "$ROOT/codex/skills/7_documentation/scripts/curation-caps.sh" \
-  "$ROOT/claude/skills/0b_intake/scripts/curation-caps.sh" \
-  "$ROOT/codex/skills/0b_intake/scripts/curation-caps.sh"
-check_identical "$ROOT/claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs" \
-  "$ROOT/codex/skills/4_writing-plans/scripts/validate-wave-plan.mjs" \
-  "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs" \
+  "$ROOT/codex/skills/7_documentation/scripts/curation-caps.sh"
+check_identical "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs"
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
-  "$ROOT/codex/skills/5_executing/scripts/worktree.sh" \
-  "$ROOT/claude/skills/8_delivery/scripts/worktree.sh" \
-  "$ROOT/codex/skills/8_delivery/scripts/worktree.sh"
+  "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
+# These helpers have exactly one copy per tree; a second one would drift silently.
+for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh; do
+  for platform in claude codex; do
+    [ ! -e "$ROOT/$platform/skills/$dup" ] || fail "duplicate helper copy must stay deleted: $platform/skills/$dup"
+  done
+done
 while IFS= read -r bugfix_file; do
   bugfix_rel="${bugfix_file#"$ROOT/codex/skills/bugfixing/"}"
   check_identical "$bugfix_file" "$ROOT/claude/skills/bugfixing/$bugfix_rel"
@@ -147,9 +147,9 @@ check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
   "$ROOT/codex/skills/vibecoder/SKILL.md"
 check_identical "$ROOT/claude/skills/1a_clarification/SKILL.md" \
   "$ROOT/codex/skills/1a_clarification/SKILL.md"
-for f in 5_executing/scripts/preflight.sh 5_executing/scripts/sync-framework.mjs 5_executing/templates/decisions.md.tmpl \
+for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/scripts/sync-framework.mjs 5_executing/templates/decisions.md.tmpl \
          5_executing/scripts/ponytail-check.sh 5_executing/scripts/compile-context-bundles.mjs \
-         5_executing/scripts/context-injector.mjs 5_executing/scripts/migration-drift-check.sh \
+         5_executing/scripts/migration-drift-check.sh \
          5_executing/scripts/story-slice.mjs \
          5_executing/manifests/roles/micro-fixer.md 5_executing/manifests/roles/implementer.md \
          5_executing/manifests/roles/frontend-implementer.md 5_executing/manifests/roles/backend-implementer.md \
@@ -189,6 +189,9 @@ HARNESS_LOGS=$(mktemp -d); trap 'rm -rf "$HARNESS_LOGS"' EXIT
 HARNESS_NAMES=(); HARNESS_PIDS=()
 harness() { local name="$1"; shift; "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
+harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"
+harness chain-refs          node "$ROOT/scripts/check-chain-refs.mjs"
+harness chain-refs-test     bash "$ROOT/scripts/test-chain-refs.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
 harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"

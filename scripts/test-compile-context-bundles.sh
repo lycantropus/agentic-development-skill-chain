@@ -110,19 +110,6 @@ CTX="specs/PROJ-1-demo/context"
 snap() { find "$CTX" .claude -type f 2>/dev/null | sort | xargs -r sha256sum; }
 rc() { local r=0; "$@" >/dev/null 2>"$CASE/err" || r=$?; echo "$r"; } # exit code; stderr in $CASE/err
 
-# retired injector stub (skill-tree manifests; no lock, no bundles here):
-# roles with an inject list get the notice only, everything else nothing, exit 0
-INJ="$SKILL/scripts/context-injector.mjs"
-NOTICE='{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"Dieser Hook ist stillgelegt. Dein Auftrag steht in der Datei aus dem Spawn-Prompt. Ohne Pfad: abbrechen und melden."}}'
-for t in implementer skillchain-implementer frontend-implementer backend-implementer reviewer skillchain-reviewer-x micro-fixer explore scout general-purpose ''; do
-  out="$(printf '{"agent_type":"%s"}' "$t" | node "$INJ" claude)" || die "stub exited non-zero for '$t'"
-  case "$t" in micro-fixer|explore|scout|general-purpose|'') want='' ;; *) want="$NOTICE" ;; esac
-  [ "$out" = "$want" ] || die "stub output for '$t': $out"
-done
-[ -z "$(echo 'not json' | node "$INJ" claude)" ] || die "stub must ignore unparseable hook input"
-[ -z "$(node "$INJ" codex implementer --path 2>/dev/null)" ] || die "stub codex mode must print nothing"
-[ "$(rc node "$INJ" bogus)" -eq 1 ] || die "stub with an unknown mode must exit 1"
-
 mkdir -p .claude/agents   # foreign agent files, one named like a role: compile must not touch them
 printf 'mine\n' >.claude/agents/my-agent.md
 printf 'mine\n' >.claude/agents/implementer.md
@@ -148,7 +135,7 @@ grep -qF 'UI_ONLY_CONSTRAINT' "$F" || die "UI constraints missing from the front
 W="$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.md"
 PLAN1="specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-1-plan.md"
 [ "$(head -1 "$W")" = "Generated from $PLAN1 @ $(sha256sum "$PLAN1" | cut -c1-12) · role backend-implementer · wave 1" ] || die "story file header wrong: $(head -1 "$W")"
-node "$SKILL/scripts/story-slice.mjs" "$PLAN1" PROJ-1-PRD-1-US-1 >"$CASE/slice.out"
+bash "$SKILL/scripts/chain" render slice "$PLAN1" PROJ-1-PRD-1-US-1 >"$CASE/slice.out"
 sed '1,/^## Deine Story$/d' "$W" | tail -n +2 | cmp - "$CASE/slice.out" || die "story part is not the slice byte for byte"
 [ "$(tail -n +3 "$W" | sed '/^## Deine Story$/,$d')" = "$(tail -n +3 "$B")" ] || die "story file role context differs from the role file"
 grep -qF 'STORY_ONE_AC' "$B" && die "story leaked into the role file"
@@ -228,7 +215,7 @@ sections "$W2S" "${CORE[@]}" "+$T_DS" "+$T_COMP" "-$T_SEC" "+$T_STORY"
 n=0
 for f in "$CTX"/workers/wave-*/*.md; do
   w="${f#*/workers/wave-}"; w="${w%%/*}"; id="$(basename "$f" .md)"; id="${id%.backend}"; id="${id%.frontend}"
-  node "$SKILL/scripts/story-slice.mjs" "specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-$w-plan.md" "$id" >"$CASE/slice.out"
+  bash "$SKILL/scripts/chain" render slice "specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-$w-plan.md" "$id" >"$CASE/slice.out"
   sed '1,/^## Deine Story$/d' "$f" | tail -n +2 | cmp - "$CASE/slice.out" || die "$f: story part is not the slice byte for byte"
   n=$((n+1))
 done
@@ -268,12 +255,11 @@ rm "$CTX/workers"
 run compile 1 demo >/dev/null
 snap | cmp - "$CASE/full.snap" || die "rerun after a write error is incomplete"
 
-# migration of a running PROJ: old bundles, lock, blocked roles and the
-# injector hook vanish; only the injector entry and the Ponytail matcher leave
-# the settings (foreign hooks, look-alike commands, groups, env and key order
-# stay); a rerun is a no-op
+# migration of a running PROJ: old bundles, lock and blocked roles vanish; a
+# rerun is a no-op; compile never touches .claude/settings.json
 for f in bundle-implementer.md bundle-implementer.claude.md bundle-reviewer.codex.md bundles.lock.json blocked-roles.json; do echo old >"$CTX/$f"; done
-cp "$ROOT/scripts/fixtures/injector-hook/settings.json" .claude/settings.json   # shared with test-preflight-biome.sh
+printf '{"hooks":{"PreToolUse":[]},"env":{"FOO":"1"}}\n' >.claude/settings.json
+cp .claude/settings.json "$CASE/settings.before"
 run compile 1 demo --wave 1 >/dev/null
 ls "$CTX" | grep -qE '^bundle-|bundles.lock.json|blocked-roles.json' && die "old bundles/lock survived compile"
 for name in PROJ-1-PRD-1-US-1 PROJ-1-PRD-1-US-2.backend PROJ-1-PRD-1-US-2.frontend PROJ-1-PRD-1-US-3; do
@@ -282,18 +268,10 @@ done
 for role in implementer frontend-implementer backend-implementer reviewer; do
   grep -qF 'Dein vollständiger Auftrag steht in der Datei aus dem Spawn-Prompt' ".claude/agents/skillchain-$role.md" || die "migration: $role agent file lacks the path pointer"
 done
-[ "$(jq -c . .claude/settings.json)" = "$(jq -c . "$ROOT/scripts/fixtures/injector-hook/expected.json")" ] \
-  || die "compile must remove only the injector hooks and the Ponytail matcher: $(jq -c . .claude/settings.json)"
-grep -q '^  "permissions": {$' .claude/settings.json || die "settings must keep two-space indentation"
+cmp -s .claude/settings.json "$CASE/settings.before" || die "compile must leave .claude/settings.json alone"
 snap >"$CASE/migrated.snap"
 run compile 1 demo --wave 1 >/dev/null
 snap | cmp - "$CASE/migrated.snap" || die "second compile after the migration changed something"
-printf '{"hooks":{"SubagentStart":[{"hooks":[{"type":"command","command":"node scripts/context-injector.mjs claude"}]}]}}\n' >.claude/settings.json
-run compile 1 demo --wave 1 >/dev/null
-[ "$(jq -c . .claude/settings.json)" = '{}' ] || die "injector-only settings must lose hooks entirely"
-printf '{ broken\n' >.claude/settings.json
-run compile 1 demo --wave 1 >/dev/null 2>"$CASE/err" || die "unparseable settings must not abort compile"
-grep -qF 'not valid JSON' "$CASE/err" && [ "$(cat .claude/settings.json)" = '{ broken' ] || die "unparseable settings: want a warning and an unchanged file"
 rm .claude/settings.json
 run compile 1 demo --wave 1 >/dev/null
 [ ! -e .claude/settings.json ] || die "compile created .claude/settings.json"
@@ -402,7 +380,7 @@ cp "$CASE/plan2.bak" "$PLAN2"
 printf '\n```md\n## not a story heading\n```\n' >>"$PLAN1"
 sed -i 's/$/\r/' "$PLAN1" "$P/3-4_plan/PROJ-1-architecture.md"
 run compile 1 demo --wave 1 >/dev/null || die "CRLF plan failed to compile"
-node "$SKILL/scripts/story-slice.mjs" "$PLAN1" PROJ-1-PRD-1-US-3 >"$CASE/slice.out"
+bash "$SKILL/scripts/chain" render slice "$PLAN1" PROJ-1-PRD-1-US-3 >"$CASE/slice.out"
 sed '1,/^## Deine Story$/d' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" | tail -n +2 | cmp - "$CASE/slice.out" || die "CRLF story part is not the slice byte for byte"
 grep -qF 'Decision 1: Server-side totals' "$B" || die "CRLF architecture lost its decisions"
 restore_plans; cp "$CASE/arch.keep" "$P/3-4_plan/PROJ-1-architecture.md"

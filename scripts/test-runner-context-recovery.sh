@@ -11,9 +11,9 @@ die() { echo "runner-context-recovery: $*" >&2; exit 1; }
 cd "$CASE"
 BASE="specs/PROJ-1-demo"
 mkdir -p "$BASE/3-4_plan" "$BASE/5_progress/lanes" scripts templates/roles
-cp "$SKILL/scripts/compile-context-bundles.mjs" "$SKILL/scripts/story-slice.mjs" "$SKILL/scripts/validate-wave-plan.mjs" "$SKILL/scripts/state.sh" scripts/
+cp "$SKILL/scripts/compile-context-bundles.mjs" "$SKILL/scripts/story-slice.mjs" "$SKILL/scripts/validate-wave-plan.mjs" "$SKILL/scripts/state.sh" "$SKILL/scripts/chain" scripts/
 cp "$SKILL/manifests/roles/backend-implementer.md" templates/roles/
-bash scripts/state.sh init 1 demo >/dev/null
+bash scripts/chain state init 1 demo >/dev/null
 node --input-type=module <<'JS'
 import { writeFileSync } from 'node:fs';
 const p = 'specs/PROJ-1-demo/3-4_plan/';
@@ -23,7 +23,7 @@ for (const n of [1, 2]) writeFileSync(p + `PROJ-1-wave-${n}-plan.md`, `# Wave ${
   `## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n` +
   `| PROJ-1-PRD-${n}-US-1 | backend | backend-implementer | sonnet | immediately |\n\n## PROJ-1-PRD-${n}-US-1: Story ${n}\n`);
 JS
-compile() { node scripts/compile-context-bundles.mjs compile 1 demo "$@" >/dev/null; }
+compile() { bash scripts/chain render context compile 1 demo "$@" >/dev/null; }
 snap() { find "$BASE/context" -type f | sort | xargs sha256sum; }
 cp "$BASE/state.json" "$CASE/state.before"
 # Both waves fit alone; a merged view would breach the budget, so this only
@@ -45,7 +45,8 @@ mv "$BASE/3-4_plan/PROJ-1-wave-2-plan.md" "$BASE/3-4_plan/PROJ-1-wave-3-plan.md"
 compile
 [ -e "$BASE/context/workers/wave-3/PROJ-1-PRD-2-US-1.md" ] || die 'wave-3 file missing after rename'
 [ ! -e "$BASE/context/workers/wave-2" ] || die 'wave-2 directory survived without a plan'
-PROJ=1 THEME=demo STATE_SH=scripts/state.sh
+PROJ=1 THEME=demo
+chain() { bash scripts/chain "$@"; } # the runner function under test dispatches through chain
 
 # The prompt the runner renders for a P5/P7 writer lane names the worker files
 # by path and no longer mentions hook, projection, hashes or a lock.
@@ -56,7 +57,7 @@ PROJ=1 THEME=demo STATE_SH=scripts/state.sh
   render_prompt writer 'Run P5.' prompt
   [ "$prompt" = "$LANE_DIR/P5-writer-prompt.md" ] || die "render_prompt wrote to an unexpected path: $prompt"
   for want in "## Worker context files" "\`$BASE/context/\`" 'workers/wave-<N>/<US-ID>.md' 'roles/wave-<N>/<role>.md' \
-              "node scripts/compile-context-bundles.mjs compile $PROJ $THEME --wave <N>" 'Brief: <US-ID>'; do
+              "bash scripts/chain render context compile $PROJ $THEME --wave <N>" 'Brief: <US-ID>'; do
     grep -qF -- "$want" "$prompt" || die "writer prompt lacks: $want"
   done
   # the pointer matches the real layout compile produced above
@@ -77,7 +78,7 @@ PROJ=1 THEME=demo STATE_SH=scripts/state.sh
 
 # An older run's state.json with .context.bundles stays valid: state.sh (the
 # schema mirror) accepts it, and the schema keeps the field, only deprecated.
-bash scripts/state.sh set 1 demo .context.bundles \
+bash scripts/chain state set 1 demo .context.bundles \
   '{"implementer":{"hash":"a1","claude_hash":"b2","codex_hash":"c3","tokens":900,"wave":1,"compiled_at":"2026-01-01T00:00:00Z"}}' >/dev/null \
   || die 'state.sh rejected an old .context.bundles record'
 jq -e '.properties.context | (has("additionalProperties") | not) and .properties.bundles.deprecated == true
@@ -91,5 +92,5 @@ store_finder_report "$CASE/finder.out" 20261013-000000
 report="$BASE/5_progress/qa-finder-20261013-000000.md"
 grep -q 'AC-1 PASS' "$report" || die 'finder report missing its text'
 grep -q '^{' "$report" && die 'finder report kept a JSON finding line'
-[ "$(bash scripts/state.sh get 1 demo .qa.finder_report)" = "$report" ] || die 'finder report path not recorded in state'
+[ "$(bash scripts/chain state get 1 demo .qa.finder_report)" = "$report" ] || die 'finder report path not recorded in state'
 echo 'runner-context-recovery: ok'

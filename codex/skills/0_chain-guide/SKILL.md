@@ -33,9 +33,9 @@ Detect where the user is in the 0-to-8 skill chain and tell them what to do next
 
 **Reading the numbers.** A bare number is a main-line step; a letter suffix is a variant at the same stage. `0a`/`0b`/`0c` are entry paths (0a+0c new build, 0b existing codebase — run one baseline path, not both); `1b`–`1e` run in sequence in the UI branch; `2b`/`2c` are optional forks; `5b` is the default Step 5 and `5` its full-procedure fallback. Checkpoint 1 and P0 are subskills of Step 5, not steps. A skill without a number is not a step: `cross-review` is a mechanism invoked by producing skills (after concept, requirements, architecture, plans, P6 QA, P7 docs) and never routed to directly; `bugfixing` (reported defect, regression, "why did tests miss this"), `refactor-dreamer`, `sonar-cli` run outside the chain and create no PROJ.
 
-Each PROJ has its folder `specs/PROJ-<X>-<theme>/`; each subfolder carries the number of the skill that writes it (architecture and plans share `3-4_plan/`). Progress is one file, `5_progress/PROJ-<X>-progress.md`. Framework runs add machine state `state.json` (only via `scripts/state.sh`) and the findings ledger `findings.json` (only via `scripts/ledger.mjs`).
+Each PROJ has its folder `specs/PROJ-<X>-<theme>/`; each subfolder carries the number of the skill that writes it (architecture and plans share `3-4_plan/`). Progress is one file, `5_progress/PROJ-<X>-progress.md`. Framework runs add machine state `state.json` (only via `scripts/chain state`) and the findings ledger `findings.json` (only via `scripts/chain findings`).
 
-**Unattended runs:** once Step 5 has sealed `P0:done`, it asks once (`5_executing/references/unattended-handoff.md`): run P5 to a PR unattended (`runner/run-phase.sh auto <X> <theme>`, detached; morning report `node runner/render-report.mjs morning specs`), drive it to the PR in this session under `/goal`, or continue interactively.
+**Unattended runs:** once Step 5 has sealed `P0:done`, it asks once (`5_executing/references/unattended-handoff.md`): run P5 to a PR unattended (`runner/run-phase.sh auto <X> <theme>`, detached; morning report `bash ~/.codex/skills/5_executing/scripts/chain render report morning specs`), drive it to the PR in this session under `/goal`, or continue interactively.
 
 ## Two Tracks
 
@@ -78,7 +78,7 @@ Scan `specs/PROJ-*/` folders to find the latest PROJ. For each PROJ, check:
    - `2b_handoff/*/README.md` exists → step 2b done; the latest dated handoff package is assembled.
 7. `3-4_plan/PROJ-<X>-architecture.md` exists → step 3 done
 8. `3-4_plan/PROJ-<X>-wave-*-plan.md` files exist → step 4 done (count waves by file glob)
-8b. `state.json` exists → framework run; read `.phase` + `.status` via `bash ~/.codex/skills/5_executing/scripts/state.sh get <X> <theme> '.phase + ":" + .status'`: `CP1:pending`/`CP1:running` → step 5 at Checkpoint 1; `CP1:approved`/`P0:running` → step 5 at P0 setup; `P0:done` → P0 complete; `P5:*`–`P8:*` → that phase is running/done; `*:blocked` → run parked, point to `5_progress/stop-report.md`
+8b. `state.json` exists → framework run; read `.phase` + `.status` via `bash ~/.codex/skills/5_executing/scripts/chain state get <X> <theme> '.phase + ":" + .status'`: `CP1:pending`/`CP1:running` → step 5 at Checkpoint 1; `CP1:approved`/`P0:running` → step 5 at P0 setup; `P0:done` → P0 complete; `P5:*`–`P8:*` → that phase is running/done; `*:blocked` → run parked, point to `5_progress/stop-report.md`
 9. `5_progress/PROJ-<X>-progress.md` exists → step 5 running or done. Do not read the file: `grep -c "Gate — PASSED" <progress.md>` against the number of wave plans.
    - Count equals the number of wave plans? → step 5 done
    - Any `2_PRDs/PROJ-<X>-PRD-*.md` has a `## QA Test Results` section, or `state.json` is at `P6:done` or later? → step 6 done
@@ -105,7 +105,7 @@ Tell the user the detected state (artifact path) and the next step, in one or tw
 | Wave plans, no state.json | **executing-large-model** (5b): Checkpoint 1 (subskill, decision log, `CP1:approved`), P0 setup, then the waves; standalone preflights without the framework. Weaker writer model: **executing** (5) |
 | `CP1:approved`, no P0 | **executing-large-model** (5b) runs P0, then asks once: unattended (`runner/run-phase.sh auto <X> <theme>`) or interactive |
 | `P0:done`, no implementation | **executing-large-model** (5b): asks once, unattended (`runner/run-phase.sh auto <X> <theme>`, dual-lane, ends with an open PR) or interactive |
-| `*:blocked` | Run parked: read `5_progress/stop-report.md` (what happened, rescue branch, cleanup list); after the fix `bash scripts/state.sh transition <X> <theme> <phase> running`, re-run the phase |
+| `*:blocked` | Run parked: read `5_progress/stop-report.md` (what happened, rescue branch, cleanup list); after the fix `bash scripts/chain state transition <X> <theme> <phase> running`, re-run the phase |
 | Some waves passed | Next wave `<N>` with the variant the run started in (5b or 5; progress.md records it) |
 | All waves passed, no QA | **qa** (6) |
 | QA passed, no docs | **documentation** (7) — conditional README/PROJECT/TECHNICAL, approval of `AGENTS.md` candidates, `CLAUDE.md` pointer-only |

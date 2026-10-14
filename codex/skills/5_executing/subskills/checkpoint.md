@@ -99,16 +99,16 @@ first):
    decision this round must still honor or revisit — never silently paper
    over it. Fails → no fast path, continue at Step 1.
 2. Both cross-reviews actually ran — `.cross_review[]` in state.json (appended
-   by `cross-review.sh --persist`, never by hand) has at least one record with
+   by `chain review --persist`, never by hand) has at least one record with
    `mode == "architecture"` and at least one with `mode == "plan"`:
    ```bash
-   bash ~/.codex/skills/5_executing/scripts/state.sh get <X> <theme> \
+   bash ~/.codex/skills/5_executing/scripts/chain state get <X> <theme> \
      '[.cross_review[]? | .mode] | (index("architecture") != null) and (index("plan") != null)'
    ```
    `false` (a mode never ran — declined, or run without `--persist`) → no fast
    path, continue at Step 1.
 3. Nothing from those rounds is still open. This is the exact query
-   `cross-review.sh` itself uses to decide BLOCKING — reuse it rather than
+   `chain review` itself uses to decide BLOCKING — reuse it rather than
    inventing a second definition of "clean":
    ```bash
    jq '[.findings[]? | select(.status == "open") | select(.severity == "critical" or .severity == "high") | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))] | length' \
@@ -183,9 +183,9 @@ Run the machine consistency validator after every cascade and once more even
 when the round adopted every point unchanged:
 
 ```bash
-node ~/.codex/skills/5_executing/scripts/validate-wave-plan.mjs \
+bash ~/.codex/skills/5_executing/scripts/chain check plan \
   specs/PROJ-<X>-<theme>/3-4_plan
-node ~/.codex/skills/5_executing/scripts/compile-context-bundles.mjs check <X> <theme>
+bash ~/.codex/skills/5_executing/scripts/chain render context check <X> <theme>
 ```
 
 The `check` compiles every wave's worker and role files in memory (it writes
@@ -210,12 +210,12 @@ Only after the cascade is clean:
 
 1. Read the `state.json` created with the PROJ folder by concept (1).
    If this is a legacy PROJ without one, recover once with
-   `bash ~/.codex/skills/5_executing/scripts/state.sh init <X> <theme>`;
+   `bash ~/.codex/skills/5_executing/scripts/chain state init <X> <theme>`;
    it must still be `CP1:pending` before this checkpoint approves it.
-2. `bash ~/.codex/skills/5_executing/scripts/state.sh transition <X> <theme> CP1 running` (first
-   round, or resuming from `CP1:blocked`), then `bash ~/.codex/skills/5_executing/scripts/state.sh transition <X> <theme> CP1 approved`
+2. `bash ~/.codex/skills/5_executing/scripts/chain state transition <X> <theme> CP1 running` (first
+   round, or resuming from `CP1:blocked`), then `bash ~/.codex/skills/5_executing/scripts/chain state transition <X> <theme> CP1 approved`
    (the installed helper — the repo copy arrives with P0)
-3. `bash ~/.codex/skills/5_executing/scripts/state.sh set <X> <theme> .decision_log specs/PROJ-<X>-<theme>/decisions.md`
+3. `bash ~/.codex/skills/5_executing/scripts/chain state set <X> <theme> .decision_log specs/PROJ-<X>-<theme>/decisions.md`
 4. Commit: `docs(PROJ-<X>): CP1 approved — decision log + cascaded plan updates`
 
 `CP1:approved` in state.json is the only thing that unlocks P0. Never
@@ -229,7 +229,7 @@ points are unresolved-but-blocking.
 
 Same loop over PR review comments instead of plan artifacts: classify
 each comment `fix now` (spawn fix, verify, push) / `debt` (ledger record
-via `scripts/ledger.mjs`, `ponytail:` marker) / `reject with rationale`
+via `scripts/chain findings`, `ponytail:` marker) / `reject with rationale`
 (reply on the PR via `gh`). Decision log entries carry the PR comment
 link. Principle-level feedback ("I never want to see this again") is
 harvested as an AGENTS.md/GUIDELINES candidate through the existing

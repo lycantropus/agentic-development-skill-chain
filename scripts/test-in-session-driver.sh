@@ -19,9 +19,9 @@ block stop   >"$CASE/stop.sh";   [ -s "$CASE/stop.sh" ]   || die 'stop block mis
 
 # --- fixture: a PROJ sitting at P5:running (quality gate passed) -----------
 mkdir -p "$CASE/repo/scripts" "$CASE/repo/specs/PROJ-1-demo/5_progress" "$CASE/bin"
-cp "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/ledger.mjs" "$CASE/repo/scripts/"
+cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/ledger.mjs" "$CASE/repo/scripts/"
 cd "$CASE/repo"
-S="bash scripts/state.sh"
+S="bash scripts/chain state"
 $S init 1 demo >/dev/null
 for p in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running"; do $S transition 1 demo $p >/dev/null; done
 
@@ -71,7 +71,7 @@ grep -q '^## QA Results' "$rep" && ! grep -q '^{' "$rep" || die 'report must hol
 if bash "$CASE/seal.sh" >/dev/null 2>&1; then die 'seal must refuse an open High finding'; fi
 [ "$($S get 1 demo '.phase + ":" + .status' | tr -d '"')" = 'P6:running' ] || die 'refused seal must leave P6 running'
 id="$(jq -r '.findings[] | select(.severity == "high") | .id' specs/PROJ-1-demo/findings.json)"
-node scripts/ledger.mjs set-status 1 demo "$id" fixed abc1234 >/dev/null || die 'set-status failed'
+bash scripts/chain findings set-status 1 demo "$id" fixed abc1234 >/dev/null || die 'set-status failed'
 bash "$CASE/seal.sh" >/dev/null || die 'seal must accept once no Critical/High is open'
 for p in "P7 running" "P7 done" "P8 running" "P8 done"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done
 
@@ -101,7 +101,7 @@ git init -q . && git config user.email t@example.invalid && git config user.name
 printf 'qa report\n' >artifact.md; printf 'x\n' >a.txt; git add -A >/dev/null; git commit -qm base
 : >"$CASE/personas.log"
 PATH="$CASE/bin:$PATH" PERSONA_LOG="$CASE/personas.log" \
-  bash "$ROOT/claude/skills/cross-review/scripts/cross-review.sh" qa 1 demo --artifacts artifact.md \
+  bash "$ROOT/claude/skills/5_executing/scripts/chain" review qa 1 demo --artifacts artifact.md \
   --author-provider claude --personas --round 1 >"$CASE/cr.out" 2>&1 || { cat "$CASE/cr.out" >&2; die 'persona review failed'; }
 starts="$(grep -c '|start ' "$CASE/personas.log")"
 [ "$starts" = 6 ] || die "expected 6 persona workers, got $starts"

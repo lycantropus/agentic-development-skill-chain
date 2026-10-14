@@ -15,7 +15,6 @@ inject:
   - test-conventions
   - ground-file
 budget_tokens: 7000
-matcher: "^(skillchain-)?implementer$"
 claude:
   agent_file: true
   tools: "Read,Grep,Glob,Bash,Edit,Write"

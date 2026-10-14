@@ -157,6 +157,8 @@ checked several times over.
 
 ## Want more detail?
 
+- [how-it-works.md](how-it-works.md) — the scripts, the P0–P8 phases and
+  the gates on one page.
 - [skill-chain.md](skill-chain.md) — the actual steps, in order, as they
   run today.
 - `CONCEPT.md` (repo root) — the full technical design, the reasoning

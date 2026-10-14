@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SkillChain findings ledger",
-  "description": "The ONE deduplicated findings ledger per PROJ, at specs/PROJ-<X>-<theme>/findings.json. All review sources flow into it (CONCEPT.md §7); written ONLY via ledger.mjs (skill 6_qa). PR body, debt section, and reports are rendered FROM this file, never maintained by hand.",
+  "description": "The ONE deduplicated findings ledger per PROJ, at specs/PROJ-<X>-<theme>/findings.json. All review sources flow into it (CONCEPT.md §7); written ONLY via chain findings (skill 6_qa). PR body, debt section, and reports are rendered FROM this file, never maintained by hand.",
   "type": "object",
   "required": ["proj", "updated_at", "findings"],
   "properties": {
@@ -29,7 +29,7 @@
           },
           "severity": {
             "enum": ["critical", "high", "medium", "low"],
-            "description": "Normalized severity (mapping table embedded in ledger.mjs). Critical/High block; Medium/Low auto-defer as debt (§8)."
+            "description": "Normalized severity (mapping table embedded in chain findings). Critical/High block; Medium/Low auto-defer as debt (§8)."
           },
           "status": {
             "enum": ["open", "fixed", "deferred", "false-positive"]

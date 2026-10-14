@@ -39,7 +39,7 @@ This skill is aligned with the Claude variant. In Codex:
 | `docs/ARCHITECTURE.md` | the load-bearing architecture truths as current state, in the sections `Stack` · `System shape` · `Data ownership` · `Invariants` (`0c_bootstrap` § 3); details → `docs/architecture/` | ≤200 lines |
 | `docs/GUIDELINES.md` | conventions that ARE the rule (incl. Known Debt notes for losing patterns) | ≤120 lines |
 | `docs/DESIGN-SYSTEM.md` | design **rules** extracted from code — tokens, scales, patterns, do/don't — or a pointer to **frontend-design** (1c) if none exist; never invented. No component inventory (that's `components.md`) | ≤80 lines |
-| `docs/components.md` | component registry — **generated** by `scripts/gen-component-registry.mjs` from the doc block above each component export | — |
+| `docs/components.md` | component registry — **generated** by `scripts/chain render registry` from the doc block above each component export | — |
 | `docs/security-baseline.md` | auth model, secret handling, input validation floor | ≤60 lines |
 | `docs/test-conventions.md` | test runner, layout, naming, what must be tested | ≤60 lines |
 | `AGENTS.md` (root) | initial durable agent rules | ≤40 non-blank lines |
@@ -47,7 +47,7 @@ This skill is aligned with the Claude variant. In Codex:
 `docs/DESIGN-SYSTEM.md` and `docs/components.md` are only required to seal
 when the repo has a component directory (`src/components` or
 `src/features/*/components`); backend-only repos skip both (see
-`scripts/intake-seal-check.sh`).
+`scripts/chain check intake`).
 
 **Existing AGENTS.md (or other curated docs) are baseline truth, never
 overwritten.** If a file already exists, the draft is a MERGE: every
@@ -83,9 +83,9 @@ they locate, the prepare subagent judges):
   integrations → ARCHITECTURE draft (+ `docs/architecture/` for detail).
 - **QA Hat:** test setup, error-handling patterns, validation, auth →
   test-conventions + security-baseline drafts.
-- **component-scout:** run `node scripts/gen-component-registry.mjs` (it
+- **component-scout:** run `bash scripts/chain render registry` (it
   scans every outermost `components/` folder under `src/`; nested app root:
-  `node scripts/gen-component-registry.mjs <app> --out docs/components.md`), then
+  `bash scripts/chain render registry <app> --out docs/components.md`), then
   write the missing doc blocks into the components it reports as
   undocumented (purpose + "not for" are interview material, not
   extractable) and regenerate → components.md registry;
@@ -133,9 +133,9 @@ the orchestrator edits no draft.
 1. Move the reconciled drafts to their final locations (`docs/*`, root
    `AGENTS.md`) and STRIP all provenance markers — they are working
    syntax, the sealed baseline never carries them.
-2. `bash scripts/intake-seal-check.sh` (copy from
-   `~/.codex/skills/0b_intake/scripts/` together with
-   `curation-caps.sh` if missing). It verifies: all eight files exist,
+2. `bash scripts/chain check intake` (no `scripts/chain` yet: use
+   `~/.codex/skills/5_executing/scripts/chain`, which finds the helpers in the
+   installed skills). It verifies: all eight files exist,
    zero residual markers, `specs/intake/decisions.md` carries
    `D-BOOTSTRAP` reconcile decisions (undiscussed drafts never seal),
    file caps hold. Red → fix, re-run; NEVER seal past a red check.
@@ -154,5 +154,5 @@ context bundles.
   marked drafts in `specs/intake/`, write one line to `specs/intake/`
   README noting the open queue — the drafts are resumable; nothing is
   half-sealed into `docs/`.
-- `intake-seal-check.sh` red → the baseline stays uncommitted; fix and
+- `chain check intake` red → the baseline stays uncommitted; fix and
   re-run. The check is idempotent.

@@ -180,7 +180,7 @@ if (mode === "morning") {
     s.worktree?.path
       ? (safeP8Resume(s)
           ? `- Retained PROJ worktree \`${s.worktree.path}\`: after resolving the stop, resume P8 (reseal, push, exact-head CI, guarded cleanup) with \`${safeP8Resume(s)}\``
-          : `- Retained PROJ worktree \`${s.worktree.path}\`: resume through P8 and obtain final green CI before running \`scripts/worktree.sh cleanup\``)
+          : `- Retained PROJ worktree \`${s.worktree.path}\`: resume through P8 and obtain final green CI before running \`scripts/chain worktree cleanup\``)
       : "- Open worktrees / dev servers (if any): documented above — evidence, do not delete before reading",
   ].filter(Boolean).join("\n");
 
@@ -195,7 +195,7 @@ if (mode === "morning") {
     CLEANUP: cleanup,
     NEXT_ACTION:
       `Fix the stop cause, then resume with ` +
-      `\`bash scripts/state.sh transition ${projX} ${theme} ${s.phase} running\` ` +
+      `\`bash scripts/chain state transition ${projX} ${theme} ${s.phase} running\` ` +
       `and re-run \`runner/run-phase.sh ${s.phase} ${projX} ${theme}\`.`,
   });
 

@@ -69,10 +69,10 @@ run_suite() {
   [[ $(wc -c <"$CASE_LOG") -eq 1 ]] || fail "$LABEL: blocked test ran or independent AC was skipped"
   expect_rc 76 run_gate
   ! grep -q 'Gate — PASSED' "$CASE/specs/PROJ-1-test/5_progress/PROJ-1-progress.md" || fail "$LABEL: blocked wave certified"
-  (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/state.sh" init 1 test >/dev/null)
-  (cd "$CASE" && node "$ROOT/$PLATFORM/skills/8_delivery/scripts/render-pr-body.mjs" 1 test) >"$TMP/$PLATFORM-pr-body"
-  (cd "$CASE" && node "$ROOT/runner/render-report.mjs" stop 1 test --reason "external prerequisite") >/dev/null
-  (cd "$CASE" && node "$ROOT/runner/render-report.mjs" morning) >/dev/null
+  (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" state init 1 test >/dev/null)
+  (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" render pr 1 test) >"$TMP/$PLATFORM-pr-body"
+  (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" render report stop 1 test --reason "external prerequisite") >/dev/null
+  (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" render report morning) >/dev/null
   for report in "$TMP/$PLATFORM-pr-body" "$CASE/specs/PROJ-1-test/5_progress/stop-report.md" "$CASE"/specs/morning-report-*.md; do
     grep -q 'specialist sign-off of revision abc' "$report" || fail "$LABEL: prerequisite missing from $report"
     grep -q 'product owner at 2026-09-08T10:00:00Z' "$report" || fail "$LABEL: decision metadata missing from $report"
@@ -141,7 +141,7 @@ EOF
   printf 'out/\n' >>"$CASE/.gitignore"
   config=$(default_config | jq '.build_cmd="mkdir -p out; echo output > out/build" | .build_artifacts=["out"]')
   write_config "$config"; commit_case; run_gate >"$GATE_OUT" 2>&1
-  (cd "$CASE" && PATH="$CASE/bin:$PATH" node "$ROOT/$PLATFORM/skills/5_executing/scripts/quality-evidence.mjs" 1 test run build) >"$GATE_OUT" 2>&1
+  (cd "$CASE" && PATH="$CASE/bin:$PATH" bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" quality 1 test run build) >"$GATE_OUT" 2>&1
   grep -q 'reused build' "$GATE_OUT" || fail "$LABEL: PROJ gate did not reuse valid wave build"
 
   for failure in build-failure review-failure build-timeout review-timeout; do
@@ -461,13 +461,13 @@ EOF
 
   case_dir ledger-cumulative
   write_config "$(default_config)"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/ledger.mjs" "$CASE/scripts/ledger.mjs"; commit_case
-  printf '%s\n' '{"source":"review","severity":"high","summary":"earlier blocker","file":"src/old.ts"}' | (cd "$CASE" && node scripts/ledger.mjs add 1 test) >/dev/null
+  printf '%s\n' '{"source":"review","severity":"high","summary":"earlier blocker","file":"src/old.ts"}' | (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings add 1 test) >/dev/null
   expect_fail run_gate; grep -q 'cumulative/current open blocking' "$GATE_OUT" || fail "$LABEL: earlier ledger blocker did not block a zero-finding review"
 
   case_dir ledger-deferred
   config=$(default_config); write_config "$config"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/ledger.mjs" "$CASE/scripts/ledger.mjs"; commit_case
-  printf '%s\n' '{"source":"coderabbit","severity":"major","summary":"same defect","file":"src/a.ts"}' | (cd "$CASE" && node scripts/ledger.mjs add 1 test) >/dev/null
-  id=$(jq -r '.findings[0].id' "$CASE/specs/PROJ-1-test/findings.json"); (cd "$CASE" && node scripts/ledger.mjs set-status 1 test "$id" deferred) >/dev/null
+  printf '%s\n' '{"source":"coderabbit","severity":"major","summary":"same defect","file":"src/a.ts"}' | (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings add 1 test) >/dev/null
+  id=$(jq -r '.findings[0].id' "$CASE/specs/PROJ-1-test/findings.json"); (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings set-status 1 test "$id" deferred) >/dev/null
   CR_FIXTURE="$TMP/$PLATFORM-coderabbit-deferred.jsonl"; export CR_FIXTURE
   printf '%s\n' '{"type":"finding","severity":"major","fileName":"src/a.ts","codegenInstructions":"same defect"}' >"$CR_FIXTURE"
   run_gate >/dev/null || fail "$LABEL: deferred re-report incorrectly blocked"

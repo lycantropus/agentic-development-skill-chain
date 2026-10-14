@@ -51,6 +51,6 @@ rc=0
 (cd "$TEST_DIR/repo" && bash "$HELPER" with-shared-lock --shared -- bash -c 'exit 17') || rc=$?
 [ "$rc" -eq 17 ] || fail "child exit code lost"
 for provider in claude codex; do
-  for skill in 8_delivery; do cmp "$HELPER" "$ROOT/$provider/skills/$skill/scripts/worktree.sh"; done
+  cmp "$HELPER" "$ROOT/$provider/skills/5_executing/scripts/worktree.sh"
 done
 echo "shared-lock concurrency and diagnostics: PASS"

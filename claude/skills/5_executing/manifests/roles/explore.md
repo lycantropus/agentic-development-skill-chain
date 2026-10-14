@@ -5,7 +5,6 @@ tier: 2
 scope: any
 inject: []
 budget_tokens: 3000
-matcher: "^(skillchain-)?(explore|scout)(-.+)?$"
 claude:
   agent_file: false
   tools: "Read,Grep,Glob"

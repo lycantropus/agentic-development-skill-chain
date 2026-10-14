@@ -238,7 +238,7 @@ const { execFileSync } = require("child_process");
 const path = "biome.json";
 const raw = fs.readFileSync(path, "utf8");
 const config = JSON.parse(raw);
-const ignored = [".claude/settings.json", "scripts/compile-context-bundles.mjs", "scripts/context-injector.mjs", "scripts/gen-component-registry.mjs", "scripts/ledger.mjs", "scripts/render-pr-body.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"];
+const ignored = [".claude/settings.json", "scripts/compile-context-bundles.mjs", "scripts/gen-component-registry.mjs", "scripts/ledger.mjs", "scripts/render-pr-body.mjs", "scripts/sync-framework.mjs", "scripts/quality-evidence.mjs", ".skillchain-helpers.json"];
 config.files ??= {};
 // Biome 2 removed `files.ignore` in favour of negated patterns in
 // `files.includes`, and rejects the old key outright — writing it makes
@@ -268,7 +268,7 @@ fs.writeFileSync(path, JSON.stringify(config, null, indent) + "\n");
 NODE
   say "✓ Biome ignores merged for framework-owned files"
 elif [ ! -f biome.jsonc ]; then
-  printf '%b\n' '{' '\t"files": {' '\t\t"includes": [' '\t\t\t"**",' '\t\t\t"!.claude/settings.json",' '\t\t\t"!scripts/compile-context-bundles.mjs",' '\t\t\t"!scripts/context-injector.mjs",' '\t\t\t"!scripts/gen-component-registry.mjs",' '\t\t\t"!scripts/ledger.mjs",' '\t\t\t"!scripts/render-pr-body.mjs"' '\t\t]' '\t}' '}' > biome.json
+  printf '%b\n' '{' '\t"files": {' '\t\t"includes": [' '\t\t\t"**",' '\t\t\t"!.claude/settings.json",' '\t\t\t"!scripts/compile-context-bundles.mjs",' '\t\t\t"!scripts/gen-component-registry.mjs",' '\t\t\t"!scripts/ledger.mjs",' '\t\t\t"!scripts/render-pr-body.mjs"' '\t\t]' '\t}' '}' > biome.json
   say "✓ Biome ignores created for framework-owned files"
 else
   say "⚠ biome.jsonc detected — add framework-owned scripts + .claude/settings.json to files.ignore before the setup commit"
@@ -276,39 +276,6 @@ fi
 if ! grep -qxF '.state.lock' .gitignore 2>/dev/null; then
   [ -s .gitignore ] && [ -z "$(tail -c1 .gitignore)" ] || printf '\n' >> .gitignore
   printf '.state.lock\n' >> .gitignore
-fi
-
-# --- retired context injector hook: remove (idempotent) -------------------
-# Workers read one compiled file named in the spawn prompt; no SubagentStart
-# hook is installed any more. Remove only the injector entry (foreign hooks
-# and their groups stay; a container goes only when this emptied it) and the
-# Ponytail matcher, with or without a hook: Ponytail's native unset path
-# reaches every normal subagent. Runs before the Ponytail check so stale
-# project settings are removed before coverage is verified. A missing
-# .claude/settings.json is not created.
-if [ -f .claude/settings.json ]; then
-  STRIP_INJECTOR='
-    def inj: (objects | .command | strings | test("(^|[\\s/\\\\])context-injector\\.mjs(\\s|$)")) // false;
-    ([.hooks.SubagentStart[]?.hooks[]? | select(inj)] | length > 0) as $hook
-    | (.env | type == "object" and has("PONYTAIL_SUBAGENT_MATCHER")) as $matcher
-    | if $hook then
-        .hooks.SubagentStart |= map(
-          if any(.hooks[]?; inj) then (.hooks |= map(select(inj | not))) | select(.hooks != []) else . end)
-        | if .hooks.SubagentStart == [] then del(.hooks.SubagentStart) else . end
-        | if .hooks == {} then del(.hooks) else . end
-      else . end
-    | if $matcher then del(.env.PONYTAIL_SUBAGENT_MATCHER) | if .env == {} then del(.env) else . end else . end'
-  TMP_SETTINGS="$(mktemp)"
-  if ! jq "$STRIP_INJECTOR" .claude/settings.json > "$TMP_SETTINGS" 2>/dev/null; then
-    rm -f "$TMP_SETTINGS"
-    say "⚠ .claude/settings.json unparseable — remove the context-injector hook and env.PONYTAIL_SUBAGENT_MATCHER by hand"
-  elif jq -e --slurpfile new "$TMP_SETTINGS" '. == $new[0]' .claude/settings.json >/dev/null 2>&1; then
-    rm -f "$TMP_SETTINGS"
-    say "✓ no context injector hook; Ponytail applies to all subagents (.claude/settings.json)"
-  else
-    mv "$TMP_SETTINGS" .claude/settings.json
-    say "✓ retired context injector hook / Ponytail matcher removed (.claude/settings.json)"
-  fi
 fi
 
 # --- ponytail install + parity gate (context system, §7) -----------------

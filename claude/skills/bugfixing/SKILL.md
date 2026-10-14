@@ -41,8 +41,8 @@ versions:
   review conventions from `5_executing`.
 - Use the optional `sonar-cli` skill only when the project is already configured
   for Sonar and both CLIs are available.
-- In a framework PROJ, write findings only through `scripts/ledger.mjs` and read
-  or change machine state only through `scripts/state.sh`. Never edit
+- In a framework PROJ, write findings only through `scripts/chain findings` and read
+  or change machine state only through `scripts/chain state`. Never edit
   `state.json` or `findings.json` directly.
 
 Do not invoke full `executing` or full `qa` for a standalone one-bug repair. They
@@ -73,7 +73,7 @@ Use this mode only when the report clearly belongs to an existing
 - Record a confirmed defect as one JSON line through:
 
   ```bash
-  node scripts/ledger.mjs add <X> <theme>
+  bash scripts/chain findings add <X> <theme>
   ```
 
   Use `source: "qa"` for reproduced behavioral defects and include a stable file
@@ -85,9 +85,9 @@ Use this mode only when the report clearly belongs to an existing
   updates, and fresh re-verification.
 - If the user explicitly started an interactive fix and no runner owns the
   PROJ, use the same workflow below, dispatch `micro-fixer`, and update finding
-  status only with `ledger.mjs` after fresh verification.
+  status only with `chain findings` after fresh verification.
 - Re-run the existing wave or quality gate when the bug belongs to an unsealed
-  wave. Do not invent a synthetic wave merely to use `wave-gate.sh`.
+  wave. Do not invent a synthetic wave merely to use `chain gate wave`.
 
 This skill never transitions framework phase state.
 

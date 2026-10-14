@@ -89,29 +89,28 @@ skill_file() { # <skill> <relative-path> -> first existing copy: chain checkout 
   return 1
 }
 
-# state.sh: prefer the repo copy (P0 setup installs it), fall back to the skill tree
-if [ -x scripts/state.sh ]; then
-  STATE_SH="scripts/state.sh"
-elif STATE_SH="$(skill_file 5_executing scripts/state.sh)" && [ -x "$STATE_SH" ]; then
-  :
-else
-  echo "run-phase.sh: state.sh not found (scripts/state.sh or skill tree)" >&2; exit 1
-fi
-
-LEDGER=""
-[ -f scripts/ledger.mjs ] && LEDGER="scripts/ledger.mjs"
-[ -n "$LEDGER" ] || LEDGER="$(skill_file 6_qa scripts/ledger.mjs || true)"
-
-WORKTREE_HELPER=""
-for candidate in scripts/worktree.sh "$(skill_file 5_executing scripts/worktree.sh || true)"; do
-  if [ -x "$candidate" ]; then WORKTREE_HELPER="$(realpath -m "$candidate")"; break; fi
-done
+# chain: per helper, the repo copy first (P0 setup installs it), then the skill tree. Pinned
+# absolute at start, so a later cd (re-entering the PROJ worktree, removing it) cannot lose it.
+CHAIN_REPO=""; [ -x scripts/chain ] && CHAIN_REPO="$(realpath -m scripts/chain)"
+CHAIN_SKILL="$(skill_file 5_executing scripts/chain || true)"
+[ -n "$CHAIN_REPO$CHAIN_SKILL" ] || { echo "run-phase.sh: chain not found (scripts/chain or skill tree)" >&2; exit 1; }
+# The skill-tree chain gets the project's scripts/ dir, so a project copy of any helper (also a customized one
+# in a repo that has no scripts/chain yet) is still preferred over the installed one, as before.
+chain_has() { # <verb> [<sub>]: is the helper behind this verb present?
+  local c; for c in ${CHAIN_REPO:+"$CHAIN_REPO"} ${CHAIN_SKILL:+"$CHAIN_SKILL"}; do CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" --where "$@" >/dev/null 2>&1 && return 0; done; return 1
+}
+chain() { # <verb> [<sub>] [args…]
+  local c; for c in ${CHAIN_REPO:+"$CHAIN_REPO"} ${CHAIN_SKILL:+"$CHAIN_SKILL"}; do
+    if CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" --where "$@" >/dev/null 2>&1; then CHAIN_SCRIPTS_DIR="$PWD/scripts" bash "$c" "$@"; return; fi
+  done
+  echo "run-phase.sh: no helper for 'chain $1' (repo and skill tree)" >&2; return 127
+}
 WORKTREE_WAS_REMOVED=0
 P8_WAITING_FOR_MERGE=0
 WORKTREE_REMOVAL_SUMMARY=""
 
 step() { echo "→ [$(date -Iseconds)] $*"; }
-state_get() { "$STATE_SH" get "$PROJ" "$THEME" "$1"; }
+state_get() { chain state get "$PROJ" "$THEME" "$1"; }
 
 # A runner re-entered after P0 must really be in the state-recorded worktree.
 # This guard is both a topology check and the loop breaker.
@@ -170,7 +169,7 @@ record_lane() { # provider role model started ended exit outfile
               --argjson x "$6" --arg o "$7" \
               '. + [{provider:$p, role:$r, model:$m, phase:$ph, started_at:$s, ended_at:$e, exit_code:$x, output_file:$o}]' \
               <<<"$lanes")"
-  "$STATE_SH" set "$PROJ" "$THEME" .lanes "$lanes" >/dev/null
+  chain state set "$PROJ" "$THEME" .lanes "$lanes" >/dev/null
 }
 
 render_prompt() { # role task_text out_var — writes prompt file, sets $out_var to its path
@@ -201,7 +200,7 @@ prompt — NEVER paste its contents into a prompt. They live in \`$BASE/context/
 - Story worker: \`workers/wave-<N>/<US-ID>.md\` (\`<US-ID>.backend.md\` /
   \`<US-ID>.frontend.md\` under \`Split: contract\`); its role is the story's
   \`Agent Type\` in the wave plan
-  (\`node scripts/validate-wave-plan.mjs --stories <wave-plan>\`).
+  (\`bash scripts/chain check plan --stories <wave-plan>\`).
 - Fix worker or reviewer without a story: \`roles/wave-<N>/<role>.md\` of the
   wave the touched files belong to (a fix across waves stays one worker and
   gets the other waves' role files by path as well).
@@ -215,7 +214,7 @@ prompt — NEVER paste its contents into a prompt. They live in \`$BASE/context/
   worker until a rerun exits 0. Do not hand-assemble context.
 
 \`\`\`bash
-node scripts/compile-context-bundles.mjs compile $PROJ $THEME --wave <N>
+bash scripts/chain render context compile $PROJ $THEME --wave <N>
 \`\`\`"
   fi
   tpl="$(cat "$RUNNER_DIR/prompts/lane-prompt.md.tmpl")"
@@ -304,14 +303,14 @@ wait_lanes() { # writer_pid [peer_pid]
 
 ingest_findings() { # outfile — advisory peer-lane findings -> ledger (valid lines only, non-fatal)
   local out="$1"
-  [ -n "$LEDGER" ] && [ -f "$out" ] || return 0
+  chain_has findings && [ -f "$out" ] || return 0
   local valid_lines="" line v
   while IFS= read -r line; do
     v="$(jq -c 'select(type == "object" and .source? and .severity? and .summary?)' <<<"$line" 2>/dev/null || true)"
     [ -n "$v" ] && valid_lines+="$v"$'\n'
   done < <(grep '^{' "$out" 2>/dev/null || true)
   if [ -n "$valid_lines" ]; then
-    printf '%s' "$valid_lines" | node "$LEDGER" add "$PROJ" "$THEME" || step "findings ingest failed (non-fatal)"
+    printf '%s' "$valid_lines" | chain findings add "$PROJ" "$THEME" || step "findings ingest failed (non-fatal)"
   else
     step "lane produced no valid finding lines (non-fatal)"
   fi
@@ -321,16 +320,16 @@ store_finder_report() { # outfile ts — the finder's non-JSON text -> 5_progres
   local report="$BASE/5_progress/qa-finder-$2.md"
   mkdir -p "$BASE/5_progress"
   grep -v '^{' "$1" >"$report" || true
-  "$STATE_SH" set "$PROJ" "$THEME" .qa.finder_report "$report" >/dev/null
+  chain state set "$PROJ" "$THEME" .qa.finder_report "$report" >/dev/null
 }
 
 open_blocking_count() {
-  if [ -z "$LEDGER" ] || [ ! -f "$BASE/findings.json" ]; then echo 0; return; fi
-  node "$LEDGER" stats "$PROJ" "$THEME" 2>/dev/null | jq -r '.open_blocking // 0' || echo 0
+  if ! chain_has findings || [ ! -f "$BASE/findings.json" ]; then echo 0; return; fi
+  chain findings stats "$PROJ" "$THEME" 2>/dev/null | jq -r '.open_blocking // 0' || echo 0
 }
 
 # P7 gate helpers (Stage 2). Reading findings.json is legal — only WRITES
-# must go through ledger.mjs.
+# must go through chain findings.
 open_cross_review_blocking() {
   if [ ! -f "$BASE/findings.json" ]; then echo 0; return; fi
   jq '[.findings[]
@@ -338,30 +337,6 @@ open_cross_review_blocking() {
        | select(.severity == "critical" or .severity == "high")
        | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))
       ] | length' "$BASE/findings.json" 2>/dev/null || echo 0
-}
-
-curation_caps_path() { # repo copy first (P0 setup installs it), then skill tree
-  if [ -f scripts/curation-caps.sh ]; then
-    echo "scripts/curation-caps.sh"
-  else
-    skill_file 7_documentation scripts/curation-caps.sh || true
-  fi
-}
-
-quality_gate_proof_path() {
-  local p
-  for p in scripts/quality-gate-proof.sh "$(skill_file 5_executing scripts/quality-gate-proof.sh || true)"; do
-    [ -f "$p" ] && { echo "$p"; return 0; }
-  done
-  return 1
-}
-
-ci_poll_path() {
-  local p
-  for p in scripts/ci-poll.sh "$(skill_file 8_delivery scripts/ci-poll.sh || true)"; do
-    [ -f "$p" ] && { echo "$p"; return 0; }
-  done
-  return 1
 }
 
 stop_run() { # reason error_file
@@ -384,23 +359,23 @@ stop_run() { # reason error_file
        && git branch "$rescue" "$commit" 2>/dev/null; then
       step "rescue branch: $rescue (working tree untouched)"
       rm -f "$tmpidx"
-      "$STATE_SH" set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\", \"rescue_branch\": \"$rescue\"}" >/dev/null
+      chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\", \"rescue_branch\": \"$rescue\"}" >/dev/null
     else
       rm -f "$tmpidx"
       step "WARNING: rescue branch creation failed — uncommitted work remains only in the working tree"
-      "$STATE_SH" set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\"}" >/dev/null
+      chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\"}" >/dev/null
     fi
   else
-    "$STATE_SH" set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\"}" >/dev/null
+    chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\"}" >/dev/null
   fi
   local cur_ph cur_st
-  cur_ph="$("$STATE_SH" get "$PROJ" "$THEME" .phase 2>/dev/null || echo "$PHASE")"
-  cur_st="$("$STATE_SH" get "$PROJ" "$THEME" .status 2>/dev/null || echo "?")"
-  if ! "$STATE_SH" transition "$PROJ" "$THEME" "$cur_ph" blocked >/dev/null 2>&1; then
+  cur_ph="$(chain state get "$PROJ" "$THEME" .phase 2>/dev/null || echo "$PHASE")"
+  cur_st="$(chain state get "$PROJ" "$THEME" .status 2>/dev/null || echo "?")"
+  if ! chain state transition "$PROJ" "$THEME" "$cur_ph" blocked >/dev/null 2>&1; then
     step "WARNING: could not transition ${cur_ph}:${cur_st} -> blocked — state remains '${cur_st}'; the stop cause is recorded in .stop and the stop report. Do NOT trust '${cur_st}' for this phase."
   fi
   node "$RUNNER_DIR/render-report.mjs" stop "$PROJ" "$THEME" --reason "$reason" ${err:+--error-file "$err"} || true
-  "$STATE_SH" set "$PROJ" "$THEME" .stop.report "$BASE/5_progress/stop-report.md" >/dev/null 2>&1 || true
+  chain state set "$PROJ" "$THEME" .stop.report "$BASE/5_progress/stop-report.md" >/dev/null 2>&1 || true
   exit 1
 }
 
@@ -433,8 +408,8 @@ setup_providers() {
   DEGRADED=false
   if ! codex_available; then
     DEGRADED=true
-    "$STATE_SH" set "$PROJ" "$THEME" .degraded true >/dev/null
-    "$STATE_SH" set "$PROJ" "$THEME" .degraded_reason "codex missing or unauthenticated at ${PHASE}" >/dev/null
+    chain state set "$PROJ" "$THEME" .degraded true >/dev/null
+    chain state set "$PROJ" "$THEME" .degraded_reason "codex missing or unauthenticated at ${PHASE}" >/dev/null
     step "DEGRADED single-provider mode — writer model ${WRITER_MODEL}, model-opposite reviewer ${REVIEW_MODEL}"
     WRITER="claude"; PEER="claude"
   else
@@ -465,10 +440,10 @@ run_p6() {
   [ "$TIMED_OUT" -eq 1 ] && stop_run "P6 finder timed out after ${TIMEOUT}s" "$finder_out"
   [ "$WRITER_RC" -ne 0 ] && stop_run "P6 finder lane ($PEER) exited $WRITER_RC — no QA verdict, cannot continue" "$finder_out"
   [ "$tree_before" = "$tree_after" ] || stop_run "P6 finder modified the working tree — finder must be read-only" "$finder_out"
-  # Strict, unlike the advisory peer lanes: ledger.mjs add rejects the whole batch on any malformed line.
+  # Strict, unlike the advisory peer lanes: chain findings add rejects the whole batch on any malformed line.
   grep -q 'Production-ready recommendation' "$finder_out" || stop_run "P6 finder returned no complete QA report" "$finder_out"
   if grep -q '^{' "$finder_out"; then
-    grep '^{' "$finder_out" | node "$LEDGER" add "$PROJ" "$THEME" || stop_run "P6 finder emitted malformed finding lines — nothing ingested" "$finder_out"
+    grep '^{' "$finder_out" | chain findings add "$PROJ" "$THEME" || stop_run "P6 finder emitted malformed finding lines — nothing ingested" "$finder_out"
   fi
   store_finder_report "$finder_out" "$ts"
 
@@ -496,15 +471,14 @@ Substitute <X>=${PROJ} and <theme>=${THEME} in every command above."
 
 finalize_p8_cleanup() { # evidence file used if the post-seal finalization stops
   local evidence_file="${1:-}" pr_number final_head current_pr_head control_path cleanup_reason final_poll_out final_poll_rc cleanup_rc
-  [ -n "$WORKTREE_HELPER" ] || stop_run "P8 sealed but worktree.sh is missing — safe cleanup cannot be evaluated" "$evidence_file"
+  chain_has worktree || stop_run "P8 sealed but chain worktree is unavailable — safe cleanup cannot be evaluated" "$evidence_file"
   pr_number="$(state_get '.pr.number // empty')"
   [ -n "$pr_number" ] || stop_run "P8 sealed but state.pr.number is missing — final CI cannot be verified" "$evidence_file"
   final_head="$(git rev-parse HEAD)"
   final_poll_out="$LANE_DIR/P8-final-ci-${final_head:0:12}.out"
-  local ci_poll
-  ci_poll="$(ci_poll_path)" || stop_run "P8 sealed but ci-poll.sh is missing (repo and skill tree) — final CI cannot be verified" "$evidence_file"
+  chain_has check ci || stop_run "P8 sealed but chain check ci is unavailable (repo and skill tree) — final CI cannot be verified" "$evidence_file"
   set +e
-  bash "$ci_poll" "$pr_number" 1800 "$final_head" >"$final_poll_out" 2>&1
+  chain check ci "$pr_number" 1800 "$final_head" >"$final_poll_out" 2>&1
   final_poll_rc=$?
   set -e
   if [ "$final_poll_rc" -ne 0 ]; then
@@ -513,23 +487,23 @@ finalize_p8_cleanup() { # evidence file used if the post-seal finalization stops
       2) cleanup_reason="final CI timed out for sealed head $final_head" ;;
       *) cleanup_reason="final CI poll exited $final_poll_rc for sealed head $final_head" ;;
     esac
-    "$WORKTREE_HELPER" retain "$PROJ" "$THEME" "$cleanup_reason" || true
+    chain worktree retain "$PROJ" "$THEME" "$cleanup_reason" || true
     stop_run "$cleanup_reason" "$final_poll_out"
   fi
   if [ "$(git rev-parse HEAD)" != "$final_head" ]; then
     cleanup_reason="local HEAD changed after final CI polling (expected $final_head, found $(git rev-parse HEAD))"
-    "$WORKTREE_HELPER" retain "$PROJ" "$THEME" "$cleanup_reason" || true
+    chain worktree retain "$PROJ" "$THEME" "$cleanup_reason" || true
     stop_run "$cleanup_reason" "$final_poll_out"
   fi
   current_pr_head="$(gh pr view "$pr_number" --json headRefOid --jq .headRefOid 2>>"$final_poll_out" || true)"
   if [ "$current_pr_head" != "$final_head" ]; then
     cleanup_reason="PR head changed after final CI polling (expected $final_head, found ${current_pr_head:-unavailable})"
-    "$WORKTREE_HELPER" retain "$PROJ" "$THEME" "$cleanup_reason" || true
+    chain worktree retain "$PROJ" "$THEME" "$cleanup_reason" || true
     stop_run "$cleanup_reason" "$final_poll_out"
   fi
   control_path="$(state_get .worktree.control_path)"
   set +e
-  "$WORKTREE_HELPER" cleanup "$PROJ" "$THEME" --ci-verified-head "$final_head"
+  chain worktree cleanup "$PROJ" "$THEME" --ci-verified-head "$final_head"
   cleanup_rc=$?
   set -e
   case "$cleanup_rc" in
@@ -585,10 +559,10 @@ run_generic() {
   if [ "$PHASE" = P0 ]; then
     [ "$TIMED_OUT" -eq 1 ] && stop_run "P0 writer timed out after ${TIMEOUT}s" "$writer_out"
     [ "$WRITER_RC" -ne 0 ] && stop_run "P0 writer lane ($WRITER) exited $WRITER_RC" "$writer_out"
-    [ -n "$WORKTREE_HELPER" ] || stop_run "P0 writer exited but worktree.sh is missing — cannot re-enter the PROJ worktree" "$writer_out"
+    chain_has worktree || stop_run "P0 writer exited but chain worktree is unavailable — cannot re-enter the PROJ worktree" "$writer_out"
     [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ] || stop_run "P0 attempted a second worktree re-exec (loop guard)" "$writer_out"
     local proj_worktree sealed
-    proj_worktree="$("$WORKTREE_HELPER" locate "$PROJ")" \
+    proj_worktree="$(chain worktree locate "$PROJ")" \
       || stop_run "P0 writer exited but proj/PROJ-${PROJ} has no registered worktree" "$writer_out"
     sealed="$(jq -r '.phase + ":" + .status' "$proj_worktree/specs/PROJ-${PROJ}-${THEME}/state.json" 2>/dev/null || true)"
     [ "$sealed" = P0:done ] || stop_run "P0 writer exited but worktree state is ${sealed:-missing}, expected P0:done" "$writer_out"
@@ -624,24 +598,21 @@ run_generic() {
   # Re-run the evidence checker outside the writer lane: a prose checklist
   # cannot make a skipped Quality Gate look clean.
   if [ "$PHASE" = "P5" ]; then
-    local quality_proof
-    quality_proof="$(quality_gate_proof_path || true)"
-    [ -n "$quality_proof" ] || stop_run "P5 sealed done but quality-gate-proof.sh is missing — cannot verify Quality Gate evidence" "$writer_out"
-    bash "$quality_proof" "$PROJ" "$THEME" >/dev/null 2>&1 || stop_run "P5 sealed done but Quality Gate proof is missing or invalid (run scripts/quality-gate-proof.sh for details)" "$writer_out"
+    chain_has quality seal || stop_run "P5 sealed done but chain quality seal is unavailable — cannot verify Quality Gate evidence" "$writer_out"
+    chain quality seal "$PROJ" "$THEME" >/dev/null 2>&1 || stop_run "P5 sealed done but Quality Gate proof is missing or invalid (run chain quality seal for details)" "$writer_out"
   fi
 
   # Hard exit rule (§8, Stage 2): P7:done is not accepted while a curation
   # gate is red — independent re-verification, mirror of the P6 gate. The
-  # writer runs curation-caps.sh + cross-review.sh itself; sealing past a
+  # writer runs chain check caps + chain review itself; sealing past a
   # red gate parks the run here. Zero findings alone is NOT enough: the
   # truth gate demands EVIDENCE that a docs cross-review actually ran
   # during this P7 — otherwise a skipped review looks identical to a
   # clean one.
   if [ "$PHASE" = "P7" ]; then
-    local caps xr_blocking p7_started xr_evidence
-    caps="$(curation_caps_path)"
-    [ -n "$caps" ] || stop_run "P7 sealed done but curation-caps.sh is missing (repo and skill tree) — the form gate cannot be verified, refusing to advance" "$writer_out"
-    bash "$caps" >/dev/null 2>&1 || stop_run "P7 sealed done but curation caps FAIL (form gate red — run 'bash $caps' for the report)" "$writer_out"
+    local xr_blocking p7_started xr_evidence
+    chain_has check caps || stop_run "P7 sealed done but chain check caps is unavailable (repo and skill tree) — the form gate cannot be verified, refusing to advance" "$writer_out"
+    chain check caps >/dev/null 2>&1 || stop_run "P7 sealed done but curation caps FAIL (form gate red — run 'chain check caps' for the report)" "$writer_out"
     p7_started="$(jq -r '[.history[]? | select(.to == "P7:running")] | last | .at // ""' "$BASE/state.json" 2>/dev/null || echo "")"
     xr_evidence="$(jq --arg t "$p7_started" \
       '[.cross_review[]? | select(.mode == "docs" and (.at // "") >= $t)] | length' \
@@ -655,9 +626,9 @@ run_generic() {
 run_one_phase() {
   PHASE="$1"
   phase_skill "$PHASE" >/dev/null || { echo "run-phase.sh: phase $PHASE not runnable (use P0/P5/P6/P7/P8)" >&2; exit 64; }
-  if [ "$PHASE" = P0 ] && [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ] && [ -n "$WORKTREE_HELPER" ]; then
+  if [ "$PHASE" = P0 ] && [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ] && chain_has worktree; then
     local existing_worktree existing_lifecycle existing_topology existing_advanced
-    existing_worktree="$("$WORKTREE_HELPER" locate "$PROJ" 2>/dev/null || true)"
+    existing_worktree="$(chain worktree locate "$PROJ" 2>/dev/null || true)"
     if [ -n "$existing_worktree" ]; then
       existing_lifecycle="$(jq -r '.phase + ":" + .status' "$existing_worktree/specs/PROJ-${PROJ}-${THEME}/state.json" 2>/dev/null || true)"
       existing_topology="$(jq -r --arg control "$(realpath -m "$PWD")" --arg path "$(realpath -m "$existing_worktree")" --arg branch "proj/PROJ-${PROJ}" \
@@ -676,7 +647,7 @@ run_one_phase() {
     fi
   fi
   if { [ "$PHASE" = P0 ] && [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ]; } || [ "$PHASE" = P8 ]; then
-    # P0's control checkout must remain clean until worktree.sh prepare runs.
+    # P0's control checkout must remain clean until chain worktree prepare runs.
     # Prompt and lane output therefore live outside the repository.
     LANE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/skillchain-P0-PROJ-${PROJ}.XXXXXX")"
   else

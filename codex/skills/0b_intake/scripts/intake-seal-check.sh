@@ -78,7 +78,9 @@ else
 fi
 
 # (d) file caps — delegated to the curation caps (FORM gate)
-if ! bash "$SCRIPT_DIR/curation-caps.sh" --require-baseline .; then
+# one copy of curation-caps.sh exists: next to this script in a synchronized repo, with 7_documentation in the skill tree
+CAPS="$SCRIPT_DIR/curation-caps.sh"; [ -f "$CAPS" ] || CAPS="$SCRIPT_DIR/../../7_documentation/scripts/curation-caps.sh"
+if ! bash "$CAPS" --require-baseline .; then
   FAIL=1
 fi
 

@@ -17,7 +17,7 @@ flowchart LR
 
 Inputs:
 
-- Wave shape: each plan's `## User Stories in this Wave` and `## Execution`, sliced with `story-slice.mjs` (read at PROJ start)
+- Wave shape: each plan's `## User Stories in this Wave` and `## Execution`, sliced with `chain render slice` (read at PROJ start)
 - Wave plans in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (one per wave, read at that wave's start)
 - PRDs in `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` (authoritative; opened only when a plan/PRD AC conflict is suspected)
 - Architecture in `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (on demand; workers get its compiled implementer view — their wave's decision Summaries — through their worker file; projects planned before Summary lines existed get `architecture-delta.md`, else the whole file unfiltered)
@@ -67,7 +67,7 @@ Required setup includes:
 - Supabase CLI or equivalent Supabase tooling when the project uses Supabase.
   On a Supabase project, every wave gate also re-checks that the shared local
   DB's applied migrations still match this worktree's own
-  `supabase/migrations/` (`migration-drift-check.sh`) — the common lock excludes
+  `supabase/migrations/` (`chain check migrations`) — the common lock excludes
   concurrent conflicting operations but does not prevent one worktree advancing
   the schema before a sibling worktree next uses it.
 - Playwright MCP when planned frontend routes require full QA later.
@@ -97,7 +97,7 @@ The most important proof blocks are the wave gate blocks:
 ### Wave N Gate - PASSED
 ```
 
-Those blocks are appended by `scripts/wave-gate.sh`. Manual checklist edits are not enough to prove a wave is complete.
+Those blocks are appended by `scripts/chain gate wave`. Manual checklist edits are not enough to prove a wave is complete.
 
 ### `agent.md`
 
@@ -123,7 +123,7 @@ git tag "wave-${WAVE}-start-PROJ-${PROJ}"
 
 The wave base tag scopes the CodeRabbit review inside the wave gate. Without the tag or `WAVE_BASE_SHA`, the gate fails.
 
-For implementation, a story worker's type is the `Agent Type` column of the wave plan's story table (read with `validate-wave-plan.mjs --stories <wave-plan>`): `frontend-implementer`, `backend-implementer` or `implementer` (full-stack); `Split: contract` yields a backend and a frontend worker. The lead spawns exactly the role named in each worker file's first line and in that JSON; old plans without the column get `implementer` (or the two side roles under `Split: contract`). Only fix workers choose the type themselves, with that type's role file.
+For implementation, a story worker's type is the `Agent Type` column of the wave plan's story table (read with `chain check plan --stories <wave-plan>`): `frontend-implementer`, `backend-implementer` or `implementer` (full-stack); `Split: contract` yields a backend and a frontend worker. The lead spawns exactly the role named in each worker file's first line and in that JSON; old plans without the column get `implementer` (or the two side roles under `Split: contract`). Only fix workers choose the type themselves, with that type's role file.
 
 Each worker reads one compiled file, `context/workers/wave-<N>/<US-ID>.md` (a fix worker: `context/roles/wave-<N>/<role>.md`), named by path in its spawn prompt. The file holds the role rules, project context, the wave's architecture and contracts and the story section of the wave plan verbatim. The lead adds only what the file lacks (execution mode, ownership and lock rules, a prior-wave summary from `progress.md`, `agent.md` and UI-handoff pointers); the worker's report starts with `Brief: <US-ID>` and names the test file per AC.
 
@@ -131,7 +131,7 @@ Parallel waves can run multiple independent user stories at once. In those cases
 
 The lead asks an active worker for status before considering cancellation; quiet files or a single process snapshot do not establish a hang. Replacement requires a confirmed stop, released child commands/resources, and an explicit transfer of files and partial work. Never message a retired worker or send its replacement to negotiate ownership: messages can resume stopped Claude teammates. The lead owns the handover.
 
-`worktree.sh with-shared-lock -- <command>` is exclusive by default across worktrees. Independently verified fixture lifecycles may opt into `--shared --timeout 30` on the same lock file; migrations, resets, global writes and overlapping fixtures remain exclusive. Shared mode provides a schema barrier, not data or auth-budget isolation. Existing auth-consuming gate commands keep their exclusive outer lock; the gate does not automatically parallelize DB/browser checks. Trace nested acquisitions before wrapping a test runner, since forked workers may drop inherited fd 8 and wait on their own parent.
+`chain worktree with-shared-lock -- <command>` is exclusive by default across worktrees. Independently verified fixture lifecycles may opt into `--shared --timeout 30` on the same lock file; migrations, resets, global writes and overlapping fixtures remain exclusive. Shared mode provides a schema barrier, not data or auth-budget isolation. Existing auth-consuming gate commands keep their exclusive outer lock; the gate does not automatically parallelize DB/browser checks. Trace nested acquisitions before wrapping a test runner, since forked workers may drop inherited fd 8 and wait on their own parent.
 
 Lock timeout is infrastructure failure (exit 73), with `SKILLCHAIN_LOCK_WAIT` and `SKILLCHAIN_LOCK_TIMEOUT` diagnostics. Keep its wait budget below an outer wrapper's timeout and preserve the failure classification. PID snapshots and process age do not prove lock age or abandonment. Every browser probe must close its owned session on error as well as success. See the [worker lifecycle and resource guide](../claude/skills/5_executing/references/worker-lifecycle.md) for scheduling, fixture isolation, diagnostics and incremental migration.
 
@@ -172,7 +172,7 @@ Before the AC pass, complete the same closure checklist in parallel and sequenti
 After every worker returns and this coverage is committed, the lead starts the canonical wave acceptance checks with:
 
 ```bash
-bash scripts/wave-gate.sh --ac-only <N> <X> <theme>
+bash scripts/chain gate wave --ac-only <N> <X> <theme>
 ```
 
 This AC-only pass uses the gate's timeout, auth-budget, pacing, and rate-limit controls and writes its results directly to `ralph-wave-<N>.json`. It collects every ordinary AC failure so disjoint repairs can be batched, while infrastructure and auth-budget exhaustion still fail fast. It exits before regressions, build, CodeRabbit, browser smoke, component registry, progress certification, and next-wave tagging.
@@ -195,7 +195,7 @@ After each edit is committed, the lead reruns the same `--ac-only` command. The 
 The wave gate is the hard boundary between waves.
 
 ```bash
-bash scripts/wave-gate.sh <N> <PROJ-X> <theme>
+bash scripts/chain gate wave <N> <PROJ-X> <theme>
 ```
 
 The script is the hard boundary and validates:
@@ -211,7 +211,7 @@ The script is the hard boundary and validates:
 - The gate reuses or starts the configured dev server. Anonymous routes retain
   the expected URL and text; redirects fail. Protected routes use auth state or
   are covered by current-wave authenticated AC or regression evidence. Browser operations have bounded timeouts.
-- `gen-component-registry.mjs --check` passes: `docs/components.md` is current, every component carries its doc block, and every component has its `id="<kebab-name>"` section on the showcase page.
+- `chain render registry --check` passes: `docs/components.md` is current, every component carries its doc block, and every component has its `id="<kebab-name>"` section on the showcase page.
 
 After ACs, regressions, browser smoke and the component registry check pass, build and CodeRabbit run concurrently on the same committed HEAD as the last gate phase, so an environmental smoke failure costs no review. Their logs and results remain separate; both must finish successfully before certification. Interruption stops their process groups. Database and browser checks remain sequential. Any committed or non-evidence uncommitted change prevents Ralph reuse.
 
@@ -236,7 +236,7 @@ the runtime never infers AC identity from an old array index.
 
 The skill avoids scattered build checks.
 
-- Wave builds run inside `scripts/wave-gate.sh`.
+- Wave builds run inside `scripts/chain gate wave`.
 - The PROJ quality gate can reuse the final wave build when declared `build_artifacts`, inputs and command still match; otherwise it runs a fresh build. Code fixes invalidate old proof.
 
 If a build fails, a fix worker gets the verbatim compiler output and the failing gate is rerun.
@@ -261,18 +261,18 @@ It focuses on assembled cross-wave risks and does not replay wave ACs. It includ
 
 The integration reviewer can run alongside build and coverage when they do not contend for resources. Sonar starts after coverage completes. Keep shared database/browser checks serialized and retain their lock/auth controls. Collect all stream results before dispatching one batch of confirmed fixes. Verify the combined revision once per recovery round; keep the existing per-issue attempt limits and Sonar carry-forward policy.
 
-`quality-evidence.mjs` runs configured commands with timeouts and records their command, commit, input fingerprint, exit result, log hash, selected-test count and artifact hashes under `5_progress/quality-*`. Build/coverage reuse requires declared `build_artifacts`/`coverage_artifacts` and matching inputs and artifacts. The fingerprint includes tracked code/configuration, local environment files, exported environment, Node runtime and dependency-install markers. Evidence-only commits preserve proof; code/configuration changes invalidate it. Clear build/coverage evidence after manual toolchain/dependency changes or changes to external inputs that cannot be fingerprinted.
+`chain quality` runs configured commands with timeouts and records their command, commit, input fingerprint, exit result, log hash, selected-test count and artifact hashes under `5_progress/quality-*`. Build/coverage reuse requires declared `build_artifacts`/`coverage_artifacts` and matching inputs and artifacts. The fingerprint includes tracked code/configuration, local environment files, exported environment, Node runtime and dependency-install markers. Evidence-only commits preserve proof; code/configuration changes invalidate it. Clear build/coverage evidence after manual toolchain/dependency changes or changes to external inputs that cannot be fingerprinted.
 
 Run it from the PROJ root after sourcing `scripts/env-local.sh`:
 
 ```bash
-node scripts/quality-evidence.mjs <X> <theme> run build
-node scripts/quality-evidence.mjs <X> <theme> run coverage       # when configured
-node scripts/quality-evidence.mjs <X> <theme> run sonar          # after coverage
-node scripts/quality-evidence.mjs <X> <theme> run 'test:<label>'  # each quality entry
-node scripts/quality-evidence.mjs <X> <theme> run lint
-node scripts/quality-evidence.mjs <X> <theme> review <report-path>
-bash scripts/quality-gate-proof.sh <X> <theme>
+bash scripts/chain quality <X> <theme> run build
+bash scripts/chain quality <X> <theme> run coverage       # when configured
+bash scripts/chain quality <X> <theme> run sonar          # after coverage
+bash scripts/chain quality <X> <theme> run 'test:<label>'  # each quality entry
+bash scripts/chain quality <X> <theme> run lint
+bash scripts/chain quality <X> <theme> review <report-path>
+bash scripts/chain quality seal <X> <theme>
 ```
 
 Record a review only after its P0/P1 findings are resolved. For an allowed Sonar skip, use `... skip-sonar 'sonar CLI unavailable'` or `... skip-sonar 'project not configured'`. The proof script requires both the human-readable gate statuses and valid evidence for current inputs. Sonar submission requires a fresh task receipt; the Sonar reviewer still checks the server's completed analysis and records its disposition.

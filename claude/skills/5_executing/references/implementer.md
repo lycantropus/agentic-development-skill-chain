@@ -90,10 +90,10 @@ Task tool:
     - applies only to one folder    -> that folder's `agent.md`
     - applies to the whole feature  -> the feature folder's `agent.md`
     - applies project-wide          -> `## AGENTS.md Candidates` in progress.md
-    - it is a defect                -> ledger (`node scripts/ledger.mjs add`), never agent.md
+    - it is a defect                -> ledger (`bash scripts/chain findings add`), never agent.md
     Render entries with `templates/agent-md-entry.md.tmpl`: dated + commit SHA,
     under exactly one of `## Gotchas` / `## Patterns That Work Well` /
-    `## Dead Ends`. Max 100 lines per agent.md (curation-caps.sh gates P7) —
+    `## Dead Ends`. Max 100 lines per agent.md (chain check caps gates P7) —
     beyond that, curate first, then append. Include every new entry in your
     report so the main agent can update progress.md.
 
@@ -110,7 +110,7 @@ Task tool:
          /** Actions. Not for navigation — use Link.
           *  @variants primary|ghost  @sizes sm|md  @states hover|disabled */
          export function Button(…)
-    6. Regenerate: `node scripts/gen-component-registry.mjs` (nested app root:
+    6. Regenerate: `bash scripts/chain render registry` (nested app root:
        `<app> --out docs/components.md`) and commit `docs/components.md`
     7. If a `/dev/components` showcase route exists → add the new component there too, with
        its variants and states. QA checks that every registered component renders.

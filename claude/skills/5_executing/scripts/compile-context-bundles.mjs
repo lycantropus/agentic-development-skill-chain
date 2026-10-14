@@ -32,8 +32,6 @@
 //
 // `compile` without --wave (or --wave all) compiles every wave, each on its own.
 // `check` renders every wave in memory and writes nothing — run it before CP1.
-// `compile` also removes the retired context-injector hook and
-// env.PONYTAIL_SUBAGENT_MATCHER from .claude/settings.json (migration).
 // Exit: 0 ok · 1 budget breach / bad manifest or architecture / write error · 2 missing or unresolvable inputs · 64 usage
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, mkdirSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -150,7 +148,7 @@ function loadManifests() {
   const manifests = [];
   for (const f of readdirSync(dir).filter((f) => f.endsWith(".md")).sort()) {
     const { fm, body } = parseFrontmatter(readFileSync(join(dir, f), "utf8"), join(dir, f));
-    for (const req of ["name", "description", "tier", "scope", "inject", "budget_tokens", "matcher"])
+    for (const req of ["name", "description", "tier", "scope", "inject", "budget_tokens"])
       if (fm[req] === undefined) fail(`${f}: missing required manifest field '${req}'`);
     // the name becomes a file name (roles/wave-N/<name>.md, .claude/agents/skillchain-<name>.md)
     if (typeof fm.name !== "string" || !/^[a-z][a-z0-9-]*$/.test(fm.name)) fail(`${f}: manifest name '${fm.name}' must match ^[a-z][a-z0-9-]*$`);
@@ -398,45 +396,6 @@ function atomicWrite(path, content) {
   renameSync(tmp, path);
 }
 
-// The retired SubagentStart hook and the Ponytail matcher leave
-// .claude/settings.json, so a running project needs no new preflight. Only
-// the injector entry goes: a foreign hook keeps its group, and a container
-// (group, SubagentStart, hooks, env) goes only when this emptied it. Returns
-// true when the file changed; an absent file stays absent.
-const SETTINGS = join(".claude", "settings.json");
-function removeInjectorHook() {
-  if (!existsSync(SETTINGS)) return false;
-  const raw = readFileSync(SETTINGS, "utf8");
-  let s;
-  try { s = JSON.parse(raw); } catch {
-    console.warn(`⚠ ${SETTINGS} is not valid JSON — left unchanged; remove the context-injector hook and env.PONYTAIL_SUBAGENT_MATCHER by hand`);
-    return false;
-  }
-  if (!s || typeof s !== "object" || Array.isArray(s)) return false;
-  let changed = false;
-  const groups = s.hooks?.SubagentStart;
-  if (Array.isArray(groups)) {
-    const isInjector = (h) => typeof h?.command === "string" && /(^|[\s/\\])context-injector\.mjs(\s|$)/.test(h.command);
-    const kept = groups.flatMap((g) => {
-      if (!Array.isArray(g?.hooks) || !g.hooks.some(isInjector)) return [g];
-      changed = true;
-      const rest = g.hooks.filter((h) => !isInjector(h));
-      return rest.length ? [{ ...g, hooks: rest }] : [];
-    });
-    if (changed) {
-      if (kept.length) s.hooks.SubagentStart = kept; else delete s.hooks.SubagentStart;
-      if (Object.keys(s.hooks).length === 0) delete s.hooks;
-    }
-  }
-  if (s.env && typeof s.env === "object" && "PONYTAIL_SUBAGENT_MATCHER" in s.env) {
-    delete s.env.PONYTAIL_SUBAGENT_MATCHER;
-    if (Object.keys(s.env).length === 0) delete s.env;
-    changed = true;
-  }
-  if (changed) atomicWrite(SETTINGS, JSON.stringify(s, null, /^\t/m.test(raw) ? "\t" : 2) + "\n");
-  return changed;
-}
-
 const waveDirs = (kind) => existsSync(join(OUT_DIR, kind))
   ? readdirSync(join(OUT_DIR, kind)).filter((d) => /^wave-\d+$/.test(d)).map((d) => join(OUT_DIR, kind, d))
   : [];
@@ -485,7 +444,6 @@ if (cmd === "compile") {
     // ONLY skillchain-<role>.md files are ever written — other agents in
     // .claude/agents/ are never touched.
     for (const [path, content] of agentFiles) atomicWrite(path, content);
-    if (removeInjectorHook()) console.log(`✓ removed the retired context-injector hook / PONYTAIL_SUBAGENT_MATCHER from ${SETTINGS}`);
   } catch (error) {
     fail(`write failed (${error.message}) — the context is incomplete; fix the cause and rerun compile before spawning workers`);
   }

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES="$ROOT/scripts/fixtures/wave-plan-validator"
-VALIDATOR="$ROOT/codex/skills/4_writing-plans/scripts/validate-wave-plan.mjs"
+VALIDATOR="$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs"
 CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
 
@@ -318,13 +318,7 @@ prepare_case plan-valid.md config-valid.json # no 2_PRDs/ (legacy): note, exit 0
 run_validator >"$CASE/output" 2>&1
 expect_output "1 wave(s), 1 AC(s)" "note: AC wording not compared against PRDs: $CASE/2_PRDs is not a directory"
 
-for copy in \
-  "$ROOT/claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs" \
-  "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
-  "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs" \
-  "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
-  "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs"
-do
+for copy in "$ROOT/claude/skills/5_executing/scripts/validate-wave-plan.mjs"; do
   cmp "$VALIDATOR" "$copy"
 done
 

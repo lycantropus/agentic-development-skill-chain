@@ -5,8 +5,7 @@
 #   context compiler   — worker files: determinism, a budget breach writes nothing,
 #                        tier matrix over the file contents (frontend vs backend
 #                        scoping, reviewer minimal, micro-fixer/explore no file),
-#                        never-inject (no PRD/progress.md content in any file),
-#                        retired injector stub (notice only, tier 0/explore nothing)
+#                        never-inject (no PRD/progress.md content in any file)
 #   curation caps      — pass + per-cap fail fixtures, --require-baseline
 #   ponytail gate      — parity ok / version mismatch / absent (enforce on+off)
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
@@ -79,9 +78,9 @@ EOF
 mkdir -p specs/intake
 printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · Decision: adopt\n' > specs/intake/decisions.md
 
-for s in 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
+for s in 5_executing/scripts/chain 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
          5_executing/scripts/story-slice.mjs 5_executing/scripts/validate-wave-plan.mjs \
-         5_executing/scripts/context-injector.mjs 5_executing/scripts/ponytail-check.sh \
+         5_executing/scripts/ponytail-check.sh \
          6_qa/scripts/ledger.mjs 7_documentation/scripts/curation-caps.sh \
          0b_intake/scripts/intake-seal-check.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
@@ -91,30 +90,30 @@ done
 mkdir -p templates
 cp "$SKILLS/cross-review/templates/cross-review-prompt.md.tmpl" templates/
 cp "$SKILLS"/5_executing/manifests/roles/*.md templates/roles/
-chmod +x scripts/*.sh
+chmod +x scripts/*.sh scripts/chain
 git add -A; git commit -qm base
 BASE_SHA="$(git rev-parse HEAD)"
 
-bash scripts/state.sh init 96 stage2 >/dev/null
-bash scripts/state.sh set 96 stage2 .base_sha "\"$BASE_SHA\"" >/dev/null
+bash scripts/chain state init 96 stage2 >/dev/null
+bash scripts/chain state set 96 stage2 .base_sha "\"$BASE_SHA\"" >/dev/null
 
 # =============================================================================
 step "context compiler (worker files, tier matrix + never-inject)"
 # =============================================================================
 CTX=specs/PROJ-96-stage2/context
 ctxsum() { find "$CTX" .claude -type f | sort | xargs cat | sha1sum; }
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1 \
+bash scripts/chain render context compile 96 stage2 >/dev/null 2>&1 \
   && ok "compile succeeds on the baseline fixture" || bad "compile failed"
 S1="$(ctxsum)"
-node scripts/compile-context-bundles.mjs compile 96 stage2 --wave 1 >/dev/null 2>&1
+bash scripts/chain render context compile 96 stage2 --wave 1 >/dev/null 2>&1
 [ "$S1" = "$(ctxsum)" ] && ok "deterministic: two compiles are byte-identical" || bad "compiles differ"
 rm -rf "$CTX" .claude/agents
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
+bash scripts/chain render context compile 96 stage2 >/dev/null 2>&1
 [ "$S1" = "$(ctxsum)" ] && ok "deterministic: a compile from scratch reproduces every byte" || bad "compile from scratch differs"
 
 # A budget breach aborts before anything is written (a budget of 40 tokens).
 sed -i 's/^budget_tokens: .*/budget_tokens: 40/' templates/roles/reviewer.md
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
+bash scripts/chain render context compile 96 stage2 >/dev/null 2>&1
 RC=$?
 git checkout -q templates/roles/reviewer.md
 [ "$RC" -eq 1 ] && [ "$S1" = "$(ctxsum)" ] \
@@ -141,29 +140,23 @@ has() { grep -qF -- "## $2" "$1" 2>/dev/null; }
   && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
 grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
   || ok "never-inject holds: no PRD/progress.md content in any worker file"
-# Retired injector stub as an old hook calls it from the repo root (manifests
-# from templates/roles): a role with a file gets the abort notice, never context.
-hook() { printf '{"agent_type":"%s"}' "$1" | node scripts/context-injector.mjs claude; }
-{ hook skillchain-implementer | jq -e '.hookSpecificOutput.additionalContext | startswith("Dieser Hook ist stillgelegt.")' >/dev/null \
-  && hook reviewer-security | grep -q 'stillgelegt' && [ -z "$(hook micro-fixer)" ] && [ -z "$(hook explore)" ]; } \
-  && ok "retired injector stub: notice for roles with a file, nothing for tier 0/explore" || bad "injector stub output wrong"
 
 # =============================================================================
 step "curation caps + intake seal"
 # =============================================================================
-bash scripts/curation-caps.sh . >/dev/null 2>&1 && ok "caps pass on the clean baseline" || bad "caps failed on clean baseline"
+bash scripts/chain check caps . >/dev/null 2>&1 && ok "caps pass on the clean baseline" || bad "caps failed on clean baseline"
 CAPS_OK=1
-seq 1 31 > docs/PRODUCT.md;      bash scripts/curation-caps.sh . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/PRODUCT.md
-seq 1 201 > docs/ARCHITECTURE.md; bash scripts/curation-caps.sh . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/ARCHITECTURE.md
-seq 1 101 > src/feature/agent.md; bash scripts/curation-caps.sh . >/dev/null 2>&1 && CAPS_OK=0; rm src/feature/agent.md
-seq 1 41 > AGENTS.md;             bash scripts/curation-caps.sh . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q AGENTS.md
+seq 1 31 > docs/PRODUCT.md;      bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/PRODUCT.md
+seq 1 201 > docs/ARCHITECTURE.md; bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/ARCHITECTURE.md
+seq 1 101 > src/feature/agent.md; bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; rm src/feature/agent.md
+seq 1 41 > AGENTS.md;             bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q AGENTS.md
 [ "$CAPS_OK" -eq 1 ] && ok "each cap breach fails (PRODUCT 31, ARCHITECTURE 201, agent.md 101, AGENTS.md 41)" || bad "a cap breach passed"
-bash scripts/intake-seal-check.sh . >/dev/null 2>&1 && ok "intake seal check passes on the clean baseline" || bad "seal check failed clean"
+bash scripts/chain check intake . >/dev/null 2>&1 && ok "intake seal check passes on the clean baseline" || bad "seal check failed clean"
 echo 'claim [assumed]' >> docs/GUIDELINES.md
-bash scripts/intake-seal-check.sh . >/dev/null 2>&1 && bad "seal check missed a residual provenance marker" || ok "seal check fails on residual provenance markers"
+bash scripts/chain check intake . >/dev/null 2>&1 && bad "seal check missed a residual provenance marker" || ok "seal check fails on residual provenance markers"
 git checkout -q docs/GUIDELINES.md
 mv specs/intake/decisions.md specs/intake/decisions.md.bak
-bash scripts/intake-seal-check.sh . >/dev/null 2>&1 && bad "seal check missed missing reconcile evidence" || ok "seal check fails without D-BOOTSTRAP reconcile evidence (undiscussed drafts never seal)"
+bash scripts/chain check intake . >/dev/null 2>&1 && bad "seal check missed missing reconcile evidence" || ok "seal check fails without D-BOOTSTRAP reconcile evidence (undiscussed drafts never seal)"
 mv specs/intake/decisions.md.bak specs/intake/decisions.md
 
 # =============================================================================
@@ -176,7 +169,7 @@ printf '[plugins."ponytail@ponytail"]\nenabled = true\n' > "$PT/codex.toml"
 echo '{"defaultMode":"full"}' > "$PT/cfg/config.json"
 ptc() { PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
         PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-        bash scripts/ponytail-check.sh "$@"; }
+        bash scripts/chain check ponytail "$@"; }
 ptc >/dev/null 2>&1 && ok "parity ok -> exit 0" || bad "parity fixture failed"
 mkdir -p "$PT/cache/4.9.0/.codex-plugin"; echo '{"version":"4.9.0"}' > "$PT/cache/4.9.0/.codex-plugin/plugin.json"
 ptc >/dev/null 2>&1 && bad "version mismatch passed" || ok "version mismatch -> exit 1 (blocks P0)"
@@ -193,7 +186,7 @@ ptc >/dev/null 2>&1 && bad "mode 'off' passed the gate" || ok "mode 'off' -> exi
 echo '{"defaultMode":"full"}' > "$PT/cfg/config.json"
 PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
   PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-  PONYTAIL_SUBAGENT_MATCHER='implementer|frontend-implementer|backend-implementer|micro-fixer' bash scripts/ponytail-check.sh >/dev/null 2>&1 \
+  PONYTAIL_SUBAGENT_MATCHER='implementer|frontend-implementer|backend-implementer|micro-fixer' bash scripts/chain check ponytail >/dev/null 2>&1 \
   && bad "scoped ladder matcher passed the gate" \
   || ok "scoped ladder matcher -> exit 1 (generic implementation fallback would be missed)"
 
@@ -232,8 +225,8 @@ esac
 echo '{"severity":"medium","category":"stale-claim","file":"docs/ARCHITECTURE.md","line":2,"summary":"stub codex finding"}'
 EOF
 chmod +x "$STUB/claude" "$STUB/codex"
-bash scripts/state.sh set 96 stage2 .authorship '{"docs-delta":{"author_provider":"claude","author_model":"opus"},"codex-delta":{"author_provider":"codex","author_model":"gpt-5.6"}}' >/dev/null
-PATH="$STUB:$PATH" bash scripts/cross-review.sh docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 1 >/dev/null 2>&1
+bash scripts/chain state set 96 stage2 .authorship '{"docs-delta":{"author_provider":"claude","author_model":"opus"},"codex-delta":{"author_provider":"codex","author_model":"gpt-5.6"}}' >/dev/null
+PATH="$STUB:$PATH" bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 1 >/dev/null 2>&1
 RC=$?
 XRP="$(jq -r '.cross_review[-1].reviewer_provider' specs/PROJ-96-stage2/state.json 2>/dev/null)"
 [ "$RC" -eq 0 ] && [ "$XRP" = "codex" ] && ok "claude-authored -> codex reviews; round recorded in state" || bad "routing rc=$RC reviewer=$XRP"
@@ -241,7 +234,7 @@ LED="$(jq -r '[.findings[] | select((.source == "cross-review") and .provider ==
 [ "${LED:-0}" -ge 1 ] && ok "finding landed in the ledger: source=cross-review, provider attributed" || bad "ledger has no attributed cross-review finding"
 # Mirror the normal persistent route: Codex-authored material must reach an
 # authenticated Claude reviewer, be provider-stamped, and land in state/ledger.
-PATH="$STUB:$PATH" CLAUDE_STUB_SEVERITY=medium bash scripts/cross-review.sh docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key codex-delta --round 1 >/dev/null 2>&1
+PATH="$STUB:$PATH" CLAUDE_STUB_SEVERITY=medium bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key codex-delta --round 1 >/dev/null 2>&1
 RC=$?
 XRP="$(jq -r '.cross_review[-1].reviewer_provider' specs/PROJ-96-stage2/state.json 2>/dev/null)"
 LED="$(jq -r '[.findings[] | select((.source == "cross-review") and .provider == "claude")] | length' specs/PROJ-96-stage2/findings.json 2>/dev/null)"
@@ -252,7 +245,7 @@ LED="$(jq -r '[.findings[] | select((.source == "cross-review") and .provider ==
 # panel. Authentication probes are excluded from the worker count.
 QA_CLAUDE_LOG="$WORK/qa-claude-personas.log"
 PATH="$STUB:$PATH" QA_STUB_LOG="$QA_CLAUDE_LOG" CLAUDE_STUB_SEVERITY=medium \
-  bash scripts/cross-review.sh qa 96 stage2 --artifacts docs/ARCHITECTURE.md \
+  bash scripts/chain review qa 96 stage2 --artifacts docs/ARCHITECTURE.md \
   --author-provider codex --persist --personas --round 1 >/dev/null 2>&1
 RC=$?
 QA_XR="$(jq -r '.cross_review[-1] | .mode + ":" + .reviewer_provider' specs/PROJ-96-stage2/state.json 2>/dev/null)"
@@ -262,7 +255,7 @@ QA_XR="$(jq -r '.cross_review[-1] | .mode + ":" + .reviewer_provider' specs/PROJ
 # A Codex-authored run has no same-provider fallback. Fail before rendering or
 # invoking a reviewer when Claude authentication is unavailable.
 CLAUDE_AUTH_OUT="$WORK/claude-auth-fail.out"
-PATH="$STUB:$PATH" CLAUDE_AUTH_FAIL=1 bash scripts/cross-review.sh docs 97 pre-p0 \
+PATH="$STUB:$PATH" CLAUDE_AUTH_FAIL=1 bash scripts/chain review docs 97 pre-p0 \
   --artifacts docs/ARCHITECTURE.md --author-provider codex >"$CLAUDE_AUTH_OUT" 2>&1
 RC=$?
 [ "$RC" -eq 1 ] && grep -q 'Claude is required.*unavailable or unauthenticated' "$CLAUDE_AUTH_OUT" \
@@ -271,7 +264,7 @@ RC=$?
 # QA evidence authored in Claude gets six *separate* Codex persona workers.
 # They must not be one prompt that merely names six personas.
 QA_LOG="$WORK/qa-personas.log"
-PATH="$STUB:$PATH" QA_STUB_LOG="$QA_LOG" bash scripts/cross-review.sh qa 96 stage2 --artifacts docs/ARCHITECTURE.md --author-provider claude --persist --personas --round 1 >/dev/null 2>&1
+PATH="$STUB:$PATH" QA_STUB_LOG="$QA_LOG" bash scripts/chain review qa 96 stage2 --artifacts docs/ARCHITECTURE.md --author-provider claude --persist --personas --round 1 >/dev/null 2>&1
 RC=$?
 QA_XR="$(jq -r '.cross_review[-1] | .mode + ":" + .reviewer_provider' specs/PROJ-96-stage2/state.json 2>/dev/null)"
 [ "$RC" -eq 0 ] && [ "$QA_XR" = "qa:codex" ] && [ "$(wc -l < "$QA_LOG" | tr -d ' ')" -eq 6 ] \
@@ -279,7 +272,7 @@ QA_XR="$(jq -r '.cross_review[-1] | .mode + ":" + .reviewer_provider' specs/PROJ
   || bad "Claude QA persona routing rc=$RC record=$QA_XR workers=$(wc -l < "$QA_LOG" | tr -d ' ')"
 printf '#!/bin/sh\nexit 1\n' > "$STUB/codex"; chmod +x "$STUB/codex"
 QA_FALLBACK_LOG="$WORK/qa-fallback-personas.log"; QA_FALLBACK_OUT="$WORK/qa-fallback.out"
-PATH="$STUB:$PATH" QA_STUB_LOG="$QA_FALLBACK_LOG" bash scripts/cross-review.sh qa 96 stage2 --artifacts docs/ARCHITECTURE.md --author-provider claude --persist --personas >"$QA_FALLBACK_OUT" 2>&1
+PATH="$STUB:$PATH" QA_STUB_LOG="$QA_FALLBACK_LOG" bash scripts/chain review qa 96 stage2 --artifacts docs/ARCHITECTURE.md --author-provider claude --persist --personas >"$QA_FALLBACK_OUT" 2>&1
 RC=$?
 QA_FALLBACK="$(jq -r '.cross_review[-1] | .reviewer_provider + ":" + (.degraded_fallback | tostring)' specs/PROJ-96-stage2/state.json 2>/dev/null)"
 [ "$RC" -eq 3 ] && [ "$QA_FALLBACK" = "claude:true" ] && [ "$(wc -l < "$QA_FALLBACK_LOG" | tr -d ' ')" -eq 6 ] \
@@ -295,7 +288,7 @@ EOF
 chmod +x "$STUB/codex"
 # Before P0 there is no state.json. An explicit author must route the review,
 # embed its input, and report findings only to the human (stdout).
-OUT="$(PATH="$STUB:$PATH" bash scripts/cross-review.sh concept 97 pre-p0 --artifacts docs/ARCHITECTURE.md --author-provider claude 2>/dev/null)"
+OUT="$(PATH="$STUB:$PATH" bash scripts/chain review concept 97 pre-p0 --artifacts docs/ARCHITECTURE.md --author-provider claude 2>/dev/null)"
 RC=$?
 printf '%s\n' "$OUT" | jq -e 'select(.provider == "codex" and .source == "cross-review")' >/dev/null 2>&1 \
   && [ "$RC" -eq 0 ] && [ ! -e specs/PROJ-97-pre-p0/findings.json ] \
@@ -305,22 +298,22 @@ printf '%s\n' "$OUT" | jq -e 'select(.provider == "codex" and .source == "cross-
 # default must stream to Claude through stdin; an explicitly configured cap
 # remains enforceable.
 awk 'BEGIN { for (i = 0; i < 150000; i++) printf "x" }' > docs/large-requirements.md
-REQUIREMENTS_STUB=1 PATH="$STUB:$PATH" bash scripts/cross-review.sh requirements 97 pre-p0 \
+REQUIREMENTS_STUB=1 PATH="$STUB:$PATH" bash scripts/chain review requirements 97 pre-p0 \
   --artifacts docs/large-requirements.md --author-provider codex >/dev/null 2>&1
 RC=$?
 [ "$RC" -eq 3 ] \
   && ok "requirements mode streams >128 KiB to Claude without an artificial default cap" \
   || bad "large requirements review failed before provider review (rc=$RC)"
 CROSS_REVIEW_MAX_CONTEXT_BYTES=1024 PATH="$STUB:$PATH" \
-  bash scripts/cross-review.sh requirements 97 pre-p0 \
+  bash scripts/chain review requirements 97 pre-p0 \
   --artifacts docs/large-requirements.md --author-provider codex >/dev/null 2>&1
 [ $? -eq 1 ] && ok "explicit cross-review context cap remains enforceable" \
   || bad "explicit cross-review context cap was ignored"
-PATH="$STUB:$PATH" bash scripts/cross-review.sh docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 3 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 3 >/dev/null 2>&1
 RC=$?
 { [ "$RC" -eq 0 ] || [ "$RC" -eq 3 ]; } && [ "$(jq -r '.cross_review[-1].round' specs/PROJ-96-stage2/state.json)" -eq 3 ] \
   && ok "round 3 runs and is persisted" || bad "round 3 failed (rc=$RC)"
-PATH="$STUB:$PATH" bash scripts/cross-review.sh docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 4 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 4 >/dev/null 2>&1
 RC=$?
 { [ "$RC" -eq 0 ] || [ "$RC" -eq 3 ]; } && [ "$(jq -r '.cross_review[-1].round' specs/PROJ-96-stage2/state.json)" -eq 4 ] \
   && ok "manual round 4 runs and is persisted" || bad "manual round 4 failed (rc=$RC)"
@@ -335,7 +328,7 @@ echo '{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md",
 EOF
 chmod +x "$STUB/codex"
 printf 'prompt' > "$WORK/p.md"
-OUT="$(PATH="$STUB:$PATH" bash scripts/review-with-codex.sh --prompt "$WORK/p.md" --timeout 10 2>/dev/null)"
+OUT="$(PATH="$STUB:$PATH" bash scripts/chain review codex --prompt "$WORK/p.md" --timeout 10 2>/dev/null)"
 [ "$(printf '%s\n' "$OUT" | grep -c '^{' || true)" -eq 1 ] \
   && ok "adapter deduplicates identical findings" || bad "adapter did not deduplicate findings"
 cat > "$STUB/codex" <<'EOF'
@@ -345,7 +338,7 @@ echo '{"severity":"low","category":"review-clean","summary":"clean"}'
 echo '{"severity":"medium","category":"contradiction","file":"docs/ARCHITECTURE.md","line":2,"summary":"not clean"}'
 EOF
 chmod +x "$STUB/codex"
-PATH="$STUB:$PATH" bash scripts/review-with-codex.sh --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review codex --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
 [ $? -eq 1 ] && ok "adapter rejects review-clean plus findings" || bad "adapter accepted contradictory clean output"
 cat > "$STUB/codex" <<'EOF'
 #!/bin/sh
@@ -354,15 +347,15 @@ echo 'bubblewrap: user namespaces unavailable'
 echo '{"severity":"medium","category":"false-success","file":"docs/ARCHITECTURE.md","line":2,"summary":"must not pass"}'
 EOF
 chmod +x "$STUB/codex"
-PATH="$STUB:$PATH" bash scripts/review-with-codex.sh --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review codex --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
 [ $? -eq 1 ] && ok "adapter rejects sandbox false-success output" || bad "adapter accepted sandbox false-success"
 # opposite provider "unavailable": stub codex fails login (a bare rm would fall
 # through to a REAL codex on PATH) -> model-opposite fallback
 printf '#!/bin/sh\nexit 1\n' > "$STUB/codex"; chmod +x "$STUB/codex"
-PATH="$STUB:$PATH" CLAUDE_REVIEW_MODEL=sonnet bash scripts/cross-review.sh docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 2 >/dev/null 2>&1
+PATH="$STUB:$PATH" CLAUDE_REVIEW_MODEL=sonnet bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 2 >/dev/null 2>&1
 DEG="$(jq -r '.cross_review[-1] | (.degraded_fallback|tostring) + ":" + .reviewer_model' specs/PROJ-96-stage2/state.json)"
 [ "$DEG" = "true:sonnet" ] && ok "degraded: model-opposite fallback used and flagged in state" || bad "degraded record wrong: $DEG"
-PATH="$STUB:$PATH" CLAUDE_REVIEW_MODEL=opus bash scripts/cross-review.sh docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta >/dev/null 2>&1
+PATH="$STUB:$PATH" CLAUDE_REVIEW_MODEL=opus bash scripts/chain review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta >/dev/null 2>&1
 [ $? -eq 1 ] && ok "reviewer model == author model refused (gate never same-model)" || bad "same-model review not refused"
 
 # Claude's adapter must enforce the same protocol controls as Codex while
@@ -372,7 +365,7 @@ cat > "$STUB/claude" <<'EOF'
 echo '{"is_error":false,"structured_output":{"findings":[{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md","line":2,"summary":"same finding"},{"severity":"medium","category":"duplicate","file":"docs/ARCHITECTURE.md","line":2,"summary":"same finding"}]}}'
 EOF
 chmod +x "$STUB/claude"
-OUT="$(PATH="$STUB:$PATH" bash scripts/review-with-claude.sh --prompt "$WORK/p.md" --timeout 10 2>/dev/null)"
+OUT="$(PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 2>/dev/null)"
 [ "$(printf '%s\n' "$OUT" | grep -c '^{' || true)" -eq 1 ] \
   && printf '%s\n' "$OUT" | jq -e 'select(.provider == "claude")' >/dev/null 2>&1 \
   && ok "Claude adapter parses structured output, stamps provider, and deduplicates" \
@@ -382,24 +375,24 @@ cat > "$STUB/claude" <<'EOF'
 echo '{"is_error":false,"structured_output":{"findings":[{"severity":"low","category":"review-clean","summary":"clean"},{"severity":"medium","category":"contradiction","summary":"not clean"}]}}'
 EOF
 chmod +x "$STUB/claude"
-PATH="$STUB:$PATH" bash scripts/review-with-claude.sh --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
 [ $? -eq 1 ] && ok "Claude adapter rejects review-clean plus findings" || bad "Claude adapter accepted contradictory clean output"
 cat > "$STUB/claude" <<'EOF'
 #!/bin/sh
 echo '{"is_error":false,"result":"review-blocked: sandbox failed","structured_output":{"findings":[{"severity":"medium","category":"false-success","summary":"must not pass"}]}}'
 EOF
 chmod +x "$STUB/claude"
-PATH="$STUB:$PATH" bash scripts/review-with-claude.sh --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
 [ $? -eq 1 ] && ok "Claude adapter rejects infrastructure false-success output" || bad "Claude adapter accepted infrastructure false-success"
 cat > "$STUB/claude" <<'EOF'
 #!/bin/sh
 echo '{"is_error":true,"terminal_reason":"api_error","result":"Not logged in"}'
 EOF
 chmod +x "$STUB/claude"
-PATH="$STUB:$PATH" bash scripts/review-with-claude.sh --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 10 >/dev/null 2>&1
 [ $? -eq 1 ] && ok "Claude adapter rejects rc=0 API/auth error envelopes" || bad "Claude adapter accepted an API/auth error envelope"
 truncate -s 10000001 "$WORK/over-claude-stdin-limit.md"
-PATH="$STUB:$PATH" bash scripts/review-with-claude.sh --prompt "$WORK/over-claude-stdin-limit.md" --timeout 10 >"$WORK/claude-size.out" 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/over-claude-stdin-limit.md" --timeout 10 >"$WORK/claude-size.out" 2>&1
 [ $? -eq 1 ] && grep -q 'stdin is limited to 10 MB' "$WORK/claude-size.out" \
   && ok "Claude adapter reports the provider's 10 MB stdin ceiling explicitly" \
   || bad "Claude adapter did not explain the provider stdin ceiling"
@@ -412,7 +405,7 @@ sleep 300
 EOF
 chmod +x "$STUB/claude"
 printf 'prompt' > "$WORK/p.md"
-PATH="$STUB:$PATH" bash scripts/review-with-claude.sh --prompt "$WORK/p.md" --timeout 3 >/dev/null 2>&1
+PATH="$STUB:$PATH" bash scripts/chain review claude --prompt "$WORK/p.md" --timeout 3 >/dev/null 2>&1
 RC=$?
 sleep 1
 if [ "$RC" -ne 0 ] && ! pgrep -f "sleep 300" >/dev/null 2>&1; then
@@ -422,20 +415,20 @@ else
 fi
 
 # degraded flag renders in the morning report
-bash scripts/state.sh set 96 stage2 .degraded true >/dev/null
-bash scripts/state.sh set 96 stage2 .degraded_reason '"codex unavailable at P7 (spike)"' >/dev/null
+bash scripts/chain state set 96 stage2 .degraded true >/dev/null
+bash scripts/chain state set 96 stage2 .degraded_reason '"codex unavailable at P7 (spike)"' >/dev/null
 node "$SPIKE_DIR/render-report.mjs" morning specs >/dev/null 2>&1
 grep -rq "cross-review: model-opposite fallback" specs/morning-report-*.md 2>/dev/null \
   && ok "degradation rendered in the morning report (cross-review: model-opposite fallback)" \
   || bad "morning report missing the degradation flag"
-bash scripts/state.sh set 96 stage2 .degraded false >/dev/null
+bash scripts/chain state set 96 stage2 .degraded false >/dev/null
 
 # =============================================================================
 step "P7 runner gate (stubbed lanes seal P7:done)"
 # =============================================================================
 # advance the fixture state to P6:done so P7 is the legal next phase
 for t in "CP1 running" "CP1 approved" "P0 running" "P0 done" "P5 running" "P5 done" "P6 running" "P6 done"; do
-  bash scripts/state.sh transition 96 stage2 $t >/dev/null
+  bash scripts/chain state transition 96 stage2 $t >/dev/null
 done
 # two writer stubs: one seals WITHOUT any cross-review evidence, one records
 # a docs cross-review round (as the real documentation skill would) first
@@ -443,19 +436,19 @@ write_stub_writer() { # <with-evidence: 0|1>
   if [ "$1" -eq 1 ]; then
     cat > "$STUB/claude" <<'EOF'
 #!/bin/sh
-bash scripts/state.sh transition 96 stage2 P7 running >/dev/null 2>&1
-CUR="$(bash scripts/state.sh get 96 stage2 '.cross_review // []')"
+bash scripts/chain state transition 96 stage2 P7 running >/dev/null 2>&1
+CUR="$(bash scripts/chain state get 96 stage2 '.cross_review // []')"
 UPD="$(printf '%s' "$CUR" | jq -c --arg at "$(date -Iseconds)" '. + [{mode:"docs",round:1,reviewer_provider:"codex",reviewer_model:"codex-default",degraded_fallback:false,findings_added:0,at:$at}]')"
-bash scripts/state.sh set 96 stage2 .cross_review "$UPD" >/dev/null 2>&1
-bash scripts/state.sh transition 96 stage2 P7 done >/dev/null 2>&1
+bash scripts/chain state set 96 stage2 .cross_review "$UPD" >/dev/null 2>&1
+bash scripts/chain state transition 96 stage2 P7 done >/dev/null 2>&1
 exit 0
 EOF
   else
     cat > "$STUB/claude" <<'EOF'
 #!/bin/sh
 # stub P7 writer: seals the phase without running any curation gate
-bash scripts/state.sh transition 96 stage2 P7 running >/dev/null 2>&1
-bash scripts/state.sh transition 96 stage2 P7 done >/dev/null 2>&1
+bash scripts/chain state transition 96 stage2 P7 running >/dev/null 2>&1
+bash scripts/chain state transition 96 stage2 P7 done >/dev/null 2>&1
 exit 0
 EOF
   fi
@@ -469,7 +462,7 @@ EOF
 chmod +x "$STUB/codex"
 mark_open_xr_fixed() {
   for id in $(jq -r '.findings[] | select(.status=="open" and (.source=="cross-review" or ((.sources // []) | index("cross-review")))) | .id' specs/PROJ-96-stage2/findings.json); do
-    node scripts/ledger.mjs set-status 96 stage2 "$id" fixed deadbeef >/dev/null 2>&1
+    bash scripts/chain findings set-status 96 stage2 "$id" fixed deadbeef >/dev/null 2>&1
   done
 }
 
@@ -479,7 +472,7 @@ seq 1 31 > docs/PRODUCT.md
 mark_open_xr_fixed
 PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7a.out" 2>&1
 RC=$?
-ST="$(bash scripts/state.sh get 96 stage2 '.phase + ":" + .status')"
+ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
 { [ "$RC" -eq 1 ] && [ "$ST" = "P7:blocked" ] && grep -q "curation caps FAIL" "$WORK/p7a.out"; } \
   && ok "P7 sealed with failing caps -> runner parks the run (P7:blocked, form gate)" \
   || bad "caps gate: rc=$RC state=$ST"
@@ -487,10 +480,10 @@ git checkout -q docs/PRODUCT.md
 
 # gate 2: caps green but NO cross-review ever ran -> parked (a skipped review
 # must not look like a clean one)
-bash scripts/state.sh transition 96 stage2 P7 running >/dev/null
+bash scripts/chain state transition 96 stage2 P7 running >/dev/null
 PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7b.out" 2>&1
 RC=$?
-ST="$(bash scripts/state.sh get 96 stage2 '.phase + ":" + .status')"
+ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
 { [ "$RC" -eq 1 ] && [ "$ST" = "P7:blocked" ] && grep -q "NO docs cross-review" "$WORK/p7b.out"; } \
   && ok "P7 sealed with zero findings but NO review evidence -> runner parks (evidence gate)" \
   || bad "evidence gate: rc=$RC state=$ST"
@@ -498,21 +491,21 @@ ST="$(bash scripts/state.sh get 96 stage2 '.phase + ":" + .status')"
 # gate 3: evidence present, open Critical/High cross-review finding -> parked
 write_stub_writer 1
 printf '{"source":"cross-review","severity":"critical","category":"stale-claim","file":"docs/ARCHITECTURE.md","line":2,"provider":"codex","summary":"spike blocking finding"}\n' \
-  | node scripts/ledger.mjs add 96 stage2 >/dev/null 2>&1
-bash scripts/state.sh transition 96 stage2 P7 running >/dev/null
+  | bash scripts/chain findings add 96 stage2 >/dev/null 2>&1
+bash scripts/chain state transition 96 stage2 P7 running >/dev/null
 PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7c.out" 2>&1
 RC=$?
-ST="$(bash scripts/state.sh get 96 stage2 '.phase + ":" + .status')"
+ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
 { [ "$RC" -eq 1 ] && [ "$ST" = "P7:blocked" ] && grep -q "cross-review finding" "$WORK/p7c.out"; } \
   && ok "P7 sealed with an open Critical/High cross-review finding -> runner parks (truth gate)" \
   || bad "truth gate: rc=$RC state=$ST"
 
 # gate 4: evidence + clean ledger + caps green -> phase completes
 mark_open_xr_fixed
-bash scripts/state.sh transition 96 stage2 P7 running >/dev/null
+bash scripts/chain state transition 96 stage2 P7 running >/dev/null
 PATH="$STUB:$PATH" timeout --foreground 120 "$SPIKE_DIR/run-phase.sh" P7 96 stage2 --timeout 60 >"$WORK/p7d.out" 2>&1
 RC=$?
-ST="$(bash scripts/state.sh get 96 stage2 '.phase + ":" + .status')"
+ST="$(bash scripts/chain state get 96 stage2 '.phase + ":" + .status')"
 [ "$RC" -eq 0 ] && [ "$ST" = "P7:done" ] && ok "green gates + evidence -> P7 completes normally" || bad "green path: rc=$RC state=$ST"
 
 # =============================================================================
@@ -541,7 +534,7 @@ If (and only if) everything is accurate: {"source":"cross-review","severity":"lo
 EOF
   LIVE_TIMEOUT=300
   if command -v claude >/dev/null 2>&1; then
-    OUT="$(bash scripts/review-with-claude.sh --prompt "$LIVE_PROMPT" --model "${CLAUDE_REVIEW_MODEL:-sonnet}" --timeout "$LIVE_TIMEOUT" 2>/dev/null)"
+    OUT="$(bash scripts/chain review claude --prompt "$LIVE_PROMPT" --model "${CLAUDE_REVIEW_MODEL:-sonnet}" --timeout "$LIVE_TIMEOUT" 2>/dev/null)"
     N="$(grep -c '^{' <<<"$OUT" 2>/dev/null || true)"
     [ "${N:-0}" -ge 1 ] && ok "live claude adapter: $N valid JSON line(s) (codex-authored -> claude direction / model-opposite fallback)" \
                         || bad "live claude adapter produced no valid lines"
@@ -549,7 +542,7 @@ EOF
     bad "claude CLI missing — cannot spike the hard provider"
   fi
   if command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; then
-    OUT="$(bash scripts/review-with-codex.sh --prompt "$LIVE_PROMPT" --timeout "$LIVE_TIMEOUT" 2>/dev/null)"
+    OUT="$(bash scripts/chain review codex --prompt "$LIVE_PROMPT" --timeout "$LIVE_TIMEOUT" 2>/dev/null)"
     N="$(grep -c '^{' <<<"$OUT" 2>/dev/null || true)"
     [ "${N:-0}" -ge 1 ] && ok "live codex adapter: $N valid JSON line(s) (claude-authored -> codex direction)" \
                         || bad "live codex adapter produced no valid lines"

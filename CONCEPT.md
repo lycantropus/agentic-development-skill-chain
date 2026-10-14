@@ -669,8 +669,7 @@ orchestrator (or the runner's P0 lane):
    `context/workers/wave-N/<US-ID>.md` per story, `context/roles/wave-N/<role>.md`
    for roles without a story — and the worker reads it first (its report
    starts with `Brief: <US-ID>`). The compiled file is canonical for both
-   providers; projects that still carry the old SubagentStart hook are
-   migrated by `compile`, and the retired injector stub only points to the path.
+   providers.
 5. **Ponytail preflight on all ACTIVE providers:** plugin installed and
    mode `full` active? Coding-agent matcher scoped so reviewer and
    explore lanes do not receive it? Version/mode parity checked when
@@ -1218,11 +1217,11 @@ response.
 | Script (skill) | Input | Output | Behavior / exit |
 |---|---|---|---|
 | `preflight.sh` (5_executing) | CLI list §7 (embedded), env | report to stdout; state.json `preflight` block | checks `command -v` + auth per tool; exit ≠ 0 on any missing HARD tool (stop condition); skippable tools → logged skip |
-| `compile-context-bundles.mjs` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, context matrix §5 | one file per story (`workers/wave-N/<US-ID>.md`) and per story-less role (`roles/wave-N/<role>.md`), plus `.claude/agents/skillchain-*.md` | counts the role tokens; exit ≠ 0 on budget breach, an unassignable story or an outdated manifest; removes the retired SubagentStart hook |
+| `compile-context-bundles.mjs` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, context matrix §5 | one file per story (`workers/wave-N/<US-ID>.md`) and per story-less role (`roles/wave-N/<role>.md`), plus `.claude/agents/skillchain-*.md` | counts the role tokens; exit ≠ 0 on budget breach, an unassignable story or an outdated manifest |
 | `state.sh` (5_executing) | `get <path>` / `set <path> <value>` / `transition <phase> <status>` | state.json (validated) | sole write path to state.json; schema-validates; illegal phase transitions exit ≠ 0 |
-| `worktree.sh` (5_executing/8_delivery) | PROJ id, control checkout, state | persistent PROJ worktree lifecycle | creates/resumes safely; links ignored `.env.local`; installs from lockfile; reports conservative cleanup eligibility |
+| `worktree.sh` (5_executing) | PROJ id, control checkout, state | persistent PROJ worktree lifecycle | creates/resumes safely; links ignored `.env.local`; installs from lockfile; reports conservative cleanup eligibility |
 | `story-slice.mjs` (5_executing) | wave plan + US ID | that story's `## <US-ID>` section, verbatim, to stdout | ends at the next `## ` heading outside code fences; exit ≠ 0 when the ID is missing or duplicated |
-| `validate-wave-plan.mjs` (4_writing-plans/5_executing) | wave plans + `wave-gate-config.json` | deterministic consistency verdict | validates unique AC mappings, bidirectional test files, broad regressions, auth budget, and protected-route coverage |
+| `validate-wave-plan.mjs` (5_executing) | wave plans + `wave-gate-config.json` | deterministic consistency verdict | validates unique AC mappings, bidirectional test files, broad regressions, auth budget, and protected-route coverage |
 | `wave-gate.sh` (5_executing, exists) | wave N, PROJ, config | gate verdict; PASSED block in progress.md; findings → ledger | runs current ACs + declared regressions, archives CodeRabbit evidence, checks cumulative blocking ledger, manages frontend readiness; red evidence → exit ≠ 0 |
 | `gen-component-registry.mjs` (5_executing) | every outermost `components/` folder under `src/` (`src/components`, `src/layout/components`, `src/features/**/components`, …), recursive, nested `components/` counted once | `docs/components.md`, or `--out <path>` (relative to the caller) when the app root is nested | reads the doc block above each component export; `--check` exits ≠ 0 on a stale registry, a component without a doc block, or a component without its `id="<kebab-name>"` section on the showcase page (wave-gate step 6). The registry is never hand-written — one source, the component file |
 | `ledger.mjs` (quality) | non-empty normalized findings JSONL from all sources | deduped, normalized `findings.json`; fix-queue clusters | dedupe key file/anchor/category, adding a stable summary fingerprint when no location exists; idempotent with reopen support; empty stdin fails |

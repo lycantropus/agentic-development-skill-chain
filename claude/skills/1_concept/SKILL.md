@@ -59,7 +59,7 @@ Create a task for each item and complete them in order:
 13. **Explicit clarity confirmation** - ask exactly: "From your perspective, is everything now clear, or are there still unclear or open points?" Only an unambiguous answer ("everything is clear", "nothing is unclear anymore") lets you proceed; anything vague or partial sends you back to clarification.
 14. **Present the feature concept** - in [template](#concept-document) order, scaled to complexity; ask for approval after each section when the concept is large or nuanced. Do not over-specify implementation.
 15. **Allocate PROJ-X and theme slug** - scan `specs/PROJ-*/`, pick the next free integer (or the roadmap's number), agree on a kebab-case theme. Only after the boundary is approved.
-16. **Create PROJ folder and state** - create `specs/PROJ-<X>-<theme>/1_concept/`, then run `bash ~/.claude/skills/5_executing/scripts/state.sh init <X> <theme>`. Write captured brownfield context to `0_context/` now. The new file stays `CP1:pending`; only the Step 5 checkpoint subskill may approve it.
+16. **Create PROJ folder and state** - create `specs/PROJ-<X>-<theme>/1_concept/`, then run `bash ~/.claude/skills/5_executing/scripts/chain state init <X> <theme>`. Write captured brownfield context to `0_context/` now. The new file stays `CP1:pending`; only the Step 5 checkpoint subskill may approve it.
 17. **Write the concept doc, direction log, and self-review** - see [Concept Document](#concept-document), [Direction Log](#direction-log), and [Self-Review](#self-review); commit.
 18. **Automatic cross-review** - see [Cross-Review](#automatic-cross-review).
 19. **User reviews the written concept** - see [User Review And Transition](#user-review-and-transition).
@@ -325,7 +325,7 @@ While over the cap, cut (never by removing scope, success criteria or constraint
 approval. Supply everything that establishes as-is truth for the concept:
 
 ```bash
-bash scripts/cross-review.sh concept <X> <theme> \
+bash scripts/chain review concept <X> <theme> \
   --artifacts specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md \
     specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-direction-log.md \
   --ground-truth specs/PROJ-<X>-<theme>/0_context/existing-state.md \
