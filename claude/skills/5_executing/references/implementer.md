@@ -1,6 +1,6 @@
 # Implementer Subagent Prompt Template
 
-Use this template when dispatching a subagent for a user story. Fill in all bracketed placeholders before dispatching. The subagent must not need to read the spec or plan files — its story slice, plus what only the lead knows, is in the prompt; everything else arrives through its role bundle.
+Use this template when dispatching a subagent for a user story. Fill in all bracketed placeholders before dispatching. The subagent must not need to read the spec or plan files — its whole brief (role rules, project context, this wave's architecture and contracts, the story slice) is ONE worker file, named by path in the prompt; the prompt adds only what the file lacks and only what only the lead knows.
 
 ## Template
 
@@ -8,17 +8,22 @@ Use this template when dispatching a subagent for a user story. Fill in all brac
 Task tool:
   description: "Implement [US-N]: [user story short title]"
   prompt: |
-    You are implementing a single user story. Your job is to implement all tasks
+    You are implementing a single user story of Wave [N]. Your job is to implement all tasks
     for this story using TDD, then run one bounded internal self-review.
 
-    ## Your Story (verbatim plan slice)
-    [Paste the unedited output of
-     `node scripts/story-slice.mjs <wave-plan> <US-ID>` — story heading (the
-     PRD's As a/I want/so that line, verbatim), ACs derived from its Given/When/Then,
-     smoke test, UI notes, tasks with TDD cycles and file paths, gotchas.
-     Never re-type or trim it; a non-zero exit is a plan defect to fix first.
-     If the lead found a plan/PRD AC conflict, add the PRD wording below the
-     slice, marked as superseding it.]
+    ## Your Brief
+    Your complete assignment is in `[specs/PROJ-<X>-<theme>/context/workers/wave-<N>/<US-ID>.md
+    (or <US-ID>.backend.md / .frontend.md under Split: contract)]`. Read it completely
+    before anything else; do not start without it, and report the missing or unreadable
+    file instead of guessing. It holds the role rules, project context, the design
+    system (frontend and full-stack roles), this wave's architecture and API contracts,
+    and `## Deine Story` (story, ACs, smoke test, tasks with TDD cycles and file paths,
+    gotchas — verbatim from the plan; never re-type or trim it in this prompt).
+    [Fix worker without a story: the path of `context/roles/wave-<N>/<role>.md`, any
+     further waves' role files by path, and the finding itself; the report then
+     starts with `Brief: <Finding-ID>`.]
+    [Only if the lead found a plan/PRD AC conflict: the PRD wording, marked as
+     superseding the file's slice.]
     Note: You do NOT verify ACs yourself. The main agent does that after you report back.
 
     ## Execution and Ownership
@@ -30,17 +35,13 @@ Task tool:
     [Short summary from `progress.md` of what earlier waves built that this US
      builds on. Never paste other waves' plans.]
 
-    ## Codebase Context
-    [Outside bundle runs only: relevant file paths, existing patterns,
-     conventions, tech stack notes. Skip in framework runs — the role bundle
-     injects architecture, guidelines and test conventions.]
-
-    ## UI Design System (include for any US that touches UI)
-    [Skip this section only when the worker runs on the frontend-implementer
-     context bundle — it already injects docs/DESIGN-SYSTEM.md and docs/components.md.
-     The generic implementer bundle (full-stack stories) does not. Otherwise, paste both files here (DESIGN-SYSTEM.md is capped at 80
-     lines, so paste it whole; components.md may be trimmed to the relevant entries).
-     The subagent MUST reuse registered components — never one-off styled elements.]
+    ## UI Implementation Handoff (UI stories only)
+    [The sections of `1d_prototypes/implementation-handoff.md` the slice's UI
+     Implementation Notes point to but do not quote. The design system and
+     `docs/components.md` are covered by the frontend / full-stack worker file (the
+     rules of DESIGN-SYSTEM.md inside it, components.md as a read-by-path
+     reference) — do not paste them. The subagent MUST reuse registered components — never
+     one-off styled elements.]
 
     ## Agent Notes (long-term memory)
     [Optionally paste known-relevant sections from `agent.md` in the source folder.
@@ -122,9 +123,11 @@ Task tool:
     Skip the entry if any criterion fails — noise in `agent.md` poisons future agents. One-off idiosyncrasies belong in the code's own comments, not here. P7 curation later keeps what is confirmed, deletes what is outdated, and promotes project-wide entries to AGENTS.md candidates.
 
     ## Report Format
+    - First line: `Brief: [US-ID]` (fix worker: `Brief: [Finding-ID]`)
     - US implemented: [US-N title]
     - Tasks completed: [list]
     - Tests run: [test names, commands, actual output summary]
+    - Test file per AC: [AC-1 → tests/x.test.ts, … — a hint for the lead, who runs the AC commands]
     - Files changed: [paths]
     - Inner Ralph self-review: [clean | fixes applied | unresolved issues]
     - Walls hit & workarounds: [list or "none" — already written to agent.md]
@@ -133,7 +136,7 @@ Task tool:
 
 ## Usage Notes
 
-- Paste the story slice verbatim; never paraphrase the US, ACs or tasks. The subagent must not read the spec or plan files.
+- Name the worker file by path; never paste or paraphrase the US, ACs or tasks. The subagent must not read the spec or plan files. A report without `Brief:` as its first line means the file was not read.
 - Prior-wave context comes from `progress.md`, not from re-reading earlier plans.
 - After every wave worker reports back, the main agent runs the wave-scoped AC verification pass — not the subagent.
 - For parallel waves: dispatch all US subagents in the same wave simultaneously using multiple Task tool calls in one message.

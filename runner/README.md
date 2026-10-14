@@ -16,7 +16,7 @@ files on disk. No conversation history crosses a phase boundary.
 | `run-phase.sh` | run one phase (`P0 P5 P6 P7 P8`) or `auto` (all remaining phases → one-line summary; the morning report renders only when P8 neither left an open PR nor removed the worktree); P5 loads `5b_executing-large-model` by default; `SKILLCHAIN_P5_SKILL="executing (5_executing)"` swaps in the full-procedure skill for weaker writer models |
 | `render-report.mjs` | `morning` (scan all PROJs → `specs/morning-report-<date>.md` + one-liner) and `stop` (stop report) |
 | `spike-dual-lane.sh` | Stage 1 release gate: concurrent lanes, read-only enforcement, JSONL capture, attribution, kill-tree cancellation |
-| `spike-stage2.sh` | Stage 2 release gate: bundle determinism/budgets/projection parity, injector tier matrix, symmetric authenticated cross-review (including six-persona QA, structured Claude output, and 10 MB transport failure), P7 runner gate |
+| `spike-stage2.sh` | Stage 2 release gate: worker-file determinism and budgets, tier matrix over the file contents, retired injector stub, symmetric authenticated cross-review (including six-persona QA, structured Claude output, and 10 MB transport failure), P7 runner gate |
 | `prompts/lane-prompt.md.tmpl` | generic lane prompt (role rules, state discipline) |
 | `prompts/p6-controller.md` | the P6 phase-controller contract (ledger triage, fix dispatch, opposite re-verification) |
 | `templates/morning-report.md.tmpl`, `templates/stop-report.md.tmpl` | report frames — reports are rendered, never hand-written |
@@ -93,12 +93,16 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
   independently re-verifies FORM (`curation-caps.sh` exit 0) and TRUTH
   (no open Critical/High ledger findings from source `cross-review`) —
   sealing past a red gate parks the run, mirror of the P6 gate.
-- **Context bundles (Stage 2):** P5/P7 writer prompts carry a POINTER to
-  `specs/.../context/` — bundle text is never pasted; Claude subagents
-  get their type-scoped bundle via the SubagentStart hook
-  (`context-injector.mjs claude`), codex lanes read
-  `bundle-<role>.codex.md`. Both providers receive the same canonical
-  bundle hash.
+- **Worker context files (Stage 2):** P5/P7 writer prompts carry a POINTER to
+  `specs/.../context/` — file text is never pasted. Every worker reads one
+  compiled file whose path the spawn prompt names:
+  `workers/wave-N/<US-ID>.md` per story (role from the plan's `Agent Type`
+  column), `roles/wave-N/<role>.md` for reviewers and fix workers. There is
+  no SubagentStart hook, no lock and no hash bookkeeping (a file's first line carries the plan hash): `compile --wave N` runs at each
+  wave start, and no worker starts after a non-zero exit until a rerun
+  exits 0. A project that still has the old hook keeps running on the
+  retired `context-injector.mjs` stub, which only says to use the path;
+  `compile` removes the hook.
 - **Ponytail coverage (Stage 2):** the runner clears
   `PONYTAIL_SUBAGENT_MATCHER`, using Ponytail's native all-subagent path;
   P0 blocks any scoped matcher because it can miss generic implementation
@@ -108,8 +112,6 @@ Env knobs: `CLAUDE_WRITER_MODEL`, `CLAUDE_REVIEW_MODEL`, `CLAUDE_MODEL_RANK`, `P
 (seconds a peer may outlive the writer, default 300), `SKILLCHAIN_POLL_SECONDS`
 (lane poll interval, default 5; the test harnesses set 0.1),
 `PONYTAIL_ENFORCE` (0 = loud escape hatch for the P0 ponytail gate),
-`CONTEXT_BUNDLE_BUDGET` (token budget override for the compiler; recorded as
-`budget_override` in `bundles.lock.json` and thus in state.json).
 `SKILLCHAIN_WORKTREE_ROOT` overrides the default sibling-worktree base;
 `SKILLCHAIN_DEV_PORT` records the PROJ dev port when setup needs a non-default.
 

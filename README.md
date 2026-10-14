@@ -41,7 +41,7 @@ scaffold stood up, agent files written); an existing codebase goes through
 | 2c | `review-reconcile` (opt) | Resolve PRD review gaps point by point |
 | 3 | `architecture` | PROJ-level tech design across all PRDs; flows straight into 4 when its cross-review is clean |
 | 4 | `writing-plans` | Wave-based implementation plans; flows straight into 5, whose CP1 is the single planning approval |
-| 5 | `executing` | Full-procedure Step 5 for weaker writer models (runner: `SKILLCHAIN_P5_SKILL`); hosts CP1 and P0 as subskills run in subagents — `checkpoint` (CP1/CP2/bootstrap reconcile loops with a decision log, seals `CP1:approved`) and `setup` (persistent isolated worktree, branch, preflight, framework scripts, dependencies, context bundles) — then worker-owned code/test/fix edits, TDD, one wave-scoped Ralph pass, hard wave gates, an integration-focused PROJ gate, then direct handoff to mandatory Skill 6 |
+| 5 | `executing` | Full-procedure Step 5 for weaker writer models (runner: `SKILLCHAIN_P5_SKILL`); hosts CP1 and P0 as subskills run in subagents — `checkpoint` (CP1/CP2/bootstrap reconcile loops with a decision log, seals `CP1:approved`) and `setup` (persistent isolated worktree, branch, preflight, framework scripts, dependencies, worker context files) — then worker-owned code/test/fix edits, TDD, one wave-scoped Ralph pass, hard wave gates, an integration-focused PROJ gate, then direct handoff to mandatory Skill 6 |
 | 5b | `executing-large-model` | **Default Step 5**: CP1 + P0 through the subskills above, then the waves with the same gates, state, and QA handoff as `executing`, procedure replaced by intent and invariants |
 | 6 | `qa` | End-to-end QA plus the required opposite-provider six-persona review; read-only finder in framework runs, findings into the ledger |
 | 7 | `documentation` | Human docs + curation of the long-lived `docs/` baseline behind form and truth gates |
@@ -81,7 +81,7 @@ per phase with exactly one writer orchestrator (the peer stays read-only),
 `state.json`/`findings.json` as the only handoff, a persistent per-PROJ
 worktree, evidence-based wave gates followed by an integration-focused PROJ
 gate, provider-opposite cross-review on every gated artifact, budgeted context
-bundles per role, the shared Ponytail minimalism ladder, hard P6/P7 gates
+files per worker, the shared Ponytail minimalism ladder, hard P6/P7 gates
 re-verified independently by the runner, and a stop policy that parks a run
 on a failed writer, timeout, unsealed phase, or red gate instead of
 continuing degraded. Reports and PR bodies are rendered from state + ledger
@@ -143,7 +143,7 @@ CONCEPT.md       The agent workflow framework specification
 `AGENTS.md` is the only curated durable-context file. `CLAUDE.md` is
 pointer-only and tells Claude to read `AGENTS.md`.
 
-Framework helper scripts (`state.sh`, `ledger.mjs`, the compiler/injector,
+Framework helper scripts (`state.sh`, `ledger.mjs`, the context compiler and its retired injector stub,
 gates, adapters) are byte-identical across their skill copies — `validate.sh`
 enforces it.
 
@@ -171,7 +171,7 @@ setup are in [docs/installation.md](docs/installation.md).
 ```bash
 ./scripts/validate.sh          # structure, frontmatter, byte-identical helpers, schemas, syntax
 runner/spike-dual-lane.sh      # Stage 1 release gate: live dual lanes, ledger guarantees, stop policy
-runner/spike-stage2.sh         # Stage 2 release gate: bundles, injector, caps, cross-review, P7 gates
+runner/spike-stage2.sh         # Stage 2 release gate: worker context files, caps, cross-review, P7 gates
 ```
 
 The validation script checks that the expected skill folders exist in both

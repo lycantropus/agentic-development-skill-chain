@@ -31,9 +31,9 @@ This subskill is aligned with the Claude variant. In Codex:
 - Do not require `claude --dangerously-skip-permissions` or
   `bypassPermissions` for THIS session. Use the current Codex session
   permissions and the normal approval/sandbox policy; there is no
-  permission-merge step. (The preflight still writes the context-injector
-  hook into `.claude/settings.json` — that file configures the Claude
-  LANES the runner starts, not this session.)
+  permission-merge step. (The preflight installs no hook; it only removes a
+  retired context-injector hook from `.claude/settings.json`, which
+  configures the Claude LANES the runner starts, not this session.)
 - Reusable skill assets live under `~/.codex/skills/...` instead of
   `~/.claude/skills/...`.
 - The preflight itself is host-neutral: `claude` stays a HARD tool
@@ -159,7 +159,7 @@ If `.coderabbit.yaml`/`.coderabbit.yml` is missing at repo root, copy
 
 Run `bash scripts/preflight.sh <X> <theme>` (if `scripts/` lacks it, copy
 the WHOLE 5_executing helper set first — `preflight.sh`, `ponytail-check.sh`,
-`compile-context-bundles.mjs`, `context-injector.mjs`, `state.sh`,
+`compile-context-bundles.mjs`, `context-injector.mjs` (retired stub), `state.sh`,
 `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh` from
 `~/.codex/skills/5_executing/scripts/` — preflight calls its siblings; a
 lone copy also works, it falls back to the installed skill tree). It checks
@@ -217,7 +217,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 
 | From (installed skill) | To |
 |---|---|
-| `5_executing/scripts/state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `context-injector.mjs`, `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `compile-context-bundles.mjs`, `context-injector.mjs` (retired stub), `worktree.sh`, `validate-wave-plan.mjs`, `migration-drift-check.sh`, `story-slice.mjs`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
@@ -286,50 +286,61 @@ config, and the decision is the user's. Record the suggestions and the default
 taken (key left absent = silently skipped) under the defaulted decisions in
 `5_progress/PROJ-<X>-progress.md`, and relay them in the return.
 
-### 5. Context system (compile bundles, ground file, injectors)
+### 5. Worker context (compile worker files, ground file)
 
-**5a. Compile the context bundles.**
+**5a. Compile the worker files for every wave.**
 
 ```bash
-node scripts/compile-context-bundles.mjs compile <X> <theme> --wave 1
+node scripts/compile-context-bundles.mjs compile <X> <theme>
 ```
 
-Wave-scoped from the start: the architecture view carries only wave 1's
-decisions; Step 5 recompiles at every wave start. CP1 already ran
-`compile-context-bundles.mjs check`, so a blocked role here means the sources
-changed since CP1 (or the ground file below pushed it over).
+Without `--wave` every wave compiles on its own (there is no merged
+cross-wave view): `context/workers/wave-N/<US-ID>.md` per story (the role comes
+from the plan table's `Agent Type`; `Split: contract` gives `.backend.md` and
+`.frontend.md`) and `context/roles/wave-N/<role>.md` per role without a story
+(reviewer, Quality-Gate fix workers). Step 5 recompiles `--wave N` at each wave
+start. CP1 already ran `compile-context-bundles.mjs check`, so a failure here
+means the sources changed since CP1 (or the ground file below pushed a role
+over its budget).
 
-- A role over budget is written to `context/blocked-roles.json` and receives
-  no bundle; all fitting roles are still compiled. Do not spawn a blocked role
-  (the injector refuses it). Condense that role's sources, or raise only its
-  manifest budget when its documented scope genuinely requires it.
-- Record the hashes in state:
-  `bash scripts/state.sh set <X> <theme> .context.bundles "$(jq -c . specs/PROJ-<X>-<theme>/context/bundles.lock.json)"`
-- The compiler also projects `.claude/agents/skillchain-<role>.md` agent
-  files for the Claude lanes the runner will start — only `skillchain-*`
-  files are ever written, existing agents are never touched.
+- A role over its manifest budget aborts `compile` with exit 1 (role, tokens,
+  budget) before anything is written. Condense that role's sources, or raise
+  only its manifest budget when its documented scope genuinely requires it.
+  Story size is reported, not capped. Exit 2 = unresolvable plan folder or story.
+- Nothing is recorded in `state.json`: no lock, no hash bookkeeping, no `state.sh set` (each file's first line carries a shortened plan hash).
+  `compile` is idempotent; an I/O error exits 1 — fix the cause and rerun it.
+- The compiler also rewrites `.claude/agents/skillchain-<role>.md` agent files
+  for the Claude lanes the runner will start — only `skillchain-*` files are ever written, existing agents
+  are never touched — and sweeps up leftovers of the old layout (`bundle-*`,
+  `bundles.lock.json`, `blocked-roles.json`).
 
 **5b. Generate the ground file** — the one bounded judgment step in P0.
 Write `specs/PROJ-<X>-<theme>/ground-file.md`: assumptions the plans rely
 on (stack versions, conventions, data-model facts), each VALIDATED
 against the codebase, and ONLY what `docs/` does not already state (§5
 redundancy rule — the ground file never duplicates curated docs). Then
-recompile (5a) so the bundles carry it.
+recompile (5a) so the worker files carry it.
 
-**5c. Activate the injector adapters.**
+**5c. Delivery — there is nothing to activate.** No hook and no injector:
+the lead (or the runner's lane prompt) names the worker file by path in each
+spawn prompt, and the worker reads it first. `preflight.sh` (step 3) installs
+no hook any more; it removes a retired context-injector hook and
+`PONYTAIL_SUBAGENT_MATCHER` from `.claude/settings.json`, so Ponytail's native
+all-subagent path also covers generic implementation fallbacks.
+Never paste file contents into spawn prompts.
 
-- Codex: prompt-file delivery — a codex lane reads
-  `specs/.../context/bundle-<role>.codex.md` before implementing
-  (`node scripts/context-injector.mjs codex <role> --path`); the
-  runner's lane prompts point there. There is no hook step on this host.
-- Claude lanes (the runner starts them even when Codex hosts setup): the
-  preflight (step 3) already merged the SubagentStart hook
-  (`node scripts/context-injector.mjs claude`) and removes any ladder matcher
-  from `.claude/settings.json`, preserving Ponytail's all-subagent coverage
-  without deferral to a later Claude session.
-- Both providers receive the same canonical bundle hash (recorded in
-  5a); the injector refuses a stale bundle (hash mismatch → injects
-  nothing and warns).
+*Running projects (migration):* `sync-framework` → `compile --wave N` in the
+same step, no worker in between and no new `preflight.sh`. `compile` writes the
+worker and agent files and removes an old hook and `PONYTAIL_SUBAGENT_MATCHER`.
+Exit 0 does not prove the removal: an unparseable `.claude/settings.json` stays
+unchanged with a warning (`⚠ … is not valid JSON — left unchanged`). Read
+`compile`'s output, repair that file by hand if the warning appears, rerun
+`compile` (or `preflight.sh`), and check that
+`grep -c context-injector .claude/settings.json` prints 0 and
+`jq -e '.env.PONYTAIL_SUBAGENT_MATCHER // empty' .claude/settings.json` prints
+nothing. No worker between `sync` and `compile` is lead discipline: the retired
+hook stub only tells a worker whose prompt names no path to abort, it delivers
+no context and does not catch a worker holding a path to an outdated file.
 
 **5d. Ponytail parity** is already gated inside step 3's preflight
 (`ponytail-check.sh`: absence or version/mode mismatch across active
@@ -341,7 +352,7 @@ reports, never silent.
 
 1. `bash scripts/state.sh transition <X> <theme> P0 done`
 2. Commit everything from steps 1–5 on the PROJ branch:
-   `chore(PROJ-<X>): P0 setup — branch, preflight, framework scripts, context bundles`
+   `chore(PROJ-<X>): P0 setup — branch, preflight, framework scripts, worker context files`
 
 → RETURN to the orchestrator with the summary from the Subagent Contract.
 It continues with execution — either the phase runner
@@ -360,9 +371,9 @@ re-executes itself there once, and starts every later phase from that path. The
 - [ ] `.env.local` is an ignored control-checkout symlink (or explicitly absent); dependencies are isolated
 - [ ] `preflight` block in state.json; `degraded` set truthfully
 - [ ] `.context.ponytail` in state.json (parity gate result, enforced truthfully)
-- [ ] `specs/.../context/` has canonical + claude/codex bundles; `.context.bundles` hashes in state.json
+- [ ] `specs/.../context/` has `workers/wave-N/` (one file per story) and `roles/wave-N/` for every wave; nothing recorded in state.json
 - [ ] `ground-file.md` written (only assumptions docs/ does not state)
-- [ ] Claude injector hook merged (or noted in progress.md for the next Claude session)
+- [ ] No context-injector hook and no `PONYTAIL_SUBAGENT_MATCHER` in `.claude/settings.json` (`grep -c context-injector` prints 0)
 - [ ] `scripts/` + `templates/` contain the framework copies, executable
 - [ ] `.coderabbit.yaml` present at repo root
 - [ ] One safe negative control was observed red, restored, and recorded

@@ -164,8 +164,8 @@ every PROJ keeps them current and small.
       delta),        │ SETUP   │  │ per wave:     │  │ QA │  │DOCS│  │ PR │
      wave plans      │ branch  │  │  implementers │  └─┬──┘  └─┬──┘  └─┬──┘
                      │ context │  │  → Ralph loop │    │       │       │
-                     │ pack    │  │  → wave gate  │  ledger  docs +  conflict
-                     │ hooks   │  │ paired lanes  │  dedupe  curation probe,
+                     │ files   │  │  → wave gate  │  ledger  docs +  conflict
+                     │ ground  │  │ paired lanes  │  dedupe  curation probe,
                      │ preflt. │  │ one writer;   │  → fix   (docs/,  PR body,
                      └─────────┘  │ multi opt-in  │  → debt  agent.md) CI checks
                                   └───────────────┘
@@ -199,12 +199,12 @@ pull requests fully automatically — with exactly two human checkpoints.
    maintenance and then become a trap. Every PROJ ends with a curation
    step.
 3. **Prevention over detection.** Minimalism rules and context belong in
-   the implementer prompts (hook injection), not only in reviews at the
+   each worker's compiled context file, not only in reviews at the
    end. Code that is never written needs no review.
 4. **Context economy: as much as necessary, as little as possible.**
    Four mechanisms: (a) one phase = fresh Claude and Codex lanes, handoff
-   only via `state.json` + file paths; (b) injection is tiered by spawn class —
-   micro-fix spawns get NO pack; (c) everything deterministic (dedup,
+   only via `state.json` + file paths; (b) context is tiered by spawn class —
+   micro-fix spawns get NO file; (c) everything deterministic (dedup,
    rendering, state updates) runs as a script, never through the LLM;
    (d) budgets are enforced (token counting in the preflight), not just
    declared.
@@ -278,7 +278,7 @@ never run. Only a full-chain PROJ enters P2d/P3 below. Existing generated
                 reconcile loop → decision log → cascade updates
                 into artifacts → state.json "approved" unlocks P0
   ┌───────────────────────┐
-  │ P0  SETUP             │  branch, context pack, ground file, hook, preflights
+  │ P0  SETUP             │  branch, worker context files, ground file, preflights
   └───────────┬───────────┘
   ┌───────────▼───────────┐
   │ P5  EXECUTION         │  per wave: implement → Ralph → wave gate
@@ -664,9 +664,13 @@ orchestrator (or the runner's P0 lane):
 3. **Generate the ground file** (common-ground principle): surface
    assumptions about stack/conventions/data model, validate them against
    the codebase
-4. **Activate provider adapters:** Claude's SubagentStart hook and
-   Codex's plugin/hook adapter inject the same type-scoped bundle. The
-   shared bundle is canonical; provider wrappers may differ.
+4. **Deliver by path, no hook:** the lead (or the runner's lane prompt)
+   names each worker's compiled file in its spawn prompt —
+   `context/workers/wave-N/<US-ID>.md` per story, `context/roles/wave-N/<role>.md`
+   for roles without a story — and the worker reads it first (its report
+   starts with `Brief: <US-ID>`). The compiled file is canonical for both
+   providers; projects that still carry the old SubagentStart hook are
+   migrated by `compile`, and the retired injector stub only points to the path.
 5. **Ponytail preflight on all ACTIVE providers:** plugin installed and
    mode `full` active? Coding-agent matcher scoped so reviewer and
    explore lanes do not receive it? Version/mode parity checked when
@@ -689,8 +693,8 @@ for each wave N:
        progress, staging, and commits; the peer lane stays read-only
      – Mode 3 parallel, overlap risk → own worktree + story branch each,
        then semantic merge gate
-     – context arrives via hook; local knowledge via the agent.md
-       reading protocol
+     – context is the worker's one compiled file (path in the spawn
+       prompt); local knowledge via the agent.md reading protocol
   2. Per US: TDD + provider-opposite inner review loop
      – learnings IMMEDIATELY into the folder agent.md (deepest
        applicable level)
@@ -805,7 +809,7 @@ primarily deterministic scripts and start model lanes only for judgment):
   (plans, progress, ledger, agent.md).
 - Every lane loads only what its phase and role need: P6 knows no wave
   conversation history; P8 judgment lanes see only ledger, state, and
-  diff. Both providers receive the same canonical bundle hash.
+  diff. Both providers read the same compiled worker files.
 - `/compact` is demoted from load-bearing element to emergency fallback
   within a Claude lane; Codex compaction/resume is equally non-load-bearing.
 - Side effect: crash resume and a normal phase transition are the same
@@ -816,8 +820,8 @@ primarily deterministic scripts and start model lanes only for judgment):
 | Layer | Location | Lifetime | Distribution | Updated |
 |---|---|---|---|---|
 | 1. Durable agent policy | project-root `AGENTS.md` | forever | host-native instruction loading | only via approved P7 candidate merge |
-| 2. Curated repo docs | `docs/` | forever | provider adapters / prompt bundles | only via P7 curation |
-| 3. PROJ artifacts | `specs/PROJ-<X>-<theme>/` | until merge | prompt bundle / path reference | during the PROJ |
+| 2. Curated repo docs | `docs/` | forever | compiled into the worker files | only via P7 curation |
+| 3. PROJ artifacts | `specs/PROJ-<X>-<theme>/` | until merge | compiled into the worker files / path reference | during the PROJ |
 | 4. Local knowledge | `src/**/agent.md` | forever | reading protocol (explicit) | immediately on learning; curated in P7 |
 
 ### Files
@@ -855,29 +859,29 @@ specs/PROJ-<X>-<theme>/        ← PROJ artifacts
 src/**/agent.md                ← local; NEVER injected
 ```
 
-### Spawn Tiering (decides whether anything is injected at all)
+### Spawn Tiering (decides whether a worker gets a context file at all)
 
-The hook fires on EVERY SubagentStart — without tiering, the budget
-multiplies with the spawn count (an overnight run = dozens of spawns,
-most of them micro-fixes). Therefore the spawn class decides first, then
-the agent type:
+Without tiering, the budget multiplies with the spawn count (an overnight
+run = dozens of spawns, most of them micro-fixes). Therefore the spawn
+class decides first, then the agent type:
 
-| Tier | Spawn class | Injection |
+| Tier | Spawn class | Context file |
 |---|---|---|
 | 0 | Micro-fix (1 finding, 1 AC, 1 build error) | **NOTHING** — the spawn prompt contains the finding verbatim + file paths + possibly an agent.md pointer. It needs nothing more. |
-| 1 | Story implementer (whole US) | full type-scoped pack (matrix below) |
+| 1 | Story implementer (whole US) | one story file: type-scoped pack (matrix below) plus the story slice |
 | 2 | Reviewer/QA personas | PRODUCT.md + review criteria + diff scope; no ladder, no design system (except ui-audit) |
 | — | Explore/scout spawns | nothing (read-only, own assignment) |
 
 Implementation: **the tier is encoded in provider-neutral role
 metadata** (`micro-fixer` = tier 0, `implementer`/`frontend-`/
-`backend-implementer` = tier 1, `reviewer-*` = tier 2). Claude projects
-that metadata into `.claude/agents/`; Codex projects it into its skill/
-agent configuration. The compiled prompt bundle is the fallback and the
-cross-provider source of truth, so hook feature differences cannot
-change what context a role receives.
+`backend-implementer` = tier 1, `reviewer-*` = tier 2). Claude gets that
+metadata as `.claude/agents/skillchain-*.md` (rewritten by every `compile`; the
+text says "read the file named in the spawn prompt"); Codex lanes read the
+same file named in the lane prompt. The compiled worker file is the
+cross-provider source of truth, so provider differences cannot change what
+context a role receives.
 
-### Injection Matrix (Tier 1, type-scoped)
+### Context Matrix (Tier 1, type-scoped)
 
 | Context | frontend impl. | backend impl. |
 |---|:---:|:---:|
@@ -886,12 +890,12 @@ change what context a role receives.
 | PROJ architecture (compiled: the wave's decision and key-flow Summaries) | ✅ | ✅ |
 | GUIDELINES.md | ✅ | ✅ |
 | Minimalism ladder | via the provider's Ponytail plugin adapter (§7); same mode/version on Claude and Codex ||
-| DESIGN-SYSTEM.md + components.md | ✅ | — |
+| DESIGN-SYSTEM.md rules (+ `components.md` as a mandatory read-by-path reference, inventory not embedded; full-stack `implementer` too) | ✅ | — |
 | api-contracts.md (ONLY contracts of the own US/wave) | as needed | ✅ |
 | Security baseline | — | ✅ |
 | Test conventions | ✅ | ✅ |
 | ground-file.md | ✅ | ✅ |
-| US + ACs + tasks | verbatim story slice of the own wave plan (`story-slice.mjs`) in the spawn prompt; never re-typed by the orchestrator ||
+| US + ACs + tasks | verbatim story slice of the own wave plan (`story-slice.mjs`), compiled into the story file under `## Deine Story`; never re-typed by the orchestrator ||
 | "what earlier waves built" | short summary by the orchestrator from progress.md ||
 | Folder agent.md | reading protocol (below), never injected ||
 | PRDs, full wave plans, architecture/* | path reference, on demand ||
@@ -908,9 +912,9 @@ change what context a role receives.
   file.
 
 **Budget enforcement (instead of budget intent):**
-- The context-curator compiles a bundle per agent type and COUNTS
-  tokens. The P0 preflight fails if a bundle exceeds the budget
-  (~2–3k tokens) → condense first, then start.
+- The context compiler counts the role context of every file (the story
+  slice is reported, not capped). `compile` and `check` fail if a role
+  exceeds its manifest budget (~2–7k tokens) → condense first, then start.
 - File caps (PRODUCT ½ page, ARCHITECTURE 200 lines, DESIGN-SYSTEM
   80 lines, agent.md 100 lines, …) are checked as a hard gate in the P7 curation —
   otherwise the curated docs grow unnoticed until every session gets
@@ -1044,7 +1048,7 @@ not the source of workflow semantics.
 |---|---|---|---|
 | Headless lane | `claude -p` | `codex exec` | prompt file in, JSON/JSONL result out |
 | Background process | shell child process | shell child process | runner starts both, waits for both, captures exit/status |
-| Type-scoped context | SubagentStart hook / prompt file | Codex plugin hook / prompt file | same compiled bundle hash |
+| Type-scoped context | worker file path in the spawn prompt | worker file path in the lane prompt | same compiled worker file |
 | Agent role | `.claude/agents/*.md` | Codex skill/agent metadata | role, tools, write scope, budget |
 | Minimalism | Ponytail Claude plugin | Ponytail Codex plugin | same Ponytail mode and rule version |
 | Cross-review | OpenAI `codex-plugin-cc` pattern | Codex-facing `claude` skill pattern | provider opposite to `author_provider` |
@@ -1061,9 +1065,8 @@ read-only tools, capture valid JSONL from both, attribute provider and
 author correctly, and prove cancellation/timeout kills both process
 trees. This is a release gate for Stage 1.
 
-**Mode 2 verification (at latest before the first Mode 2 wave):** does
-SubagentStart also fire for team teammates? (proven only for Task
-spawns). Fallback: put the bundle into the teammate prompt.
+**Mode 2:** no hook is involved — every teammate gets the path of its
+compiled worker file in its spawn prompt.
 
 **Stage 4 verification spike (~1h, 2 dummy stories):** direct Claude
 and Codex writer lanes into named worktrees, merge file-disjoint changes,
@@ -1081,7 +1084,7 @@ port allocation. Mode 3 stays disabled until this passes.
 | `git` | branching, worktrees, merge gate, rescue, conflict probe | ✅ hard |
 | `gh` | create PR, `gh pr checks` polling (P8) | ✅ hard |
 | `claude` | Claude phase lane + provider-opposite review via `claude -p` | ✅ hard |
-| `node` | hooks (context injector, ponytail, wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
+| `node` | hooks (ponytail, wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
 | `jq` | wave-gate.sh, ledger scripts, state.json helpers | ✅ hard |
 | `coderabbit` | wave review (`--agent --base-commit`) | ✅ hard (gate component) |
 | `codex` | Codex phase lane + provider-opposite review via `codex exec` | 🟡 preferred, degradable — missing/unauthenticated → single-provider run with model-opposite review, flagged in report + PR body, never silent |
@@ -1166,8 +1169,8 @@ codex plugin marketplace add DietrichGebert/ponytail
 - **Coverage:** leave `PONYTAIL_SUBAGENT_MATCHER` unset so Ponytail reaches
   every normal subagent, including generic implementation fallbacks. P0
   rejects scoped matchers because they silently drop that coverage.
-- **No double injection:** our context injector carries NO ladder of
-  its own — ponytail is the single source for it.
+- **No double delivery:** our compiled worker files carry NO ladder of
+  their own — ponytail is the single source for it.
 - **Debt integration:** ponytail's `ponytail:` comment convention is
   our debt-marker convention (P6). Harvest for PR body/morning report
   via `/ponytail-debt` or our own grep script into the ledger.
@@ -1213,7 +1216,7 @@ response.
 | Script (skill) | Input | Output | Behavior / exit |
 |---|---|---|---|
 | `preflight.sh` (5_executing) | CLI list §7 (embedded), env | report to stdout; state.json `preflight` block | checks `command -v` + auth per tool; exit ≠ 0 on any missing HARD tool (stop condition); skippable tools → logged skip |
-| `compile-context-bundles.mjs` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, injection matrix §5 | one canonical bundle per role plus Claude/Codex projections | counts tokens and hashes both provider projections; exit ≠ 0 on budget breach or semantic drift |
+| `compile-context-bundles.mjs` (5_executing) | root `AGENTS.md`, `docs/*`, `specs/PROJ-<X>-<theme>/*`, context matrix §5 | one file per story (`workers/wave-N/<US-ID>.md`) and per story-less role (`roles/wave-N/<role>.md`), plus `.claude/agents/skillchain-*.md` | counts the role tokens; exit ≠ 0 on budget breach, an unassignable story or an outdated manifest; removes the retired SubagentStart hook |
 | `state.sh` (5_executing) | `get <path>` / `set <path> <value>` / `transition <phase> <status>` | state.json (validated) | sole write path to state.json; schema-validates; illegal phase transitions exit ≠ 0 |
 | `worktree.sh` (5_executing/8_delivery) | PROJ id, control checkout, state | persistent PROJ worktree lifecycle | creates/resumes safely; links ignored `.env.local`; installs from lockfile; reports conservative cleanup eligibility |
 | `story-slice.mjs` (5_executing) | wave plan + US ID | that story's `## <US-ID>` section, verbatim, to stdout | ends at the next `## ` heading outside code fences; exit ≠ 0 when the ID is missing or duplicated |
@@ -1251,8 +1254,7 @@ template frame or a schema field, never as an unstructured document of
 its own. The `state.sh` helpers matter most: one tested write path
 instead of dozens of ad-hoc jq calls. Agent definitions themselves stay
 declarative (frontmatter: model, tools); their lifecycle scripting
-lives in hooks, which are scripts anyway (context injector, ponytail,
-wave-gate-enforcer).
+lives in hooks, which are scripts anyway (ponytail, wave-gate-enforcer).
 
 ### Findings Ledger (`findings.json`)
 One record per finding: source (coderabbit/sonar/review/qa/merge-gate),
@@ -1331,7 +1333,7 @@ its stop report. Notification failure never loses state.
 | Change | Replaces/extends |
 |---|---|
 | P3 reads/writes the curated ARCHITECTURE.md, produces a delta | Skill 3 (per-PROJ architecture without a baseline) |
-| P0 setup with context pack + injector hook | FIRST-ACTION block + if/else context logic in Skill 5 |
+| P0 setup with compiled worker context files | FIRST-ACTION block + if/else context logic in Skill 5 |
 | Paired Claude + Codex lanes by default; worktrees for concurrent writers | one host process plus same-host subagents in a shared checkout |
 | required project `sonar_cmd`, secrets caught before merge | Sonar only at PROJ end (this concept originally proposed running `sonar_cmd` in every wave gate; the shipped implementation kept it PROJ-end-only — see §7) |
 | Findings ledger as the central fix queue | 4 separate finding streams |
@@ -1374,9 +1376,10 @@ agent-browser smoke tests.
    `0b_intake` skill (scan & draft with provenance markers → developer
    interview → reconcile via `4a_checkpoint` → seal; see §3), extend
    `4a_checkpoint` from the Stage 1 minimum to bootstrap reuse, extend
-   `4b_setup` with the context compiler and provider projections,
-   context-injector adapters (define the
-   manifest schema following the claude-skills frontmatter taxonomy),
+   `4b_setup` with the context compiler (one file per worker; the first
+   design's provider projections and SubagentStart injector are retired —
+   the path in the spawn prompt replaces them; manifest schema following
+   the claude-skills frontmatter taxonomy),
    install + parity-check Ponytail on Claude and Codex (§7), agent.md protocol +
    P7 curation, and the symmetric `cross-review` mechanism. The current
    producing skills now wire automatic concept/architecture/plan reviews and
@@ -1421,7 +1424,7 @@ agent-browser smoke tests.
 | PRD ownership | PM PRDs are raw input: developers enrich with technical stories, re-cut into buildable PRDs (in Jira for Mode B), and OWN the selection of the story set sent into the agentic loop — the framework checks AC quality, not scope |
 | Morning report | one-line summary + best-effort notification at run end; file in `specs/` rendered on demand (or at run end when P8 left neither an open PR nor a removed worktree) |
 | Minimalism ladder | Ponytail as a ready-made plugin on all active providers; same version/mode required when both are active, no own ladder, no double injection |
-| Context pack manifest | schema following the claude-skills frontmatter taxonomy, defined when building the injector (Stage 2) |
+| Context pack manifest | schema following the claude-skills frontmatter taxonomy, defined when building the compiler (Stage 2) |
 | Cross-model review | symmetric provider-opposite review via our thin `cross-review`: Claude-authored → Codex, Codex-authored → authenticated isolated Claude with validated structured output, joint → both independently; required for Requirements/P6/P7 and automatic on saved concept/architecture/plan outputs; conservative default input cap, explicit diff omissions and Claude 10 MB stdin failure; any permitted model-opposite fallback is flagged, and same-model review never satisfies the gate; findings → ledger, blocking per §8 |
 | Focused bug repair | `bugfixing` stays outside the feature chain: reproduce first (real browser for UI), trace code cause + test escape, prove a regression test red before the fix, dispatch a micro-fixer, and stop after at most three Ralph repair attempts; CodeRabbit/Sonar are proportional existing gates, not new dependencies |
 | Structure quality | Gate-driven, no "cleaner" agent: a check that fails beats a prompt that dilutes. Optional project-supplied `complexity_cmd` / `arch_rules_cmd` run last in the wave gate's AC pass, before build + CodeRabbit; failures go verbatim through the existing four Outer Ralph stages and the rerun re-proves the ACs. Thresholds live in the tool's config; absent = skipped. When configured, the Quality Gate reviewer and the matching QA personas are told not to re-flag what the tool measures. Per-story checks and trimming `GUIDELINES.md` wait for run data (`Variant Notes`). Contract: `wave-gate-config.md` |
