@@ -104,7 +104,7 @@ command -v sonar >/dev/null && command -v sonar-scanner >/dev/null
    (only `sonar-scanner` writes this) with an mtime at or after this step's
    start.
 
-3. Fetch current Sonar issues, measures, and quality-gate status. Save the issue list under `5_progress/` and record it; `sonar-issues` binds that file to the current scan, rejects an incomplete list (every page must be in it, `paging.total` equal to the number of issues) and keeps the open BLOCKER/CRITICAL/MAJOR issues in files changed since the base tag (step 4's filter). Repeat it after every rescan:
+3. Fetch current Sonar issues, measures, and quality-gate status. Save the issue list under `5_progress/` and record it; `sonar-issues` binds that file to the current scan, rejects an incomplete list (every page must be in it, `paging.total` equal to the number of issues) and keeps the open BLOCKER/CRITICAL/MAJOR issues in files changed since the base tag (step 4's filter). Fetch the list after the scan has finished and again after every rescan (a file older than the current scan record is rejected; moving the base tag invalidates the record):
    ```bash
    BRANCH=$(git rev-parse --abbrev-ref HEAD)
    sonar list issues --project <project-key> --branch "$BRANCH" --page-size 500 > 5_progress/sonar-issues.json

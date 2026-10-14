@@ -165,6 +165,13 @@ try {
     assert.match(bad('sonar-issues', `${progress}/../issues-outside.json`), /usage: sonar-issues/);
     assert.ok(!fs.existsSync(issuesPath), 'a rejected file leaves no record');
     ok('sonar-issues', issuesFile()); ok('check'); assert.equal(seal().status, 0, seal().stderr); // none of the real issues is in a changed file
+    // A list saved before the current scan is not evidence for it, even though the file itself is unchanged.
+    const stale = issuesFile([], data => data, 'stale.json'); ok('run', 'sonar'); assert.match(bad('sonar-issues', stale), /older than the current scan/);
+    ok('sonar-issues', issuesFile()); ok('check');
+    // The recorded base tag is part of the issues evidence: moving it changes which files count as changed.
+    const tagged = execFileSync('git', ['rev-parse', 'proj-PROJ-1-base'], { cwd, encoding: 'utf8' }).trim();
+    git('tag', '-f', 'proj-PROJ-1-base', 'HEAD'); assert.match(bad('check'), /sonar-issues: base tag moved/);
+    git('tag', '-f', 'proj-PROJ-1-base', tagged); ok('check');
     // Issues recorded for an earlier head: a code change plus a fresh scan does not carry the old list over.
     write('source.txt', 'four'); commit(); ok('run', 'build'); ok('run', 'lint'); ok('review', `${progress}/review.md`); ok('run', 'sonar');
     assert.match(bad('check'), /sonar-issues: stale or failed evidence/); assert.notEqual(seal().status, 0);
