@@ -105,6 +105,17 @@ test('creating a user persists to DB and returns from API', async () => {
 - Prefer many small focused tests over few large ones — easier to diagnose failures
 - If a bug is found later, write a regression test BEFORE fixing it
 
+## Evidence Rules
+
+Binding for every test an implementer, the Outer Ralph or a gate relies on.
+
+- Run it and read the output; a test that was not run is not evidence.
+- A test that depends on state outside itself (provider rate budget, suite order, clock) establishes or asserts that state itself. Never accept green because neighbouring tests primed the bucket or fixture.
+- "Nothing happened" is weak evidence: add a positive control proving the valid session/input/path would have worked. The same holds for gate commands (`complexity_cmd`, `arch_rules_cmd`, `mutation_cmd`).
+- Polling matchers must observe the transition; one that can pass on its first attempt proves nothing.
+- Inside the shared-resource lock a test must not acquire the lock again. Node `--test` workers do not preserve inherited file descriptors: when a `node:test` entry point detects ownership through a descriptor, run it directly with `node path/to/test.mjs` and verify the selected-test count.
+- Stuck after 3 attempts: escalate to the lead instead of guessing.
+
 ## When Stuck
 
 | Problem | Solution |

@@ -129,6 +129,16 @@ command -v sonar >/dev/null && command -v sonar-scanner >/dev/null
 
 ---
 
+## Handling findings
+
+Triage before fixing; reviewers and scanners can be wrong.
+
+1. Verify each finding against the actual code. Push back on false positives, findings that break existing behavior or conflict with the user's decisions, and YAGNI suggestions: grep for real usage before adding handling or abstractions.
+2. Combine confirmed review P0/P1 and Sonar BLOCKER/CRITICAL/MAJOR into the coordinated recovery rounds below. Batch disjoint fixes concurrently, overlapping ones serially, and verify the combined revision once per round.
+3. Log P2/P3 and Sonar MINOR/INFO, plus any Sonar finding still open after round 3, in `progress.md` as carried-forward; they never block or escalate.
+
+---
+
 ## Execution and evidence
 
 Use the existing lead to coordinate these commands; no additional scheduler is needed.

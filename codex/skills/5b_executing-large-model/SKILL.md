@@ -127,13 +127,16 @@ from `5_executing` and the same scripts enforce them.
    an integration-focused review of `BASE_SHA..HEAD`, mutation hardening
    (Gate 0b, when `mutation_cmd` is set), build via `quality-evidence.mjs`,
    coverage, Sonar once per PROJ with at most three fix rounds,
-   combined recovery rounds. Zero P0/P1 review findings to pass. Fill the
-   `## Quality Gate — PROJ-X` section, then `bash scripts/quality-gate-proof.sh <X> <theme>`
+   combined recovery rounds; triage findings before fixing
+   (`quality-gate.md` § Handling findings). Zero P0/P1 review findings to
+   pass. Fill the `## Quality Gate — PROJ-X` section, then `bash scripts/quality-gate-proof.sh <X> <theme>`
    must exit 0.
 9. **Handoff.** Framework run: `bash scripts/state.sh transition <X> <theme> P5 done`
    and stop; the runner starts P6 as fresh lanes. In-session driver run: go on
-   with `5_executing/references/in-session-driver.md`. Interactive run: invoke
-   `/6_qa`. Skill 5 never performs QA itself and never skips Skill 6.
+   with `5_executing/references/in-session-driver.md`. Interactive run: flush
+   context — tell the user to run `/compact` (or open a fresh session, ideally
+   on a different model) and then `/6_qa`, and end the turn. Skill 5 never
+   performs QA itself and never skips Skill 6.
 10. **Learnings.** When a worker or the lead hits a wall and gets past it, the
     workaround goes into the feature folder's `agent.md` immediately, using
     `5_executing/templates/agent-md-entry.md.tmpl`.
@@ -159,10 +162,9 @@ expected to choose the concrete steps.
 - **Tests.** Every behavior change is covered by a test that fails before the
   change and passes after it, run by command with the output read. Whether
   that is strict RED/GREEN/REFACTOR per task or a test written alongside the
-  implementation is the worker's call. A test that was not run is not evidence.
-- **Self-review.** Before reporting, a worker re-reads its diff against the
-  story once, fixes what it finds within its ownership, runs the targeted
-  tests once, and reports anything unresolved. It does not loop.
+  implementation is the worker's call. Test-evidence rules (positive control,
+  external state, polling, shared-lock caveat):
+  `5_executing/references/writing-tests.md` § Evidence Rules.
 - **Worker briefs.** A brief carries the story slice verbatim — the output of
   `node scripts/story-slice.mjs <wave-plan> <US-ID>` with the story, its
   acceptance criteria (verified by the lead, not the worker) and tasks; never
@@ -198,11 +200,9 @@ expected to choose the concrete steps.
   the next decision. A session that already carried steps 3–4 (PRDs,
   architecture, plans) starts this skill only after the user ran `/compact` or
   in a fresh session — writing-plans ends its turn for that; if it did not,
-  ask for the flush and end the turn. Background spawning and team versus
-  single subagent are host decisions the model makes as it goes.
-- **Debugging.** Root cause before fix: full error text, reproduce, diff since
-  it last worked, one hypothesis at a time. Repeated failures use the Outer
-  Ralph stages in item 6 or the blocked path, never open-ended retries.
+  ask for the flush and end the turn.
+- **Debugging.** Root cause before fix (`5_executing/references/debugging.md`).
+  Repeated failures use the Outer Ralph stages in item 6 or the blocked path.
 - **Reviews.** CodeRabbit inside the wave gate and the Quality Gate reviewer
   are the only Step 5 reviews. No minimalism persona, no six-persona panel;
   those belong to Skill 6. Structure and test quality are judged by the
@@ -228,8 +228,8 @@ and reuse registered components. Component mockups do not replace production
 implementation or required tests.
 
 Every behavior change needs a test that failed before and passes after; run it
-and read the output. Before reporting, re-read your diff against the story
-once, fix what you find, run targeted tests once, then report in ≤300 tokens:
+and read the output (rules: 5_executing/references/writing-tests.md). Before
+reporting, re-read your diff against the story once, fix what you find, run targeted tests once, then report in ≤300 tokens:
 files changed, tests added and their commands, anything unresolved.
 Sequential wave: commit as feat(PROJ-<X>-PRD-<Y>): implement US-<N> <task>.
 Parallel wave: do not stage or commit; the lead integrates and commits.
@@ -313,5 +313,5 @@ runs use `state.sh` for the blocked phase and reason and render the stop report.
   prompt ("read this first"; no file = blocked role, do not spawn). Background
   spawns are the default for independent workers.
 - **Codex:** use `spawn_agent` worker roles with explicit file ownership; no
-  `/compact`; skill assets live under `.codex/skills`; the installed
-  synchronizer is `~/.codex/skills/5_executing/scripts/sync-framework.mjs`.
+  `/compact`, so item 9 becomes: suggest a different model, then invoke
+  `/6_qa`; skill assets live under `.codex/skills`; the installed synchronizer is `~/.codex/skills/5_executing/scripts/sync-framework.mjs`.
