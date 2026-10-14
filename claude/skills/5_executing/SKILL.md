@@ -489,9 +489,7 @@ if failures still remain: use the existing blocked-run evidence path
 
 **Rules for wave-scoped Ralph:**
 - Checks must be **deterministic** — run actual test commands, read actual output. No subjective judgment ("this looks like it works").
-- Tests inside the shared-resource lock must not acquire that lock again. Node `--test` workers do not preserve arbitrary inherited file descriptors; when a `node:test` entry point detects ownership through a descriptor, execute it directly with `node path/to/test.mjs` and verify the selected-test count.
-- A test that depends on state outside itself — provider rate budget, file order, or clock — must establish that state itself or explicitly assert it. Never accept a green result merely because neighbouring tests primed the bucket or fixture.
-- Treat “nothing happened” as weak evidence: add a positive control that proves the valid session/input/path would have worked, and do not let polling matchers pass on their first attempt without proving the observed transition.
+- Test-evidence rules (positive control, external state, polling matchers, shared-lock descriptor caveat): `references/writing-tests.md` § Evidence Rules.
 - Failure output is passed **verbatim** to correction and diagnostic workers — not summarized or interpreted.
 - Reuse requires the same committed `HEAD` and complete gate-config fingerprint. Identical AC commands with matching `test_files` and `auth_consuming` share successful execution across AC IDs, with separate evidence for every ID. Identical failed/empty/timed-out commands also share their result within one AC-only invocation, but failures are retried on the next invocation; infrastructure and auth exhaustion still stop immediately. Every correction commit invalidates reuse; no cross-HEAD impact inference is supported. Remove cached Ralph evidence after dependency, runtime, or environment changes.
 - Recovery has exactly four stages: normal fix round 1, normal fix round 2 with fresh workers, fresh diagnosis, then a different diagnosis-driven implementer. Do not add retries or silently weaken an AC.
@@ -644,18 +642,7 @@ The lead uses `quality-evidence.mjs` to verify build (reusing valid final-wave a
 entries are verified as wired to their named workflows, not replayed locally. The lead
 consolidates reviewer, build, integration/quality-phase, and Sonar results. Do not rerun `ac_commands`; their canonical proof belongs to wave-scoped Ralph and `wave-gate.sh`.
 
-**After teammates report — Handling Findings with Technical Rigor:**
-
-Do NOT blindly implement every finding. Apply this discipline:
-
-1. **READ** each finding carefully — understand what the reviewer is flagging
-2. **VERIFY** — Does this finding apply? Check the actual code. Reviewers (human or automated) can be wrong.
-3. **EVALUATE** — Is this a real problem or a false positive?
-   - **Push back when:** The finding breaks existing functionality, violates YAGNI (suggests "proper" patterns for unused scenarios), is technically incorrect, or conflicts with the user's explicit decisions
-   - **YAGNI check:** If a reviewer suggests adding error handling for a scenario that can't happen, or abstracting code that's used once — grep the codebase for actual usage before implementing
-4. **FIX** what's real — combine confirmed review P0/P1 and Sonar BLOCKER/CRITICAL/MAJOR into the coordinated recovery rounds in `references/quality-gate.md`. Batch disjoint fixes concurrently, overlapping fixes serially; verify the combined revision once per round. Preserve the existing per-issue limits and Sonar carry-forward policy.
-5. **LOG** P2/P3, Sonar MINOR/INFO, and any Sonar BLOCKER/CRITICAL/MAJOR still open after 3 rounds to `progress.md` as carried-forward — these never block or escalate
-6. Clean up the team
+**After the reviewer and Sonar report:** triage per `references/quality-gate.md` § Handling findings, then clean up the team.
 
 **Exit criteria:**
 - Zero P0/P1 code review findings
