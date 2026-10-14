@@ -41,8 +41,8 @@ scaffold stood up, agent files written); an existing codebase goes through
 | 2c | `review-reconcile` (opt) | Resolve PRD review gaps point by point |
 | 3 | `architecture` | PROJ-level tech design across all PRDs; flows straight into 4 when its cross-review is clean |
 | 4 | `writing-plans` | Wave-based implementation plans; flows straight into 5, whose CP1 is the single planning approval |
-| 5 | `executing` | Full-procedure Step 5 for weaker writer models (runner: `SKILLCHAIN_P5_SKILL`); hosts CP1 and P0 as subskills run in subagents — `checkpoint` (CP1/CP2/bootstrap reconcile loops with a decision log, seals `CP1:approved`) and `setup` (persistent isolated worktree, branch, preflight, framework scripts, dependencies, worker context files) — then worker-owned code/test/fix edits, TDD, one wave-scoped Ralph pass, hard wave gates, an integration-focused PROJ gate, then direct handoff to mandatory Skill 6 |
-| 5b | `executing-large-model` | **Default Step 5**: CP1 + P0 through the subskills above, then the waves with the same gates, state, and QA handoff as `executing`, procedure replaced by intent and invariants |
+| 5 | `executing` | Full-procedure Step 5 for weaker writer models; hosts the CP1 `checkpoint` and P0 `setup` subskills and the framework scripts that `5b` uses too |
+| 5b | `executing-large-model` | **Default Step 5**: CP1 + P0 through the `5_executing` subskills, then the waves with the same gates, state, and QA handoff as `executing`, procedure replaced by intent and invariants |
 | 6 | `qa` | End-to-end QA plus the required opposite-provider six-persona review; read-only finder in framework runs, findings into the ledger |
 | 7 | `documentation` | Human docs + curation of the long-lived `docs/` baseline behind form and truth gates |
 | 8 | `delivery` | Conflict probe, PR with rendered body, CI fix loop, CP2 comment reconcile |
@@ -66,52 +66,41 @@ developer via Linear at Step 2, no codebase required. See
 
 ## The Agent Workflow Framework
 
-Once Step 5 has sealed P0, it asks once whether to run P5 to a PR unattended, drive it in this
-session under `/goal`, or continue interactively. Unattended starts the host-neutral phase
-runner, detached, which drives the execution phases:
+Once Step 5 has sealed P0, it asks once whether to run P5 to a PR unattended,
+drive it in this session under `/goal`, or continue interactively. Unattended
+starts the host-neutral phase runner detached (`runner/run-phase.sh auto`,
+P5 → P6 → P7 → P8); in the morning you read the run's one-line summary and
+the PR body, then review the PR (CP2).
 
-```bash
-runner/run-phase.sh auto <proj-x> <theme>     # P0 → P5 → P6 → P7 → P8
-# morning: read the run's one-line summary and the PR body, then review the PR (CP2)
-# optional cross-PROJ overview: bash ~/.claude/skills/5_executing/scripts/chain render report morning specs
-```
+What makes that trustworthy, in short: dual Claude + Codex lanes with exactly
+one writer per phase, `state.json`/`findings.json` as the only handoff,
+script-verified gates the runner re-checks itself, provider-opposite
+cross-review on every gated artifact, and a stop policy that parks a run
+instead of continuing degraded. Reports and PR bodies are rendered from state
+and ledger, never hand-written.
 
-What makes an overnight run trustworthy, in short: dual Claude + Codex lanes
-per phase with exactly one writer orchestrator (the peer stays read-only),
-`state.json`/`findings.json` as the only handoff, a persistent per-PROJ
-worktree, evidence-based wave gates followed by an integration-focused PROJ
-gate, provider-opposite cross-review on every gated artifact, budgeted context
-files per worker, the shared Ponytail minimalism ladder, hard P6/P7 gates
-re-verified independently by the runner, and a stop policy that parks a run
-on a failed writer, timeout, unsealed phase, or red gate instead of
-continuing degraded. Reports and PR bodies are rendered from state + ledger
-by template scripts, never hand-written.
-
-New to the framework? [docs/how-it-works.md](docs/how-it-works.md) maps
-the scripts (`chain <verb>`), the P0–P8 phases and the gates on one page.
-Details: [docs/skill-chain.md](docs/skill-chain.md#framework-runs-agent-workflow-stage-1--stage-2)
-for the full mechanics, [runner/README.md](runner/README.md) for the runner
-itself, and `CONCEPT.md` for the full model and rationale. Stage 3+ of the
-concept (P3 runner rework, deeper pre-mortem orchestration, Jira import, and
-optional per-story worktree parallelism) is not built yet; the
-producing-skill cross-review handoffs themselves are already wired.
+- New to the framework? [docs/how-it-works.md](docs/how-it-works.md) maps the
+  scripts (`chain <verb>`), the P0–P8 phases and the gates on one page.
+- Runner mechanics: [docs/skill-chain.md](docs/skill-chain.md#framework-runs-agent-workflow-stage-1--stage-2).
+- The runner's invariants, pinned models, degraded mode and stop policy:
+  [runner/README.md](runner/README.md#invariants-the-runner-owns).
+- The unattended handoff question and launch block:
+  [unattended-handoff.md](claude/skills/5_executing/references/unattended-handoff.md).
+- The full model and rationale: `CONCEPT.md`. Its Stage 3+ (P3 runner rework,
+  deeper pre-mortem orchestration, Jira import, optional per-story worktree
+  parallelism) is not built yet; the producing-skill cross-review handoffs
+  are already wired.
 
 ## Outside the Chain
 
-`cross-review` is not a chain step and is never routed to directly: it is
-the symmetric opposite-provider review mechanism, invoked by the producing
-skills. Concept, architecture, and plan reviews start automatically as soon as
-their outputs are saved (and plan validation passes), before user approval or
-handoff. Requirements, P6 QA, and P7 documentation also require review.
-Findings of any severity trigger reconciliation and another review, up to three
-automatic rounds; clean reviews stop early. Additional manually requested
-rounds have no limit (`--round 4`, `--round 5`, and so on). Remaining
-Critical/High findings block handoff; Medium/Low findings are reported or
-deferred after the automatic rounds.
-P6 uses six isolated discipline reviewers rather than one reviewer playing a
-panel. When the opposite provider is unavailable, QA falls back loudly to six reviewers
-on the same vendor (Claude: its strongest model; Codex: its default), flagged
-degraded.
+`cross-review` is not a chain step and is never routed to directly: the
+producing skills invoke it automatically on their saved outputs, and the
+provider opposite the author tries to break the artifact (Claude-authored →
+Codex, Codex-authored → Claude; QA runs six isolated discipline reviewers).
+Review rounds, severity gates and the loudly flagged degraded fallback are
+defined in [claude/skills/cross-review/SKILL.md](claude/skills/cross-review/SKILL.md#routing-and-output-integrity);
+the model rank the runner pins for review lanes is in
+[runner/README.md](runner/README.md#invariants-the-runner-owns).
 
 ## Optional Skills
 
@@ -124,9 +113,8 @@ update-chain
 vibecoder
 ```
 
-Each sits outside the main 0–8 flow — a drop-in Step 5 substitute for
-frontier models (`5b`), a standalone repair workflow, or standalone tooling.
-See [docs/skill-chain.md#optional-skills](docs/skill-chain.md#optional-skills)
+Each sits outside the main 0–8 flow — a standalone repair workflow, an
+exploratory or discovery run, or standalone tooling. See [docs/skill-chain.md#optional-skills](docs/skill-chain.md#optional-skills)
 for what each one does and when to reach for it.
 
 Claude-specific experimental or personal skills are intentionally excluded.
@@ -171,19 +159,16 @@ setup are in [docs/installation.md](docs/installation.md).
 ## Validate
 
 ```bash
-./scripts/validate.sh          # structure, frontmatter, byte-identical helpers, schemas, syntax
+./scripts/validate.sh          # structure, frontmatter, byte-identical helpers, schemas, syntax, behavior harnesses
 runner/spike-dual-lane.sh      # Stage 1 release gate: live dual lanes, ledger guarantees, stop policy
 runner/spike-stage2.sh         # Stage 2 release gate: live Claude/Codex review adapter smoke (makes real CLI calls)
 ```
 
-The validation script checks that the expected skill folders exist in both
-trees, every skill has `SKILL.md` frontmatter, the byte-identical helper
-set stays in sync, the schemas parse, every script passes a syntax check,
-and the Wave Gate, ledger, worktree, plan-consistency, preflight/Biome,
-cross-review, and registry behavior harnesses pass. The harnesses run
-concurrently on their own fixtures; a full run takes about 40 seconds. The spikes are the release gates for the framework: they exercise
-live provider lanes, the ledger's concurrency and reopen guarantees, and
-every runner gate against stubbed failure fixtures.
+`validate.sh` is the pre-publish check for this repository; the exact checks
+and the deterministic behavior harnesses (run concurrently on their own
+fixtures, never contacting external services) are in
+[scripts/validate.sh](scripts/validate.sh). The two spikes are the
+framework's release gates, described in [runner/README.md](runner/README.md).
 
 ## Inspirations
 
