@@ -406,7 +406,7 @@ worktree can advance the schema between waves with no lock involved at all.
 **Every worker reads one file, named by path in its spawn prompt** (the normal case, not a fallback):
 - Story worker: `specs/PROJ-<X>-<theme>/context/workers/wave-<N>/<US-ID>.md` (`<US-ID>.backend.md` / `<US-ID>.frontend.md` under `Split: contract`).
 - Fix worker without a story: `specs/PROJ-<X>-<theme>/context/roles/wave-<N>/<role>.md` of the wave the affected files belong to. A fix across waves stays one worker; add the other waves' role files by path.
-- Missing file or a wrong one: rerun `compile --wave <N>` (`show <US-ID>` / `show --wave <N> <role>` prints a file); never hand-assemble the context. Where the session cannot spawn the `skillchain-<role>` agent types, use the normal agent type; the path in the prompt does the same job. A `general-purpose` spawn gets no file unless its path is in the prompt. `micro-fixer` and `explore` get none.
+- Missing file or a wrong one: rerun `compile <X> <theme> --wave <N>` (`show <X> <theme> <US-ID>` / `show <X> <theme> --wave <N> <role>` prints a file); never hand-assemble the context. Where the session cannot spawn the `skillchain-<role>` agent types, use the normal agent type; the path in the prompt does the same job. A `general-purpose` spawn gets no file unless its path is in the prompt. `micro-fixer` and `explore` get none.
 
 **Choose the right model per US (from the wave plan's `Complexity` column):**
 Read the `Complexity` column in the wave plan's "User Stories in this Wave" table. Pass the value as the `model` parameter on the `Agent` spawn so the teammate runs on the right brain for the job.
