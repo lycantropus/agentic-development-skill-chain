@@ -129,7 +129,7 @@ bash scripts/ci-poll.sh <pr-number> 1800 "$FINAL_CI_HEAD"
 
 Only exit 0 from that final poll makes `P8:done` valid. A red/timeout reopens
 delivery work; immediately run
-`scripts/worktree.sh retain <X> <theme> "<exact final-CI reason>"` so the
+`scripts/chain worktree retain <X> <theme> "<exact final-CI reason>"` so the
 preserved worktree records why cleanup was refused. Do not claim the previous
 head's CI as evidence for this one.
 
@@ -138,7 +138,7 @@ follow-up can use it. After the human merges, rerun P8 (or `auto`) to repeat
 the exact-head checks and remove the worktree only through the safety helper:
 
 ```bash
-scripts/worktree.sh cleanup <X> <theme> --ci-verified-head "$FINAL_CI_HEAD"
+scripts/chain worktree cleanup <X> <theme> --ci-verified-head "$FINAL_CI_HEAD"
 ```
 
 The helper exits 2 without changing `P8:done` while the authoritative

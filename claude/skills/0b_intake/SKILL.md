@@ -120,9 +120,9 @@ the orchestrator edits no draft.
 1. Move the reconciled drafts to their final locations (`docs/*`, root
    `AGENTS.md`) and STRIP all provenance markers — they are working
    syntax, the sealed baseline never carries them.
-2. `bash scripts/intake-seal-check.sh` (copy from
-   `~/.claude/skills/0b_intake/scripts/` together with
-   `curation-caps.sh` if missing). It verifies: all eight files exist,
+2. `bash scripts/chain check intake` (no `scripts/chain` yet: use
+   `~/.claude/skills/5_executing/scripts/chain`, which finds the helpers in the
+   installed skills). It verifies: all eight files exist,
    zero residual markers, `specs/intake/decisions.md` carries
    `D-BOOTSTRAP` reconcile decisions (undiscussed drafts never seal),
    file caps hold. Red → fix, re-run; NEVER seal past a red check.
@@ -141,5 +141,5 @@ context bundles.
   marked drafts in `specs/intake/`, write one line to `specs/intake/`
   README noting the open queue — the drafts are resumable; nothing is
   half-sealed into `docs/`.
-- `intake-seal-check.sh` red → the baseline stays uncommitted; fix and
+- `chain check intake` red → the baseline stays uncommitted; fix and
   re-run. The check is idempotent.

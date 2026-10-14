@@ -535,14 +535,10 @@ set -e
 grep -E "registered PROJ worktree is already P[5-8]:" "$TMP_ROOT/runner-advanced-restart.out" >/dev/null || { cat "$TMP_ROOT/runner-advanced-restart.out" >&2; fail "advanced control-checkout restart relaunched P0"; }
 ok "auto restart re-enters an advanced PROJ lifecycle without relaunching P0"
 
-for copy in \
-  "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
-  "$ROOT/codex/skills/8_delivery/scripts/worktree.sh" \
-  "$ROOT/claude/skills/8_delivery/scripts/worktree.sh"
-do
+for copy in "$ROOT/claude/skills/5_executing/scripts/worktree.sh"; do
   cmp "$HELPER" "$copy" || fail "worktree helper copies differ"
 done
-ok "all setup/delivery provider copies of worktree.sh are byte-identical"
+ok "the claude and codex copies of worktree.sh are byte-identical"
 
 PREFLIGHT="$ROOT/codex/skills/5_executing/scripts/preflight.sh"
 grep -F 'git gh claude node jq coderabbit realpath flock unlink' "$PREFLIGHT" >/dev/null || fail "preflight hard-tool list lacks worktree lifecycle tools"

@@ -149,7 +149,7 @@ Write `3-4_plan/wave-gate-config.json` from the example and judgment rules in [r
 Run the validator first — it checks plan/config structure, AC↔task↔command↔test mapping, AC wording against the PRDs, task length, literal SQL/DDL, and narrated-diff text. Failure blocks review and handoff; re-run after every plan/config change:
 
 ```bash
-node ~/.claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs \
+bash ~/.claude/skills/5_executing/scripts/chain check plan \
   specs/PROJ-<X>-<theme>/3-4_plan
 node ~/.claude/skills/5_executing/scripts/compile-context-bundles.mjs check <X> <theme>
 ```
