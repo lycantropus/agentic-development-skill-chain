@@ -6,7 +6,6 @@
 #                        tier matrix over the file contents (frontend vs backend
 #                        scoping, reviewer minimal, micro-fixer/explore no file),
 #                        never-inject (no PRD/progress.md content in any file)
-#   curation caps      — pass + per-cap fail fixtures, --require-baseline
 #   ponytail gate      — parity ok / version mismatch / absent (enforce on+off)
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
 #                        (opposite provider, six-persona parity, auth preflight,
@@ -80,8 +79,7 @@ printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · 
 
 for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/plan.mjs \
          5_executing/scripts/ponytail-check.sh \
-         6_qa/scripts/findings.mjs 7_documentation/scripts/curation-caps.sh \
-         0b_intake/scripts/intake-seal-check.sh \
+         6_qa/scripts/findings.mjs 7_documentation/scripts/curation.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh; do
   cp "$SKILLS/$s" scripts/
@@ -139,24 +137,6 @@ has() { grep -qF -- "## $2" "$1" 2>/dev/null; }
   && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
 grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
   || ok "never-inject holds: no PRD/progress.md content in any worker file"
-
-# =============================================================================
-step "curation caps + intake seal"
-# =============================================================================
-bash scripts/chain check caps . >/dev/null 2>&1 && ok "caps pass on the clean baseline" || bad "caps failed on clean baseline"
-CAPS_OK=1
-seq 1 31 > docs/PRODUCT.md;      bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/PRODUCT.md
-seq 1 201 > docs/ARCHITECTURE.md; bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q docs/ARCHITECTURE.md
-seq 1 101 > src/feature/agent.md; bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; rm src/feature/agent.md
-seq 1 41 > AGENTS.md;             bash scripts/chain check caps . >/dev/null 2>&1 && CAPS_OK=0; git checkout -q AGENTS.md
-[ "$CAPS_OK" -eq 1 ] && ok "each cap breach fails (PRODUCT 31, ARCHITECTURE 201, agent.md 101, AGENTS.md 41)" || bad "a cap breach passed"
-bash scripts/chain check intake . >/dev/null 2>&1 && ok "intake seal check passes on the clean baseline" || bad "seal check failed clean"
-echo 'claim [assumed]' >> docs/GUIDELINES.md
-bash scripts/chain check intake . >/dev/null 2>&1 && bad "seal check missed a residual provenance marker" || ok "seal check fails on residual provenance markers"
-git checkout -q docs/GUIDELINES.md
-mv specs/intake/decisions.md specs/intake/decisions.md.bak
-bash scripts/chain check intake . >/dev/null 2>&1 && bad "seal check missed missing reconcile evidence" || ok "seal check fails without D-BOOTSTRAP reconcile evidence (undiscussed drafts never seal)"
-mv specs/intake/decisions.md.bak specs/intake/decisions.md
 
 # =============================================================================
 step "ponytail parity gate (stubbed registries)"

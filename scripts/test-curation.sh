@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # chain check caps / chain check intake: a scenario transcript (exit code plus the full report) is
 # compared with scripts/fixtures/curation/expected.txt, which was recorded from the retired
-# curation-caps.sh and intake-seal-check.sh. `test-curation.sh --record` rewrites that file.
+# curation-caps.sh and intake-seal-check.sh (now curation.sh caps|seal). `test-curation.sh --record` rewrites that file.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -64,7 +64,7 @@ transcript() {
 
 for provider in claude codex; do
   CHAIN="$ROOT/$provider/skills/5_executing/scripts/chain"
-  bash "$CHAIN" check caps --help | grep -q 'Usage: ' || fail "$provider: caps --help prints no usage"
+  bash "$CHAIN" check caps --help | grep -q 'curation.sh caps' || fail "$provider: caps --help prints no usage"
   CHAIN="$ROOT/$provider/skills/5_executing/scripts/chain"
   transcript >"$TMP/$provider.txt"
   if [ "${1:-}" = "--record" ]; then cp "$TMP/$provider.txt" "$EXPECTED"; echo "test-curation: recorded $EXPECTED"; exit 0; fi

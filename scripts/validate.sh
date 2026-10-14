@@ -108,12 +108,10 @@ check_identical "$ROOT/runner/prompts/p6-controller.md" "$ROOT/claude/skills/5_e
 check_identical "$ROOT/claude/skills/5_executing/references/in-session-driver.md" "$ROOT/codex/skills/5_executing/references/in-session-driver.md"
 check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/skills/5_executing/scripts/state.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
-check_identical "$ROOT/claude/skills/7_documentation/scripts/curation-caps.sh" \
-  "$ROOT/codex/skills/7_documentation/scripts/curation-caps.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
   "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 # Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
-for dup in 0b_intake/scripts/curation-caps.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
+for dup in 0b_intake/scripts/curation-caps.sh 7_documentation/scripts/curation-caps.sh 0b_intake/scripts/intake-seal-check.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
          5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/story-slice.mjs 5_executing/scripts/compile-context-bundles.mjs \
          8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh \
          6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh; do
@@ -154,7 +152,7 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
          5_executing/manifests/roles/micro-fixer.md 5_executing/manifests/roles/implementer.md \
          5_executing/manifests/roles/frontend-implementer.md 5_executing/manifests/roles/backend-implementer.md \
          5_executing/manifests/roles/reviewer.md 5_executing/manifests/roles/explore.md \
-         0b_intake/scripts/intake-seal-check.sh \
+         7_documentation/scripts/curation.sh \
          cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh cross-review/templates/cross-review-prompt.md.tmpl \
          5_executing/templates/agent-md-entry.md.tmpl \
