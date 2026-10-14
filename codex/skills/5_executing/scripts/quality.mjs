@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Command evidence for the agent-coordinated PROJ gate; no second scheduler.
-//   quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON]
+//   quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON|sonar-issues FILE]
 //   quality.mjs seal PROJ THEME   refuse to seal P5 unless every record is current and progress.md shows its status block
 // The record actions write 5_progress/quality-*.json and refresh the rendered "### Gate Status" block of the
 // "## Quality Gate" section in progress.md; `seal` only reads (exit 0 sealable, 1 not, 64 usage).
+// `run sonar` also appends to quality-sonar-rounds.json (scan history); `sonar-issues FILE` binds the saved output of
+// `sonar list issues` to the current scan; `seal` then checks the carry-forward notes in progress.md against both.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -50,7 +52,22 @@ function mutants(log) {
   log = log.replace(/\x1b\[[0-9;]*m/g, '');
   return Math.max(0, ...[...log.matchAll(/([0-9]+)\s+(?:mutants?|mutations?)\b|\b(?:mutants?|mutations?)\s*[:=]\s*([0-9]+)/gi)].map(m => Number(m[1] ?? m[2])));
 }
+function survivors(log) {
+  // Mutation wrappers print "Survivors: N" next to "Mutants: N"; exit 1 without it is not survivor evidence.
+  log = log.replace(/\x1b\[[0-9;]*m/g, '');
+  return Math.max(0, ...[...log.matchAll(/\bsurvivors?\s*[:=]\s*([0-9]+)/gi)].map(m => Number(m[1])));
+}
 function mutationBase() { return git('rev-parse', '--verify', `proj-PROJ-${proj}-base^{commit}`); }
+const roundsPath = `${progress}/quality-sonar-rounds.json`;
+const rounds = () => fs.existsSync(roundsPath) ? JSON.parse(fs.readFileSync(roundsPath, 'utf8')) : [];
+const SONAR_OPEN = ['OPEN', 'CONFIRMED', 'REOPENED'], SONAR_BLOCKING = ['BLOCKER', 'CRITICAL', 'MAJOR'];
+// "### Carried Forward (<kind>…" up to the next heading, or null.
+function carriedForward(text, kind) {
+  const heading = new RegExp(`^### Carried Forward \\(${kind}[^\\n]*$`, 'm').exec(text);
+  if (!heading) return null;
+  const rest = text.slice(heading.index + heading[0].length), next = /^#{1,3} /m.exec(rest);
+  return next ? rest.slice(0, next.index) : rest;
+}
 function write(key, record) {
   const target = evidencePath(key), temp = `${target}.${randomUUID()}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(record, null, 2) + '\n'); fs.renameSync(temp, target);
@@ -63,13 +80,14 @@ function valid(key, config, fingerprint) {
   const record = JSON.parse(fs.readFileSync(evidencePath(key), 'utf8'));
   // Mutation contract: exit 0 = the tool's own threshold is met, exit 1 with mutants analysed = survivors (the progress status decides
   // whether they block); any other non-zero exit (timeout 124/137, crash) is a failed run, never survivor evidence.
-  if (record.inputs !== fingerprint || !record.head || (record.rc !== 0 && !(key === 'mutation' && record.rc === 1 && record.mutants > 0))) throw new Error(`${key}: stale or failed evidence`);
-  if (key !== 'review' && key !== 'sonar-skip' && record.command !== commandFor(key, config)) throw new Error(`${key}: command changed`);
+  if (record.inputs !== fingerprint || !record.head || (record.rc !== 0 && !(key === 'mutation' && record.rc === 1 && record.mutants > 0 && record.survivors > 0))) throw new Error(`${key}: stale or failed evidence`);
+  if (!['review', 'sonar-skip', 'sonar-issues'].includes(key) && record.command !== commandFor(key, config)) throw new Error(`${key}: command changed`);
   if (!record.log || snapshotFile(record.log) !== record.log_hash) throw new Error(`${key}: log missing or changed`);
   if (JSON.stringify(artifacts(record.artifacts.map(([name]) => name))) !== JSON.stringify(record.artifacts)) throw new Error(`${key}: artifacts missing or changed`);
   if ((key === 'coverage' || key.startsWith('test:')) && !(record.selected > 0)) throw new Error(`${key}: no tests selected`);
   if (key === 'mutation' && !(record.mutants > 0)) throw new Error('mutation: no mutants analysed');
   if (key === 'mutation' && record.base_sha !== mutationBase()) throw new Error('mutation: base tag moved since the run');
+  if (key === 'sonar-issues' && record.ce_task !== valid('sonar', config, fingerprint).ce_task) throw new Error('sonar-issues: recorded for a different scan');
   return record;
 }
 function canSkip(reason) {
@@ -83,9 +101,10 @@ function statusBlock(config, fingerprint) {
   const current = key => { try { return valid(key, config, fingerprint); } catch { return null; } };
   const passed = keys => keys.every(key => current(key)) ? 'passed' : 'pending';
   const tests = [...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)];
-  const mutation = !config.mutation_cmd ? 'skipped (not configured)' : current('mutation') ? (current('mutation').rc === 0 ? 'ran' : 'ran (survivors carried forward)') : 'pending';
+  const mutation = !config.mutation_cmd ? 'skipped (not configured)' : current('mutation') ? (current('mutation').rc === 0 ? 'ran' : `ran (${current('mutation').survivors} survivors carried forward)`) : 'pending';
   const skip = fs.existsSync(evidencePath('sonar-skip')) ? current('sonar-skip') : null;
-  const sonar = skip ? (canSkip(skip.reason) ? `skipped (${skip.reason})` : 'pending') : current('sonar') ? 'ran' : 'pending';
+  const issues = current('sonar-issues');
+  const sonar = skip ? (canSkip(skip.reason) ? `skipped (${skip.reason})` : 'pending') : current('sonar') && issues ? (issues.open.length ? `ran (${issues.open.length} carried forward)` : 'ran') : 'pending';
   const rows = [['Code Review', passed(['review'])], ['Mutation', mutation], ['Build', passed(['build'])], ['Tests', tests.length ? passed(tests) : 'skipped (none declared)'], ['Lint', passed(['lint'])], ['SonarCloud', sonar]];
   return [STATUS_BEGIN, '### Gate Status', '', '| Check | Status |', '|---|---|', ...rows.map(([name, status]) => `| ${name} | ${status} |`), STATUS_END].join('\n');
 }
@@ -126,11 +145,11 @@ function verifyAll(config, fingerprint) {
   if (fs.existsSync(evidencePath('sonar-skip'))) {
     const skip = valid('sonar-skip', config, fingerprint);
     if (!canSkip(skip.reason)) throw new Error('Sonar skip no longer valid');
-  } else valid('sonar', config, fingerprint);
+  } else { valid('sonar', config, fingerprint); valid('sonar-issues', config, fingerprint); }
 }
 function main() {
   if (action === 'seal' && (!proj || !theme)) { console.error('Usage: quality.mjs seal PROJ THEME'); process.exit(64); }
-  if (!proj || !theme || !/^[\w-]+$/.test(proj) || !/^[\w-]+$/.test(theme)) throw new Error('Usage: quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON] | seal PROJ THEME');
+  if (!proj || !theme || !/^[\w-]+$/.test(proj) || !/^[\w-]+$/.test(theme)) throw new Error('Usage: quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON|sonar-issues FILE] | seal PROJ THEME');
   if (fs.realpathSync('.') !== fs.realpathSync(git('rev-parse', '--show-toplevel'))) throw new Error('run from the worktree root');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   if (action === 'seal') loadEnvLocal(); // the fingerprint hashes the environment the commands ran in
@@ -154,7 +173,28 @@ function act(config, fingerprint) {
     // exactly one block in the whole file, inside the section, identical to the one derived from the records
     const blocks = text.match(STATUS_BLOCK) ?? [];
     if (blocks.length !== 1 || !text.slice(section.start, section.end).includes(blocks[0]) || blocks[0] !== statusBlock(config, fingerprint)) throw new Error('Quality Gate status block missing, duplicated, outside the section or edited — run `chain quality <X> <theme> check` to render it');
+    // Carry-forward claims: the notes in progress.md must match the records.
+    if (!fs.existsSync(evidencePath('sonar-skip'))) {
+      const open = valid('sonar-issues', config, fingerprint).open;
+      if (open.length && rounds().length < 4) throw new Error(`Sonar: ${open.length} issue(s) open but ${rounds().length} scan(s) recorded; carrying forward needs the initial scan plus three fix rounds`);
+      const missing = open.filter(issue => !carriedForward(text, 'Sonar')?.includes(issue.key));
+      if (missing.length) throw new Error(`Sonar issues missing from "### Carried Forward (Sonar": ${missing.map(issue => issue.key).join(', ')}`);
+    }
+    if (config.mutation_cmd && valid('mutation', config, fingerprint).rc === 1 && !/^\s*[-*] /m.test(carriedForward(text, 'Mutation') ?? '')) throw new Error('Mutation survivors need a bullet under "### Carried Forward (Mutation"');
     console.log('✓ Quality Gate proof present (code review, build, Sonar disposition)'); return;
+  }
+  if (action === 'sonar-issues') {
+    const sonar = valid('sonar', config, fingerprint);
+    if (!kind || !path.posix.normalize(kind).startsWith(`${progress}/`)) throw new Error(`usage: sonar-issues ${progress}/<file> (the saved output of: sonar list issues … --page-size 500)`);
+    const data = JSON.parse(fs.readFileSync(kind, 'utf8'));
+    if (!Array.isArray(data.issues) || !Number.isInteger(data.paging?.total)) throw new Error('not the output of sonar list issues');
+    if (data.issues.length !== data.paging.total) throw new Error(`sonar issues incomplete (${data.issues.length} of ${data.paging.total}); fetch every page`);
+    const changed = new Set(git('diff', '--name-only', `${mutationBase()}..HEAD`).split('\n').filter(Boolean));
+    const open = data.issues.filter(issue => SONAR_OPEN.includes(issue.status) && SONAR_BLOCKING.includes(issue.severity))
+      .map(issue => ({ key: issue.key, severity: issue.severity, file: String(issue.component).replace(/^[^:]*:/, ''), line: issue.line ?? null, rule: issue.rule }))
+      .filter(issue => changed.has(issue.file));
+    write('sonar-issues', { head: git('rev-parse', 'HEAD'), inputs: fingerprint, rc: 0, log: kind, log_hash: snapshotFile(kind), artifacts: [], ce_task: sonar.ce_task, open, source: 'file' });
+    console.log(`✓ sonar issues: ${open.length} open BLOCKER/CRITICAL/MAJOR in changed files`); return;
   }
   if (action === 'review' || action === 'skip-sonar') {
     const key = action === 'review' ? 'review' : 'sonar-skip';
@@ -209,16 +249,18 @@ function act(config, fingerprint) {
   const count = isMut ? mutants(output) : selected(output);
   if ((key === 'coverage' || key.startsWith('test:') || isMut) && !count) rc ||= 1;
   if (inputs() !== fingerprint || git('rev-parse', 'HEAD') !== head) rc ||= 1;
-  let files = [];
+  let files = [], ceTask;
   if (rc === 0) {
     if (key === 'sonar') {
       const task = '.scannerwork/report-task.txt';
       if (!fs.existsSync(task) || fs.statSync(task).mtimeMs < started || !/^ceTaskId=.+/m.test(fs.readFileSync(task, 'utf8'))) throw new Error('Sonar produced no fresh task receipt');
-      files = artifacts([task]);
+      files = artifacts([task]); ceTask = /^ceTaskId=(.+)$/m.exec(fs.readFileSync(task, 'utf8'))[1];
     } else files = artifacts(artifactNames);
   }
-  write(key, { head, inputs: fingerprint, command, rc, ...(isMut ? { mutants: count, base_sha: baseSha } : { selected: count }), log, log_hash: snapshotFile(log), artifacts: files });
-  if (rc) throw new Error(`${key} failed (${rc})${isMut && count && rc === 1 ? ' — surviving mutants, see log' : ''}; log: ${log}`);
+  const survived = isMut ? survivors(output) : 0;
+  write(key, { head, inputs: fingerprint, command, rc, ...(isMut ? { mutants: count, survivors: survived, base_sha: baseSha } : { selected: count }), ...(ceTask ? { ce_task: ceTask } : {}), log, log_hash: snapshotFile(log), artifacts: files });
+  if (key === 'sonar' && rc === 0) fs.writeFileSync(roundsPath, JSON.stringify([...rounds(), { n: rounds().length + 1, head, ce_task: ceTask, at: new Date().toISOString() }], null, 2) + '\n');
+  if (rc) throw new Error(`${key} failed (${rc})${isMut && count && rc === 1 ? (survived ? ' — surviving mutants, see log' : ' — exit 1 without a "Survivors: N" line, see log') : ''}; log: ${log}`);
   if (key === 'sonar') fs.rmSync(evidencePath('sonar-skip'), { force: true });
   console.log(`✓ ${key}: ${log}`);
 }
