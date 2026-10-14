@@ -92,6 +92,8 @@ After decomposition:
 
 ## Framework Runs (Agent Workflow, Stage 1 + Stage 2)
 
+The script map (`chain <verb>`), the P0–P8 phases and which gate is a script or a review are on one page: [how-it-works.md](how-it-works.md). This section keeps the runner mechanics.
+
 Once Step 5 has sealed P0 (`P0:done`), it asks once whether to run P5 to a PR unattended, drive it
 to the PR in the current session (the lead plays the runner's role; `/goal` keeps the session
 turning), or continue interactively. On unattended it starts the host-neutral phase runner detached

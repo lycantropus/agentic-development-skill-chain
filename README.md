@@ -87,6 +87,8 @@ on a failed writer, timeout, unsealed phase, or red gate instead of
 continuing degraded. Reports and PR bodies are rendered from state + ledger
 by template scripts, never hand-written.
 
+New to the framework? [docs/how-it-works.md](docs/how-it-works.md) maps
+the scripts (`chain <verb>`), the P0–P8 phases and the gates on one page.
 Details: [docs/skill-chain.md](docs/skill-chain.md#framework-runs-agent-workflow-stage-1--stage-2)
 for the full mechanics, [runner/README.md](runner/README.md) for the runner
 itself, and `CONCEPT.md` for the full model and rationale. Stage 3+ of the

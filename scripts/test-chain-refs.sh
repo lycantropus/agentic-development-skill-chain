@@ -24,4 +24,13 @@ rejects "removed skill copy"     "6_qa/scripts/gone.sh does not exist" 'See `6_q
 rejects "unknown project script" "scripts/gone.sh does not exist"    'Run `bash scripts/gone.sh`.'
 rejects "unknown verb"           "'chain bogus' is not a chain verb"  'Run `chain bogus x`.'
 rejects "unknown sub"            "'chain check nope' is not in the dispatcher table" 'Run `chain check nope`.'
+rejects "table names a missing script" "table names gone.sh, which does not exist" '| `gone.sh` | `scripts/` |'
+
+# the how-it-works page must cover every verb of the table
+printf 'Nothing here.\n' >"$DOC"
+printf 'Only `chain state` is described.\n' >"$TMP/docs/how-it-works.md"
+if check; then fail "accepted a how-it-works page that misses verbs"; fi
+grep -qF "does not mention 'chain findings harvest'" "$TMP/out" || { cat "$TMP/out" >&2; fail "page coverage reported the wrong verbs"; }
+bash "$TMP/claude/skills/5_executing/scripts/chain" --list | awk -F'|' '{ printf "`chain %s%s%s`\n", $1, ($2 == "" ? "" : " "), $2 }' >"$TMP/docs/how-it-works.md"
+check || { cat "$TMP/out" >&2; fail "rejected a page that mentions every verb"; }
 echo "test-chain-refs: ok"

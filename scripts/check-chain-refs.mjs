@@ -2,7 +2,8 @@
 // Orphan-script check for the prose that drives the chain (skills, references, runner prompts, docs):
 //  A. it must not name a script file the `chain` dispatcher routes (use `chain <verb>`); table rows are exempt;
 //  B. a path-qualified script reference (`<skill>/scripts/<file>`, `scripts/<file>`) must point at a file that exists;
-//  C. every `chain <verb> [<sub>]` must be a verb/sub in the dispatcher table (`chain --list`).
+//  C. every `chain <verb> [<sub>]` must be a verb/sub in the dispatcher table (`chain --list`);
+//  D. a script file named in a table row must exist, and docs/how-it-works.md must mention every verb of the table.
 // Usage: check-chain-refs.mjs [repo-root]
 import fs from "node:fs";
 import path from "node:path";
@@ -43,6 +44,9 @@ for (const file of files) {
   fs.readFileSync(file, "utf8").split("\n").forEach((line, i) => {
     const at = `${path.relative(root, file)}:${i + 1}`;
     const isTableRow = line.trimStart().startsWith("|");
+    if (isTableRow) for (const m of line.matchAll(/(?<![\w./-])([\w-]+\.(?:sh|mjs))(?![\w-])/g)) {
+      if (!scriptFiles.has(m[1])) problems.push(`${at}: table names ${m[1]}, which does not exist`);
+    }
     const named = namedScript.exec(line);
     if (named && !isTableRow) problems.push(`${at}: names script '${named[1]}' — call it through chain (chain --list)`);
     for (const m of line.matchAll(/(?<![\w$.-])([0-9A-Za-z_]+(?:-[0-9A-Za-z_]+)*)\/scripts\/([\w.-]+)/g)) {
@@ -58,6 +62,11 @@ for (const file of files) {
       else if (sub && !hasRow(verb, sub) && !hasRow(verb, "") && !isTableRow) problems.push(`${at}: 'chain ${verb} ${sub}' is not in the dispatcher table`);
     }
   });
+}
+const page = path.join(root, "docs/how-it-works.md");
+if (fs.existsSync(page)) {
+  const text = fs.readFileSync(page, "utf8");
+  for (const [verb, sub] of rows) if (!text.includes(`chain ${verb}${sub ? ` ${sub}` : ""}`)) problems.push(`docs/how-it-works.md: does not mention 'chain ${verb}${sub ? ` ${sub}` : ""}'`);
 }
 if (problems.length) { console.error(problems.join("\n")); console.error(`check-chain-refs: ${problems.length} problem(s)`); process.exit(1); }
 console.log(`check-chain-refs: ${files.length} files, ${routed.length} routed scripts, no orphan references`);
