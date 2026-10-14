@@ -59,4 +59,19 @@ for provider in claude codex; do
   [ "$rc" = 127 ] || fail "$provider missing script should exit 127, got $rc"
 done
 
+# 5. CHAIN_SCRIPTS_DIR: a project's own (customized) copy wins over the installed one; others still resolve from the tree
+proj="$TMP/project"; mkdir -p "$proj/scripts"; printf 'echo custom-ledger "$@"\n' >"$proj/scripts/ledger.mjs"
+rc=0; got="$(cd "$proj" && CHAIN_SCRIPTS_DIR="$proj/scripts" bash "$ROOT/claude/skills/5_executing/scripts/chain" --where findings)"
+[ "$got" = "$proj/scripts/ledger.mjs" ] || fail "CHAIN_SCRIPTS_DIR copy not preferred: $got"
+got="$(cd "$proj" && CHAIN_SCRIPTS_DIR="$proj/scripts" bash "$ROOT/claude/skills/5_executing/scripts/chain" --where state)"
+case "$got" in */5_executing/scripts/state.sh) ;; *) fail "helper missing in CHAIN_SCRIPTS_DIR must fall back to the tree: $got" ;; esac
+# the phase runner passes its project's scripts/ dir: a customized helper in a repo WITHOUT scripts/chain stays selected
+(
+  cd "$proj"; printf 'echo custom-worktree "$@"\n' >scripts/worktree.sh
+  CHAIN_REPO=""; CHAIN_SKILL="$ROOT/claude/skills/5_executing/scripts/chain"
+  eval "$(sed -n '/^chain_has() {/,/^}/p;/^chain() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
+  [ "$(chain worktree locate 1)" = "custom-worktree locate 1" ] || { echo "runner chain() ignored the project copy" >&2; exit 1; }
+  chain_has worktree || { echo "chain_has lost the project copy" >&2; exit 1; }
+) || fail "runner project-copy preference"
+
 echo "test-chain-dispatcher: ok"

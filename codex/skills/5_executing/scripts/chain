@@ -9,6 +9,8 @@
 #
 # `chain --list` prints the table, `chain --where <verb> [sub]` the resolved path.
 #
+# CHAIN_SCRIPTS_DIR=<dir> makes a script in <dir> win over the one next to chain.
+#
 # Not routed: env-local.sh (a library other helpers `source`) and
 # merge-project-settings.sh (Claude-only, manual one-time step).
 set -euo pipefail
@@ -59,6 +61,8 @@ usage() {
 # Where a script lives: next to chain, or (installed skill tree only) in a sibling skill / the runner.
 find_script() {
   local name="$1" dir
+  # A project's own copy wins when the caller names its scripts/ dir (the phase runner does, from the skill tree).
+  if [ -n "${CHAIN_SCRIPTS_DIR:-}" ] && [ -f "$CHAIN_SCRIPTS_DIR/$name" ]; then echo "$CHAIN_SCRIPTS_DIR/$name"; return 0; fi
   if [ -f "$here/$name" ]; then echo "$here/$name"; return 0; fi
   if [ -f "$here/../SKILL.md" ]; then
     for dir in "$here"/../../*/scripts "$here/../runner" "$here/../../../../runner"; do

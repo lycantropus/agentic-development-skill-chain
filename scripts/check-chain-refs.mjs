@@ -59,7 +59,7 @@ for (const file of files) {
     for (const m of line.matchAll(/(?:scripts\/chain|`chain)\s+([a-z]+)(?:\s+([a-z][a-z-]*))?/g)) {
       const [, verb, sub] = m;
       if (!rows.some(r => r[0] === verb)) problems.push(`${at}: 'chain ${verb}' is not a chain verb`);
-      else if (sub && !hasRow(verb, sub) && !hasRow(verb, "") && !isTableRow) problems.push(`${at}: 'chain ${verb} ${sub}' is not in the dispatcher table`);
+      else if (sub && !hasRow(verb, sub) && !hasRow(verb, "")) problems.push(`${at}: 'chain ${verb} ${sub}' is not in the dispatcher table`);
     }
   });
 }

@@ -27,11 +27,11 @@ Not behind `chain`: `env-local.sh` (a library the gates `source`), `merge-projec
 
 ## The phases at a glance
 
-The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Steps 1–4 of the chain (concept to plans) run before `state.json` exists; the phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
+The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder; it stays `CP1:pending` through steps 1–4 until Checkpoint 1 approves the plan. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
 
 | Phase | Call | Reads | Writes (its one writer) |
 |---|---|---|---|
-| **CP1** — approve the plan | `chain check plan`, `chain render context check`, then `chain state transition … CP1 approved` | wave plans, `wave-gate-config.json`, PRDs | `state.json` and the decision log, both via `chain state` |
+| **CP1** — approve the plan | `chain check plan`, `chain render context check`, then `chain state transition … CP1 approved` | wave plans, `wave-gate-config.json`, PRDs | `state.json` via `chain state` (phase, and the path of the decision log); the log itself, `decisions.md`, is written by the checkpoint subskill |
 | **P0** — setup | see the P0 diagram below | the approved plans, `docs/` | worktree, `state.json`, `scripts/`, worker files |
 | **P5** wave start | git tag `wave-N-start-PROJ-X`, `chain render context compile <X> <theme> --wave N` | the wave plan, `progress.md` | `context/workers/wave-N/*.md` |
 | **P5** worker | reads its one file; `chain worktree with-shared-lock -- <cmd>` for migrations and auth commands | its worker file | code and tests |
