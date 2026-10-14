@@ -45,6 +45,10 @@ if [ "${REQUIREMENTS_STUB:-0}" -eq 1 ]; then
     *"Testability:"*"Cross-PRD consistency:"*) ;;
     *) exit 10 ;;
   esac
+  case "$input" in
+    *END-OF-LARGE-ARTIFACT*) ;;
+    *) exit 11 ;;
+  esac
 fi
 printf '{"is_error":false,"structured_output":{"findings":[{"severity":"%s","category":"claude-stale-claim","file":"docs/ARCHITECTURE.md","line":2,"summary":"stub claude finding"}]}}\n' "${CLAUDE_STUB_SEVERITY:-high}"
 EOS
@@ -126,11 +130,13 @@ printf '%s\n' "$OUT" | jq -e 'select(.provider == "codex" and .source == "cross-
   || die 'pre-P0 review must report to stdout without state.json or ledger'
 
 # Requirements mode: a prompt above the former 128 KiB default streams to Claude; an explicit cap still bites.
-awk 'BEGIN { for (i = 0; i < 150000; i++) printf "x" }' >docs/large-requirements.md
+{ awk 'BEGIN { for (i = 0; i < 150000; i++) printf "x" }'; echo END-OF-LARGE-ARTIFACT; } >docs/large-requirements.md
 rc=0; REQUIREMENTS_STUB=1 review requirements 97 pre-p0 --artifacts docs/large-requirements.md --author-provider codex >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 3 ] || die "requirements review above 128 KiB must reach the provider (rc=$rc)"
-rc=0; CROSS_REVIEW_MAX_CONTEXT_BYTES=1024 review requirements 97 pre-p0 --artifacts docs/large-requirements.md --author-provider codex >/dev/null 2>&1 || rc=$?
-[ "$rc" -eq 1 ] || die 'an explicit context cap must stay enforceable'
+[ "$rc" -eq 3 ] || die "requirements review above 128 KiB must reach the provider with the whole artifact, end marker included (rc=$rc)"
+: >"$CASE/capped.log"; rc=0
+QA_STUB_LOG="$CASE/capped.log" CROSS_REVIEW_MAX_CONTEXT_BYTES=1024 review requirements 97 pre-p0 --artifacts docs/large-requirements.md --author-provider codex >"$CASE/capped.out" 2>&1 || rc=$?
+[ "$rc" -eq 1 ] && grep -q 'above configured limit 1024' "$CASE/capped.out" && [ ! -s "$CASE/capped.log" ] \
+  || die "an explicit context cap must stop the review before any provider call (rc=$rc)"
 
 # Manual rounds beyond the automatic limit run and persist.
 for round in 3 4; do
