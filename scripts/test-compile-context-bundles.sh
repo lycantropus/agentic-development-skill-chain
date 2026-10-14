@@ -123,6 +123,10 @@ done
 [ -z "$(node "$INJ" codex implementer --path 2>/dev/null)" ] || die "stub codex mode must print nothing"
 [ "$(rc node "$INJ" bogus)" -eq 1 ] || die "stub with an unknown mode must exit 1"
 
+mkdir -p .claude/agents   # foreign agent files, one named like a role: compile must not touch them
+printf 'mine\n' >.claude/agents/my-agent.md
+printf 'mine\n' >.claude/agents/implementer.md
+sha256sum .claude/agents/my-agent.md .claude/agents/implementer.md >"$CASE/foreign.sha"
 run compile 1 demo --wave 1 >/dev/null
 B="$CTX/roles/wave-1/backend-implementer.md"
 F="$CTX/roles/wave-1/frontend-implementer.md"
@@ -154,6 +158,7 @@ for side in backend frontend; do
 done
 [ -e "$CTX/workers/wave-1/PROJ-1-PRD-1-US-2.md" ] && die "contract story also got an unsplit file"
 head -1 "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" | grep -qF 'role implementer' || die "fan-out story must be one implementer file"
+[ "$(ls "$CTX"/workers/wave-1/PROJ-1-PRD-1-US-3* | wc -l)" -eq 1 ] || die "fan-out story must give exactly one file"
 grep -qF 'Design system (docs/DESIGN-SYSTEM.md)' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" || die "implementer file lacks the design system"
 grep -qF 'Security baseline' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" || die "implementer file lacks the security baseline"
 # agent files: path pointer for roles with an inject list only
@@ -163,6 +168,48 @@ grep -qF 'Spawn-Prompt' .claude/agents/skillchain-micro-fixer.md && die "micro-f
 grep -qF 'SubagentStart' .claude/agents/skillchain-*.md && die "agent files still mention the hook"
 [ -e .claude/agents/skillchain-explore.md ] && die "explore got an agent file"
 [ -e "$CTX/roles/wave-1/micro-fixer.md" ] || [ -e "$CTX/roles/wave-1/explore.md" ] && die "tier 0/explore got a role file"
+[ -z "$(find "$CTX" \( -name 'micro-fixer*' -o -name 'explore*' \))" ] || die "tier 0/explore got a worker or role file"
+# only skillchain-<manifest>.md agent files are written; foreign ones stay byte-identical
+sha256sum -c --quiet "$CASE/foreign.sha" || die "compile touched a foreign agent file"
+[ "$(ls .claude/agents | tr '\n' ' ')" = "implementer.md my-agent.md skillchain-backend-implementer.md skillchain-frontend-implementer.md skillchain-implementer.md skillchain-micro-fixer.md skillchain-reviewer.md " ] \
+  || die "unexpected agent files: $(ls .claude/agents | tr '\n' ' ')"
+
+# role matrix over the file contents; sections are told apart by their titles
+# (preambles mention "design system" and "security baseline" in prose)
+T_PRODUCT='Product (docs/PRODUCT.md)'; T_ARCH='Architecture overview (docs/ARCHITECTURE.md)'; T_PROJ='PROJ architecture ('
+T_GUIDE='Guidelines (docs/GUIDELINES.md)'; T_DS='Design system (docs/DESIGN-SYSTEM.md)'; T_COMP='Component registry (docs/components.md)'
+T_API='API contracts — own wave only'; T_SEC='Security baseline (docs/security-baseline.md)'; T_TEST='Test conventions (docs/test-conventions.md)'
+T_GROUND='Validated assumptions ('; T_CRIT='Review criteria'; T_DIFF='Diff scope'; T_STORY='Deine Story'
+sections() { # file, then +title (must have a "## title..." line) / -title (must not)
+  local f="$1" spec t; shift
+  for spec in "$@"; do
+    t="${spec:1}"
+    if awk -v t="## $t" 'index($0, t) == 1 { found = 1 } END { exit !found }' "$f"; then [ "${spec:0:1}" = "+" ] || die "$f must not have a '## $t' section"
+    else [ "${spec:0:1}" = "-" ] || die "$f lacks a '## $t' section"; fi
+  done
+}
+CORE=("+$T_PRODUCT" "+$T_ARCH" "+$T_PROJ" "+$T_GUIDE" "+$T_API" "+$T_TEST" "+$T_GROUND" "-$T_CRIT" "-$T_DIFF")
+for f in "$CTX/roles/wave-1/frontend-implementer.md" "$CTX/workers/wave-1/PROJ-1-PRD-1-US-2.frontend.md"; do
+  sections "$f" "${CORE[@]}" "+$T_DS" "+$T_COMP" "-$T_SEC"
+done
+for f in "$CTX/roles/wave-1/backend-implementer.md" "$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.md" "$CTX/workers/wave-1/PROJ-1-PRD-1-US-2.backend.md"; do
+  sections "$f" "${CORE[@]}" "-$T_DS" "-$T_COMP" "+$T_SEC"
+done
+for f in "$CTX/roles/wave-1/implementer.md" "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md"; do
+  sections "$f" "${CORE[@]}" "+$T_DS" "+$T_COMP" "+$T_SEC"
+done
+sections "$CTX/roles/wave-1/reviewer.md" "+$T_PRODUCT" "+$T_CRIT" "+$T_DIFF" "-$T_ARCH" "-$T_PROJ" "-$T_GUIDE" "-$T_DS" "-$T_COMP" "-$T_API" "-$T_SEC" "-$T_TEST" "-$T_GROUND" "-$T_STORY"
+for f in "$CTX"/roles/wave-1/*.md; do sections "$f" "-$T_STORY"; done   # role files carry no story
+for f in "$CTX"/workers/wave-1/*.md; do sections "$f" "+$T_STORY"; done  # every story file does
+ls "$CTX"/workers/wave-1 | grep -q reviewer && die "reviewer got a worker file"
+# the preambles agree with the file: story in the file, design system also for the full-stack role
+for r in implementer frontend-implementer backend-implementer; do
+  grep -qF 'are in the `## Deine Story` section of this' "$CTX/roles/wave-1/$r.md" || die "$r preamble does not point to the story section"
+  grep -qF 'arrive in the spawn prompt from the orchestrator' "$CTX/roles/wave-1/$r.md" && die "$r preamble still says the story is in the spawn prompt"
+done
+grep -qF 'stays with frontend-implementer' "$CTX/roles/wave-1/implementer.md" && die "implementer preamble still keeps the design system with the frontend"
+[ "$(sed -n 's/^budget_tokens: //p' "$SKILL/manifests/roles/implementer.md")" = "$(sed -n 's/^budget_tokens: //p' "$SKILL/manifests/roles/frontend-implementer.md")" ] \
+  || die "implementer budget must equal the frontend-implementer budget"
 
 run compile 1 demo --wave 2 >/dev/null
 B2="$CTX/roles/wave-2/backend-implementer.md"
@@ -171,12 +218,30 @@ grep -qF 'Decision 1' "$B2" && die "wave-1 decision leaked into wave 2"
 grep -qF 'Flow 1: Invoice export** (Affects: PRD-2) — Export enqueues first' "$B2" || die "wave-2 key flow missing"
 head -1 "$CTX/workers/wave-2/PROJ-1-PRD-2-US-1.md" | grep -qF 'role frontend-implementer · wave 2' || die "role must come from the table"
 [ -e "$W" ] || die "--wave 2 removed wave-1 files"
+# 'Affects: all' reaches every wave, in the role file and in the story files; the other wave's item never does
+W2S="$CTX/workers/wave-2/PROJ-1-PRD-2-US-1.md"
+grep -qF 'Decision 3: Auth on every route' "$B2" && grep -qF 'Decision 3: Auth on every route' "$W2S" || die "'all' decision missing from wave 2"
+grep -qF 'Decision 2: Export queue' "$W2S" && ! grep -qF 'Decision 1' "$W2S" && grep -qF 'Decision 1' "$W" && ! grep -qF 'Decision 2' "$W" \
+  || die "story files must hold only the decisions of their own wave"
+sections "$W2S" "${CORE[@]}" "+$T_DS" "+$T_COMP" "-$T_SEC" "+$T_STORY"
+# every story file ends in the slice of its own plan, byte for byte
+n=0
+for f in "$CTX"/workers/wave-*/*.md; do
+  w="${f#*/workers/wave-}"; w="${w%%/*}"; id="$(basename "$f" .md)"; id="${id%.backend}"; id="${id%.frontend}"
+  node "$SKILL/scripts/story-slice.mjs" "specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-$w-plan.md" "$id" >"$CASE/slice.out"
+  sed '1,/^## Deine Story$/d' "$f" | tail -n +2 | cmp - "$CASE/slice.out" || die "$f: story part is not the slice byte for byte"
+  n=$((n+1))
+done
+[ "$n" -eq 5 ] || die "expected 5 story files, found $n"
 
 # compile without --wave compiles every wave on its own; a rerun is idempotent
 rm -rf "$CTX"
 run compile 1 demo >/dev/null
 grep -qF 'Decision 1' "$B" && ! grep -qF 'Decision 2' "$B" && grep -qF 'Decision 2' "$B2" && ! grep -qF 'Decision 1' "$B2" \
   || die "compile without --wave must compile each wave separately"
+[ "$(ls "$CTX" | tr '\n' ' ')" = "roles workers " ] && [ -z "$(find "$CTX/roles" "$CTX/workers" -mindepth 1 -maxdepth 1 ! -name 'wave-*')" ] \
+  && [ "$(ls "$CTX/roles/wave-1" | tr '\n' ' ')" = "backend-implementer.md frontend-implementer.md implementer.md reviewer.md " ] \
+  || die "context must hold only per-wave roles/ and workers/ directories (no cross-wave view)"
 snap >"$CASE/full.snap"
 run compile 1 demo --wave all >/dev/null
 snap | cmp - "$CASE/full.snap" || die "rerun is not byte-identical"
@@ -184,7 +249,8 @@ snap | cmp - "$CASE/full.snap" || die "rerun is not byte-identical"
 # budget breach and parser error: exit != 0, nothing written or deleted
 cp -r "$SKILL/manifests/roles" "$CASE/tight"
 sed -i 's/^budget_tokens: .*/budget_tokens: 50/' "$CASE/tight/reviewer.md"
-if node "$COMPILE" compile 1 demo --roles-dir "$CASE/tight" >"$CASE/budget.out" 2>&1; then die "budget breach compiled"; fi
+[ "$(rc node "$COMPILE" compile 1 demo --roles-dir "$CASE/tight")" -eq 1 ] || die "budget breach must exit 1"
+node "$COMPILE" compile 1 demo --roles-dir "$CASE/tight" >"$CASE/budget.out" 2>&1 || true
 grep -qE 'reviewer [0-9]+/50 tokens' "$CASE/budget.out" || die "budget breach must name role, tokens and budget"
 snap | cmp - "$CASE/full.snap" || die "budget breach changed files"
 cp "$PLAN1" "$CASE/plan1.bak"
@@ -192,7 +258,7 @@ sed -i 's/^| PROJ-1-PRD-1-US-1 | backend | backend-implementer/| PROJ-1-PRD-1-US
 [ "$(rc run compile 1 demo)" -eq 2 ] || die "unsupported Agent Type must exit 2"
 grep -qF "$PLAN1: PROJ-1-PRD-1-US-1: unsupported Agent Type" "$CASE/err" || die "parser error must name plan and story"
 snap | cmp - "$CASE/full.snap" || die "parser error changed files"
-if run check 1 demo >/dev/null 2>&1; then die "check accepted an unassignable story"; fi
+[ "$(rc run check 1 demo)" -eq 2 ] && grep -qF "$PLAN1: PROJ-1-PRD-1-US-1: unsupported Agent Type" "$CASE/err" || die "check must exit 2 for an unassignable story, naming plan and story"
 cp "$CASE/plan1.bak" "$PLAN1"
 
 # write error (a file where the workers dir belongs): exit 1, rerun completes
@@ -263,6 +329,28 @@ mv "$CASE/wave2.bak" specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-2-plan.md
 restore_plans() { cp "$CASE/plan1.bak" "$PLAN1"; printf '# Wave 2\n\n**PRDs involved:** PROJ-1-PRD-2\n\n## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n| PROJ-1-PRD-2-US-1 | frontend | frontend-implementer | sonnet | immediately |\n\n## PROJ-1-PRD-2-US-1: Export invoices\n**Scope:** frontend\n' >specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-2-plan.md; }
 restore_plans
 
+# role change and a new split rewrite the story's files and leave no stale ones; the story size is no budget
+run compile 1 demo >/dev/null
+workers() { (cd "$CTX/workers" && find . -type f | sort | tr '\n' ' '); }
+WORKER_SET="./wave-1/PROJ-1-PRD-1-US-1.md ./wave-1/PROJ-1-PRD-1-US-2.backend.md ./wave-1/PROJ-1-PRD-1-US-2.frontend.md ./wave-1/PROJ-1-PRD-1-US-3.md ./wave-2/PROJ-1-PRD-2-US-1.md "
+[ "$(workers)" = "$WORKER_SET" ] || die "unexpected worker file set: $(workers)"
+U1="$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.md"
+sed -i 's/^| PROJ-1-PRD-1-US-1 | backend | backend-implementer/| PROJ-1-PRD-1-US-1 | full-stack | implementer/; s/^\*\*Scope:\*\* backend → backend-implementer$/**Scope:** full-stack → implementer/' "$PLAN1"
+run compile 1 demo --wave 1 >/dev/null
+head -1 "$U1" | grep -qF 'role implementer · wave 1' && sections "$U1" "+$T_DS" "+$T_SEC" || die "role change did not rewrite the story file"
+sed -i 's/^\*\*Scope:\*\* full-stack → implementer$/&\n**Split:** `contract`/' "$PLAN1"
+run compile 1 demo --wave 1 >/dev/null
+[ -e "$U1" ] && die "a newly split story kept its unsplit file"
+head -1 "$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.frontend.md" | grep -qF 'role frontend-implementer' && [ -e "$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.backend.md" ] || die "new split gave no side files"
+cp "$CASE/plan1.bak" "$PLAN1"
+run compile 1 demo --wave 1 >/dev/null
+[ "$(workers)" = "$WORKER_SET" ] \
+  || die "restoring the plan left stale or missing files: $(workers)"
+sections "$U1" "-$T_DS" "+$T_SEC"
+awk 'BEGIN { for (i = 0; i < 3000; i++) print "A long implementation note in the slice, counted as story tokens, never as role budget." }' >>"$PLAN1"
+run compile 1 demo --wave 1 >"$CASE/big.out" && grep -qE 'PROJ-1-PRD-1-US-3 \(implementer, story [0-9]{4,} tokens\)' "$CASE/big.out" || die "a large story must compile and report its tokens (no story budget)"
+restore_plans
+
 # one story ID in two wave plans: compile (even --wave N), check and show exit 2 before any change
 run compile 1 demo >/dev/null
 snap >"$CASE/dup.snap"
@@ -323,7 +411,7 @@ rm -rf specs/PROJ-1-demo/context
 run check 1 demo >"$CASE/check.out" || die "check failed on a fitting PROJ"
 grep -q '^wave 2:' "$CASE/check.out" || die "check must cover every wave"
 [ -e specs/PROJ-1-demo/context ] && die "check must not write"
-if node "$COMPILE" check 1 demo --roles-dir "$CASE/tight" >/dev/null 2>&1; then die "check accepted a budget breach"; fi
+[ "$(rc node "$COMPILE" check 1 demo --roles-dir "$CASE/tight")" -eq 1 ] && grep -qE 'reviewer [0-9]+/50 tokens' "$CASE/err" || die "check must exit 1 on a budget breach naming the role"
 
 # The header must cover real story sections before it can filter decisions.
 PLAN="$P/3-4_plan/PROJ-1-wave-1-plan.md"
@@ -379,9 +467,17 @@ sed -i '/^\*\*Summary:\*\*/d' "$P/3-4_plan/PROJ-1-architecture.md"
 echo "LEGACY_DELTA_TEXT" >"$P/architecture-delta.md"
 run compile 1 demo --wave all >/dev/null
 grep -qF 'LEGACY_DELTA_TEXT' "$B" || die "legacy delta fallback broken"
+grep -qF 'LEGACY_DELTA_TEXT' "$B2" && grep -qxF "## Architecture delta of this PROJ (specs/PROJ-1-demo/architecture-delta.md — legacy PROJ)" "$B" \
+  || die "legacy delta must reach every wave unfiltered under its own title"
+grep -qF 'Implementer view of' "$B" && die "legacy delta must not be reduced to the implementer view"
+grep -qF 'LEGACY_DELTA_TEXT' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.md" || die "legacy delta missing from the story file"
 rm "$P/architecture-delta.md"
 run compile 1 demo >/dev/null
 grep -qF 'FULL_RATIONALE_ONE' "$B" || die "legacy full-document fallback broken"
+grep -q '^## PROJ architecture (.*legacy format without Summary lines, injected whole)$' "$B" || die "legacy full document must carry its own title"
+grep -qF 'Implementer view of' "$B" && die "legacy full document got a filtered view"
+grep -qF 'DIAGRAM_NODE' "$B" && grep -qF 'Decision 2: Export queue' "$B" && grep -qF 'Decision 1: Server-side totals' "$B2" && grep -qF 'UI_ONLY_CONSTRAINT' "$B" \
+  || die "legacy full document must come whole (diagrams, other waves' decisions, UI constraints) in every wave"
 cp "$CASE/arch.bak" "$P/3-4_plan/PROJ-1-architecture.md"
 
 # repo manifests synced before the rename still say architecture-delta

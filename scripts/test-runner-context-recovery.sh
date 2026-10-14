@@ -47,6 +47,34 @@ compile
 [ ! -e "$BASE/context/workers/wave-2" ] || die 'wave-2 directory survived without a plan'
 PROJ=1 THEME=demo STATE_SH=scripts/state.sh
 
+# The prompt the runner renders for a P5/P7 writer lane names the worker files
+# by path and no longer mentions hook, projection, hashes or a lock.
+(
+  PHASE=P5 LANE_DIR="$BASE/5_progress/lanes" RUNNER_DIR="$ROOT/runner"
+  # Loading only this function avoids runner/provider side effects.
+  eval "$(sed -n '/^render_prompt() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
+  render_prompt writer 'Run P5.' prompt
+  [ "$prompt" = "$LANE_DIR/P5-writer-prompt.md" ] || die "render_prompt wrote to an unexpected path: $prompt"
+  for want in "## Worker context files" "\`$BASE/context/\`" 'workers/wave-<N>/<US-ID>.md' 'roles/wave-<N>/<role>.md' \
+              "node scripts/compile-context-bundles.mjs compile $PROJ $THEME --wave <N>" 'Brief: <US-ID>'; do
+    grep -qF -- "$want" "$prompt" || die "writer prompt lacks: $want"
+  done
+  # the pointer matches the real layout compile produced above
+  [ -e "$BASE/context/workers/wave-1/PROJ-1-PRD-1-US-1.md" ] && [ -e "$BASE/context/roles/wave-1/backend-implementer.md" ] \
+    || die "prompt points at a layout compile did not produce"
+  if grep -qiE 'SubagentStart|hook|projection|hash|bundles\.lock|\.context\.bundles|bundle-|\block\b|stale' "$prompt"; then
+    grep -niE 'SubagentStart|hook|projection|hash|bundles\.lock|\.context\.bundles|bundle-|\block\b|stale' "$prompt" >&2
+    die 'writer prompt still talks about hook, projection, hash or lock'
+  fi
+  PHASE=P7 render_prompt writer 'Run P7.' p7
+  grep -qF '## Worker context files' "$p7" || die 'P7 writer prompt lacks the worker context section'
+  render_prompt peer 'Review P5.' peer
+  grep -qF 'Worker context files' "$peer" && die 'a peer lane must not get the worker context section'
+  PHASE=P6 render_prompt writer 'Run P6.' p6
+  grep -qF 'Worker context files' "$p6" && die 'only P5/P7 writer lanes get the worker context section'
+  exit 0
+) || exit 1
+
 # An older run's state.json with .context.bundles stays valid: state.sh (the
 # schema mirror) accepts it, and the schema keeps the field, only deprecated.
 bash scripts/state.sh set 1 demo .context.bundles \
