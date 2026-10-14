@@ -2,12 +2,10 @@
 # spike-stage2.sh — Stage 2 verification spike / release gate (CONCEPT.md §10.2).
 #
 # Proves, on disposable fixtures:
-#   context compiler   — determinism, a budget breach blocks only that role, projection
-#                        hash parity (claude/codex embed the canonical body),
-#                        verify catches drift and tampering
-#   context injector   — tier matrix (micro-fixer/explore nothing, frontend vs
-#                        backend scoping, reviewer minimal), never-inject
-#                        (no PRD/progress.md content in any bundle), stale-hash refusal
+#   context compiler   — worker files: determinism, a budget breach writes nothing,
+#                        tier matrix over the file contents (frontend vs backend
+#                        scoping, reviewer minimal, micro-fixer/explore no file),
+#                        never-inject (no PRD/progress.md content in any file)
 #   curation caps      — pass + per-cap fail fixtures, --require-baseline
 #   ponytail gate      — parity ok / version mismatch / absent (enforce on+off)
 #   cross-review       — symmetric deterministic routing via PATH-shimmed CLIs
@@ -58,10 +56,30 @@ printf '# PRD\nNEVER-INJECT-MARKER-PRD full requirement text.\n' > specs/PROJ-96
 printf '# Progress\nNEVER-INJECT-MARKER-PROGRESS wave log.\n' > specs/PROJ-96-stage2/5_progress/PROJ-96-progress.md
 printf '## Wave 1 — queue API\nPOST /enqueue\n' > specs/PROJ-96-stage2/api-contracts.md
 printf '# Ground file\nAssumption: node 22.\n' > specs/PROJ-96-stage2/ground-file.md
+mkdir -p specs/PROJ-96-stage2/3-4_plan
+cat > specs/PROJ-96-stage2/3-4_plan/PROJ-96-wave-1-plan.md <<'EOF'
+# Wave 1
+
+**PRDs involved:** PROJ-96-PRD-1
+
+## User Stories in this Wave
+
+| US ID | Scope | Agent Type | Complexity | Can start when |
+|---|---|---|---|---|
+| PROJ-96-PRD-1-US-1 | frontend | frontend-implementer | sonnet | immediately |
+| PROJ-96-PRD-1-US-2 | backend | backend-implementer | sonnet | immediately |
+
+## PROJ-96-PRD-1-US-1: Queue view
+**Scope:** frontend → frontend-implementer
+
+## PROJ-96-PRD-1-US-2: Queue API
+**Scope:** backend → backend-implementer
+EOF
 mkdir -p specs/intake
 printf '# Bootstrap decisions\n\n- D-BOOTSTRAP-01 · Point: error convention · Decision: adopt\n' > specs/intake/decisions.md
 
 for s in 5_executing/scripts/state.sh 5_executing/scripts/compile-context-bundles.mjs \
+         5_executing/scripts/story-slice.mjs 5_executing/scripts/validate-wave-plan.mjs \
          5_executing/scripts/context-injector.mjs 5_executing/scripts/ponytail-check.sh \
          6_qa/scripts/ledger.mjs 7_documentation/scripts/curation-caps.sh \
          0b_intake/scripts/intake-seal-check.sh \
@@ -80,76 +98,38 @@ bash scripts/state.sh init 96 stage2 >/dev/null
 bash scripts/state.sh set 96 stage2 .base_sha "\"$BASE_SHA\"" >/dev/null
 
 # =============================================================================
-step "context compiler"
+step "context compiler (worker files, tier matrix + never-inject)"
 # =============================================================================
-node scripts/compile-context-bundles.mjs compile 96 stage2 --wave all >/dev/null 2>&1 \
-  && ok "compile succeeds on the baseline fixture" || bad "compile failed"
 CTX=specs/PROJ-96-stage2/context
-S1="$(cat "$CTX"/bundle-*.md | sha1sum)"
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
-S2="$(cat "$CTX"/bundle-*.md | sha1sum)"
-[ "$S1" = "$S2" ] && ok "deterministic: two compiles are byte-identical" || bad "compiles differ"
+ctxsum() { find "$CTX" .claude -type f | sort | xargs cat | sha1sum; }
+node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1 \
+  && ok "compile succeeds on the baseline fixture" || bad "compile failed"
+S1="$(ctxsum)"
+node scripts/compile-context-bundles.mjs compile 96 stage2 --wave 1 >/dev/null 2>&1
+[ "$S1" = "$(ctxsum)" ] && ok "deterministic: two compiles are byte-identical" || bad "compiles differ"
 
-# A budget breach blocks only the breaching role: no bundle is written for it and
-# blocked-roles.json records the denial (a budget of 40 tokens blocks every role).
-CONTEXT_BUNDLE_BUDGET=40 node scripts/compile-context-bundles.mjs compile 96 stage2 --wave all >/dev/null 2>&1
+# A budget breach aborts before anything is written (a budget of 40 tokens).
+sed -i 's/^budget_tokens: .*/budget_tokens: 40/' templates/roles/reviewer.md
+node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
 RC=$?
-NBLOCKED="$(jq length "$CTX/blocked-roles.json" 2>/dev/null || echo 0)"
-NBUNDLES="$(find "$CTX" -name 'bundle-*.md' | wc -l | tr -d ' ')"
-[ "$RC" -eq 0 ] && [ "$NBLOCKED" -gt 0 ] && [ "$NBUNDLES" -eq 0 ] \
-  && ok "budget breach: role blocked in blocked-roles.json, no bundle written for it" \
-  || bad "budget breach rc=$RC blocked=$NBLOCKED bundles=$NBUNDLES"
-node scripts/compile-context-bundles.mjs compile 96 stage2 --wave all >/dev/null 2>&1   # restore for the checks below
+git checkout -q templates/roles/reviewer.md
+[ "$RC" -eq 1 ] && [ "$S1" = "$(ctxsum)" ] \
+  && ok "budget breach: exit 1, existing files unchanged" || bad "budget breach rc=$RC or files changed"
 
-PARITY_OK=1
-for r in implementer frontend-implementer backend-implementer reviewer; do
-  canon="$(sha256sum "$CTX/bundle-$r.md" | cut -d' ' -f1)"
-  for p in claude codex; do
-    emb="$(tail -n +2 "$CTX/bundle-$r.$p.md" | sha256sum | cut -d' ' -f1)"
-    [ "$emb" = "$canon" ] || PARITY_OK=0
-  done
-done
-[ "$PARITY_OK" -eq 1 ] && ok "projection parity: claude+codex embed the canonical body verbatim (same hash)" || bad "projection embeds a different body"
-
-node scripts/compile-context-bundles.mjs verify 96 stage2 >/dev/null 2>&1 && ok "verify passes on fresh compile" || bad "verify failed on fresh compile"
-echo "drift" >> docs/GUIDELINES.md
-node scripts/compile-context-bundles.mjs verify 96 stage2 >/dev/null 2>&1 && bad "verify missed semantic drift" || ok "verify catches semantic drift (doc changed after compile)"
-git checkout -q docs/GUIDELINES.md
-echo "tamper" >> "$CTX/bundle-reviewer.md"
-node scripts/compile-context-bundles.mjs verify 96 stage2 >/dev/null 2>&1 && bad "verify missed tampering" || ok "verify catches on-disk tampering"
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
-
-# =============================================================================
-step "context injector (tier matrix + never-inject)"
-# =============================================================================
-inject() { printf '{"hook_event_name":"SubagentStart","agent_type":"%s"}' "$1" | node scripts/context-injector.mjs claude 2>/dev/null; }
-T0_OK=1
-[ -z "$(inject skillchain-micro-fixer)" ] || T0_OK=0
-[ -z "$(inject Explore)" ] || T0_OK=0
-[ -z "$(inject totally-unknown-agent)" ] || T0_OK=0
-[ "$T0_OK" -eq 1 ] && ok "tier 0/explore/unknown spawns get NOTHING" || bad "tier-0 class received context"
-FE="$(inject frontend-implementer | jq -r '.hookSpecificOutput.additionalContext')"
-BE="$(inject backend-implementer  | jq -r '.hookSpecificOutput.additionalContext')"
-RV="$(inject skillchain-reviewer-security | jq -r '.hookSpecificOutput.additionalContext')"
+FE="$(cat "$CTX/workers/wave-1/PROJ-96-PRD-1-US-1.md" 2>/dev/null)"
+BE="$(cat "$CTX/workers/wave-1/PROJ-96-PRD-1-US-2.md" 2>/dev/null)"
+RV="$(cat "$CTX/roles/wave-1/reviewer.md" 2>/dev/null)"
+[ -z "$(find "$CTX" -name 'micro-fixer*' -o -name 'explore*')" ] && ! grep -q 'Spawn-Prompt' .claude/agents/skillchain-micro-fixer.md \
+  && ok "tier 0/explore get NO file (micro-fixer agent file without path pointer)" || bad "tier-0 class received a file"
 { grep -q "Design system" <<<"$FE" && ! grep -q "Security baseline" <<<"$FE" \
   && grep -q "Security baseline" <<<"$BE" && ! grep -q "Design system" <<<"$BE"; } \
   && ok "tier 1 type-scoping: frontend gets design-system (no security), backend the inverse" \
   || bad "tier-1 scoping wrong"
 { grep -q "Product" <<<"$RV" && grep -q "Review criteria" <<<"$RV" && ! grep -q "Guidelines (docs" <<<"$RV"; } \
-  && ok "tier 2 reviewer bundle is minimal (product + criteria + diff scope)" || bad "reviewer bundle wrong"
-grep -rq "NEVER-INJECT-MARKER" "$CTX"/bundle-*.md && bad "never-inject violated: PRD/progress content in a bundle" \
-  || ok "never-inject holds: no PRD/progress.md content in any bundle"
-echo "tamper" >> "$CTX/bundle-implementer.md"
-[ -z "$(inject implementer)" ] && ok "stale bundle (hash mismatch) injects NOTHING" || bad "stale bundle was injected"
-node scripts/compile-context-bundles.mjs compile 96 stage2 >/dev/null 2>&1
-# SKILLCHAIN_PROJ/THEME pin the injector to the run's PROJ (the runner exports
-# them) — a newer decoy PROJ must not hijack injection
-mkdir -p specs/PROJ-97-decoy/context
-echo '{}' > specs/PROJ-97-decoy/context/bundles.lock.json
-echo '{"phase":"P5"}' > specs/PROJ-97-decoy/state.json
-PIN="$(printf '{"hook_event_name":"SubagentStart","agent_type":"implementer"}' | SKILLCHAIN_PROJ=96 SKILLCHAIN_THEME=stage2 node scripts/context-injector.mjs claude 2>/dev/null)"
-[ -n "$PIN" ] && ok "SKILLCHAIN_PROJ/THEME pin the injector to the run's PROJ (decoy ignored)" || bad "project pinning failed — injector guessed wrong PROJ"
-rm -rf specs/PROJ-97-decoy
+  && ok "tier 2 reviewer file is minimal (product + criteria + diff scope)" || bad "reviewer file wrong"
+grep -rq "NEVER-INJECT-MARKER" "$CTX" && bad "never-inject violated: PRD/progress content in a worker file" \
+  || ok "never-inject holds: no PRD/progress.md content in any worker file"
+# replaced in step 3 (stub): injector tier matrix, stale-hash refusal, PROJ pinning
 
 # =============================================================================
 step "curation caps + intake seal"

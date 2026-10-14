@@ -190,6 +190,47 @@ assert.deepEqual([plain[0].scope, plain[0].agent, plain[0].split], [null, null, 
 assert.deepEqual(parseStories(read("stories-duplicate.md")).map((story) => [story.id, story.line]), [["PROJ-1-PRD-1-US-1", 10], ["PROJ-1-PRD-1-US-1", 11]]);
 ' "file://$VALIDATOR" "$FIXTURES"
 
+# --stories: role per story from the Agent Type column, fail-closed (exit 2 naming story and plan)
+stories_fail() { # fixture expected-message
+  if node "$VALIDATOR" --stories "$FIXTURES/$1" >"$CASE/output" 2>&1; then echo "--stories accepted $1" >&2; exit 1; fi
+  node "$VALIDATOR" --stories "$FIXTURES/$1" >/dev/null 2>&1 || [ $? -eq 2 ] || { echo "--stories $1: exit must be 2" >&2; exit 1; }
+  grep -F "$1: PROJ-1-PRD-1-US-" "$CASE/output" | grep -F "$2" >/dev/null || { echo "--stories $1: expected '$2' with story and plan" >&2; cat "$CASE/output" >&2; exit 1; }
+}
+stories_fail stories-duplicate-row.md "duplicate row in the story table"
+stories_fail stories-row-without-section.md "has no story section"
+stories_fail stories-section-without-row.md "story section has no row"
+stories_fail stories-unsupported-agent.md "unsupported Agent Type"
+stories_fail stories-scope-conflict.md "table Scope 'frontend' contradicts"
+stories_fail stories-agent-conflict.md "contradicts the section's **Scope:** agent"
+stories_fail stories-split-conflict.md "Split: contract contradicts"
+stories_fail stories-split-invalid.md "unsupported **Split:**"
+stories_fail stories-duplicate.md "duplicate story section"
+printf '# PROJ-1 Wave 1\n\nNo stories.\n' >"$CASE/empty.md"
+if node "$VALIDATOR" --stories "$CASE/empty.md" >/dev/null 2>&1 || [ $? -ne 2 ]; then echo "--stories accepted a plan without table and stories" >&2; exit 1; fi
+node "$VALIDATOR" --stories "$FIXTURES/stories-aliases.md" | jq -e '
+  map([.id, .role, .split, (.fallback // false)]) == [
+    ["PROJ-1-PRD-1-US-1", "backend-implementer", "none", false],
+    ["PROJ-1-PRD-1-US-2", "implementer", "contract", false],
+    ["PROJ-1-PRD-1-US-3", "implementer", "none", false],
+    ["PROJ-1-PRD-1-US-4", "implementer", "none", false]]
+  and .[1].agentType == "full-stack-implementer" and .[0].scope == "backend (test-only)"' >/dev/null \
+  || { echo "--stories alias normalization wrong" >&2; exit 1; }
+node "$VALIDATOR" --stories "$FIXTURES/stories-legacy.md" | jq -e '
+  map([.id, .role, .split, .fallback]) == [["PROJ-1-PRD-1-US-1", "implementer", "none", true], ["PROJ-1-PRD-1-US-2", "implementer", "contract", true]]' >/dev/null \
+  || { echo "--stories legacy fallback wrong" >&2; exit 1; }
+stories_fail stories-ascii-arrow.md "contradicts the section's **Scope:** agent 'frontend-implementer'"
+node --input-type=module -e '
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const { parseStories } = await import(process.argv[1]);
+const [story] = parseStories(readFileSync(process.argv[2], "utf8"));
+assert.deepEqual([story.scope, story.agent], ["full-stack", "frontend-implementer"]); // ASCII arrow splits like →
+' "file://$VALIDATOR" "$FIXTURES/stories-ascii-arrow.md"
+node "$VALIDATOR" --stories "$FIXTURES/stories-agent-trailing.md" | jq -e 'map(.role) == ["implementer", "frontend-implementer", "backend-implementer"]' >/dev/null \
+  || { echo "--stories: prose after the section agent (or no role token) must not be compared" >&2; exit 1; }
+node "$VALIDATOR" --stories "$FIXTURES/stories-valid.md" | jq -e 'map(.role) == ["backend-implementer", "implementer"] and .[1].split == "fan-out"' >/dev/null \
+  || { echo "--stories valid fixture wrong" >&2; exit 1; }
+
 for copy in \
   "$ROOT/claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \

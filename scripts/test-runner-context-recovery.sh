@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Execute the rendered recovery instructions; no provider calls required.
+# Worker context without lock or recovery: the wave comes from the plan file
+# name, each wave compiles on its own, a rerun is idempotent and never touches
+# state.json. P6: the runner stores the finder report. No provider calls.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL="$ROOT/codex/skills/5_executing"
@@ -9,7 +11,7 @@ die() { echo "runner-context-recovery: $*" >&2; exit 1; }
 cd "$CASE"
 BASE="specs/PROJ-1-demo"
 mkdir -p "$BASE/3-4_plan" "$BASE/5_progress/lanes" scripts templates/roles
-cp "$SKILL/scripts/compile-context-bundles.mjs" "$SKILL/scripts/state.sh" scripts/
+cp "$SKILL/scripts/compile-context-bundles.mjs" "$SKILL/scripts/story-slice.mjs" "$SKILL/scripts/validate-wave-plan.mjs" "$SKILL/scripts/state.sh" scripts/
 cp "$SKILL/manifests/roles/backend-implementer.md" templates/roles/
 bash scripts/state.sh init 1 demo >/dev/null
 node --input-type=module <<'JS'
@@ -17,53 +19,33 @@ import { writeFileSync } from 'node:fs';
 const p = 'specs/PROJ-1-demo/3-4_plan/';
 writeFileSync(p + 'PROJ-1-architecture.md', '# Architecture\n\n## Cross-Cutting Tech Decisions\n' +
   [1, 2].map(n => `### Decision ${n}: Wave ${n} rule\n**Affects:** PRD-${n}\n**Summary:** ${'Required rule. '.repeat(1200)}\n`).join('\n'));
-for (const n of [1, 2]) writeFileSync(p + `PROJ-1-wave-${n}-plan.md`, `# Wave ${n}\n\n**PRDs involved:** PROJ-1-PRD-${n}\n`);
+for (const n of [1, 2]) writeFileSync(p + `PROJ-1-wave-${n}-plan.md`, `# Wave ${n}\n\n**PRDs involved:** PROJ-1-PRD-${n}\n\n` +
+  `## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n` +
+  `| PROJ-1-PRD-${n}-US-1 | backend | backend-implementer | sonnet | immediately |\n\n## PROJ-1-PRD-${n}-US-1: Story ${n}\n`);
 JS
 compile() { node scripts/compile-context-bundles.mjs compile 1 demo "$@" >/dev/null; }
-# Both waves fit alone, but a merged compile blocks the role.
-compile --wave all >"$CASE/unscoped.out" 2>&1
-jq -e 'length == 1' "$BASE/context/blocked-roles.json" >/dev/null || die 'fixture must breach the unscoped budget'
-compile --wave 1
-jq -e '."backend-implementer".wave == 1' "$BASE/context/bundles.lock.json" >/dev/null || die 'wave 1 must fit'
-PHASE=P5 PROJ=1 THEME=demo STATE_SH=scripts/state.sh
-LANE_DIR="$BASE/5_progress/lanes" RUNNER_DIR="$ROOT/runner"
-# Loading only this function avoids runner/provider side effects.
-eval "$(sed -n '/^render_prompt() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
-render_prompt writer 'Run P5.' prompt
-
-recover() {
-  awk '/^```bash$/ { block=1; next } /^```$/ { block=0 } block' "$prompt" >"$CASE/recover.sh"
-  [ -s "$CASE/recover.sh" ] || die 'rendered recovery command missing'
-  bash "$CASE/recover.sh"
-}
-
-# P5 advances after prompt creation; recovery must use the latest wave scope.
-compile --wave 2
-jq -e '."backend-implementer".wave == 2' "$BASE/context/bundles.lock.json" >/dev/null || die 'wave 2 must fit'
-rm "$BASE/context/bundle-backend-implementer.codex.md"
-recover >"$CASE/recovery.out" 2>&1 || { cat "$CASE/recovery.out" >&2; die 'wave-scoped recovery failed'; }
-jq -e '."backend-implementer".wave == 2' "$BASE/context/bundles.lock.json" >/dev/null || die 'recovery lost the current wave'
-grep -q 'Decision 2:' "$BASE/context/bundle-backend-implementer.md" || die 'current wave decision missing'
-grep -q 'Decision 1:' "$BASE/context/bundle-backend-implementer.md" && die 'unrelated decision leaked'
-jq -e --slurpfile lock "$BASE/context/bundles.lock.json" '.context.bundles == $lock[0]' "$BASE/state.json" >/dev/null || die 'regenerated lock not recorded through state.sh'
-
-# Intentional unscoped legacy locks remain compatible when their context fits.
-sed -i 's/^\*\*Summary:\*\*.*/**Summary:** A short rule./' "$BASE/3-4_plan/PROJ-1-architecture.md"
-compile --wave all
-recover >/dev/null
-jq -e '."backend-implementer".wave == null' "$BASE/context/bundles.lock.json" >/dev/null || die 'legacy scope changed'
-
-# Unknown scope must stop before mutating the context or recorded state.
-cp "$BASE/context/bundles.lock.json" "$CASE/lock.bak"
-rm "$BASE/context/bundles.lock.json"
-render_prompt writer 'Run P5 without a lock.' prompt
-if recover >"$CASE/missing.out" 2>&1; then die 'missing lock guessed a wave'; fi
-[ ! -e "$BASE/context/bundles.lock.json" ] || die 'missing lock recovery wrote context'
-cp "$CASE/lock.bak" "$BASE/context/bundles.lock.json"
-jq '. + {"other-role": {wave: 2}}' "$BASE/context/bundles.lock.json" >"$CASE/mixed.json"
-cp "$CASE/mixed.json" "$BASE/context/bundles.lock.json"
-if recover >"$CASE/mixed.out" 2>&1; then die 'mixed lock scope accepted'; fi
-cmp "$CASE/mixed.json" "$BASE/context/bundles.lock.json" || die 'mixed scope recovery wrote context'
+snap() { find "$BASE/context" -type f | sort | xargs sha256sum; }
+cp "$BASE/state.json" "$CASE/state.before"
+# Both waves fit alone; a merged view would breach the budget, so this only
+# passes while every wave compiles on its own.
+compile || die 'per-wave compile failed (merged view?)'
+W1="$BASE/context/workers/wave-1/PROJ-1-PRD-1-US-1.md"
+W2="$BASE/context/workers/wave-2/PROJ-1-PRD-2-US-1.md"
+grep -q 'Decision 1:' "$W1" && ! grep -q 'Decision 2:' "$W1" || die 'wave 1 must hold only its decision'
+grep -q 'Decision 2:' "$W2" && ! grep -q 'Decision 1:' "$W2" || die 'wave 2 must hold only its decision'
+head -1 "$W2" | grep -qF '· wave 2' || die 'wave not taken from the plan file name'
+[ ! -e "$BASE/context/bundles.lock.json" ] || die 'compile wrote a lock'
+cmp "$CASE/state.before" "$BASE/state.json" || die 'compile touched state.json'
+# Rerun is idempotent (the recovery is: run compile again).
+snap >"$CASE/first.snap"
+compile
+snap | cmp - "$CASE/first.snap" || die 'rerun changed the context'
+# The plan file name is the wave: renaming wave 2 to wave 3 moves its files.
+mv "$BASE/3-4_plan/PROJ-1-wave-2-plan.md" "$BASE/3-4_plan/PROJ-1-wave-3-plan.md"
+compile
+[ -e "$BASE/context/workers/wave-3/PROJ-1-PRD-2-US-1.md" ] || die 'wave-3 file missing after rename'
+[ ! -e "$BASE/context/workers/wave-2" ] || die 'wave-2 directory survived without a plan'
+PROJ=1 THEME=demo STATE_SH=scripts/state.sh
 
 # P6: the finder's text output is stored by the runner and recorded in state.
 eval "$(sed -n '/^store_finder_report() {/,/^}/p' "$ROOT/runner/run-phase.sh")"

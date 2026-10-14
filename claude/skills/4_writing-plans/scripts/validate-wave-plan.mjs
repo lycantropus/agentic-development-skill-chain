@@ -82,7 +82,7 @@ export function parseStories(text) {
     if (boundary) closeAc();
     const scope = line.match(/^\*\*Scope:\*\*\s*(.*)$/);
     if (scope && story.scope === null) {
-      const [name, ...agent] = scope[1].split("→");
+      const [name, ...agent] = scope[1].split(/→|->/);
       story.scope = name.trim();
       story.agent = agent.length ? agent.join("→").trim() : null;
     }
@@ -94,7 +94,78 @@ export function parseStories(text) {
   return stories;
 }
 
+const ROLES = ["implementer", "frontend-implementer", "backend-implementer"];
+const ROLE_ALIASES = { "fullstack-implementer": "implementer", "full-stack-implementer": "implementer" };
+const SIMPLE_SCOPES = ["frontend", "backend", "full-stack"];
+const SPLITS = ["none", "contract", "fan-out"];
+const normalizeRole = (value) => {
+  const role = clean(value).replace(/^skillchain-/, "");
+  return ROLE_ALIASES[role] ?? role;
+};
+
+// One record per story of a wave plan: the worker role comes from the table's
+// `Agent Type` column (normalized), checked fail-closed against the story
+// sections. A plan without that column (legacy) maps every story to
+// `implementer` with `fallback: true`. Throws an Error naming story and plan.
+export function resolveStories(text, planFile) {
+  const fail = (id, message) => { throw new Error(`${planFile}: ${id}: ${message}`); };
+  const stories = parseStories(text);
+  const sections = new Map();
+  for (const story of stories) {
+    if (sections.has(story.id)) fail(story.id, `duplicate story section (lines ${sections.get(story.id).line} and ${story.line})`);
+    sections.set(story.id, story);
+  }
+  const splitOf = (story) => {
+    const split = story.split === null ? "none" : clean(story.split).toLowerCase();
+    if (!SPLITS.includes(split)) fail(story.id, `unsupported **Split:** '${story.split}' (expected ${SPLITS.join("|")})`);
+    return split;
+  };
+  const rows = parseStoryTable(text);
+  if (!rows?.some((row) => row.agentType !== undefined)) {
+    if (stories.length === 0) fail("-", "no story table with an Agent Type column and no story section");
+    return stories.map((story) => ({ id: story.id, scope: story.scope, role: "implementer", agentType: null, complexity: null, canStart: null, split: splitOf(story), fallback: true }));
+  }
+  const resolved = new Map();
+  for (const row of rows) {
+    const id = clean(row.id ?? "");
+    if (resolved.has(id)) fail(id, `duplicate row in the story table (line ${row.line})`);
+    const section = sections.get(id);
+    if (!section) fail(id, `story table row (line ${row.line}) has no story section`);
+    const role = normalizeRole(row.agentType ?? "");
+    if (!ROLES.includes(role)) fail(id, `unsupported Agent Type '${row.agentType}' (one of ${ROLES.join(", ")}, optional skillchain- prefix)`);
+    // Only the first token after the arrow is the agent; trailing prose
+    // ("→ implementer. Backend scope shipped in Wave 2.") is not compared.
+    const sectionRole = section.agent === null ? null : normalizeRole(section.agent.split(/[\s.(,;]/)[0]);
+    if (ROLES.includes(sectionRole) && sectionRole !== role)
+      fail(id, `Agent Type '${row.agentType}' contradicts the section's **Scope:** agent '${section.agent}'`);
+    const tableScope = clean(row.scope ?? "").toLowerCase();
+    const sectionScope = (section.scope ?? "").toLowerCase();
+    if (SIMPLE_SCOPES.includes(tableScope) && SIMPLE_SCOPES.includes(sectionScope) && tableScope !== sectionScope)
+      fail(id, `table Scope '${tableScope}' contradicts the section's **Scope:** '${sectionScope}'`);
+    const split = splitOf(section);
+    if (split === "contract" && [tableScope, sectionScope].some((scope) => scope === "frontend" || scope === "backend"))
+      fail(id, `Split: contract contradicts the single-sided Scope '${[tableScope, sectionScope].find((scope) => scope === "frontend" || scope === "backend")}'`);
+    resolved.set(id, { id, scope: clean(row.scope ?? "") || section.scope, role, agentType: clean(row.agentType), complexity: row.complexity ?? null, canStart: row.canStart ?? null, split });
+  }
+  for (const story of stories) if (!resolved.has(story.id)) fail(story.id, "story section has no row in the story table");
+  return stories.map((story) => resolved.get(story.id));
+}
+
+function storiesMain(planFile) {
+  if (!planFile) {
+    console.error("usage: validate-wave-plan.mjs --stories <wave-plan.md>");
+    process.exit(64);
+  }
+  try {
+    console.log(JSON.stringify(resolveStories(fs.readFileSync(planFile, "utf8"), planFile), null, 2));
+  } catch (error) {
+    console.error(`stories: ${error.message}`);
+    process.exit(2);
+  }
+}
+
 function main() {
+  if (process.argv[2] === "--stories") return storiesMain(process.argv[3]);
   const planDir = path.resolve(process.argv[2] ?? "");
   const repoRoot = path.resolve(process.argv[3] ?? path.join(planDir, "../../.."));
   const errors = [];

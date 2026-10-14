@@ -33,6 +33,11 @@ grep -qF 'US-10' "$CASE/out" && { echo "slice leaked into US-10" >&2; exit 1; }
 grep -qF 'Execution' "$CASE/out" && { echo "slice leaked the lead header" >&2; exit 1; }
 node "$SLICE" "$CASE/plan.md" PROJ-1-PRD-1-US-10 | grep -qF 'US-10-AC-1' || { echo "last section must slice to EOF" >&2; exit 1; }
 
+# CRLF plan: fences and headings still match; only the line endings differ
+sed 's/$/\r/' "$CASE/plan.md" >"$CASE/crlf.md"
+node "$SLICE" "$CASE/crlf.md" PROJ-1-PRD-1-US-1 | tr -d '\r' | cmp - "$CASE/out" || { echo "CRLF plan sliced differently" >&2; exit 1; }
+node "$SLICE" "$CASE/crlf.md" PROJ-1-PRD-1-US-1 | head -1 | grep -q $'\r$' || { echo "CRLF slice must keep its bytes" >&2; exit 1; }
+
 # exported slice(): same bytes as the CLI; throws with `count` unless exactly one section matches
 node --input-type=module -e '
 const { slice } = await import(process.argv[1]);

@@ -15,12 +15,13 @@ export function slice(text, heading) {
   const starts = [];
   let fence = null, end = null;
   for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\r$/, "");   // CRLF plans: match without the CR, output stays byte-exact
     // CommonMark: a fence closes only on the same char, at least as long, bare.
-    const [, marker, info] = lines[i].match(/^ {0,3}(`{3,}|~{3,})(.*)$/) ?? [];
+    const [, marker, info] = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/) ?? [];
     if (marker && !fence) fence = marker;
     else if (marker && marker[0] === fence[0] && marker.length >= fence.length && !info.trim()) { fence = null; continue; }
-    if (fence || !lines[i].startsWith("## ")) continue;
-    if (own.test(lines[i])) starts.push(i);
+    if (fence || !line.startsWith("## ")) continue;
+    if (own.test(line)) starts.push(i);
     else if (starts.length === 1 && end === null) end = i;
   }
   if (starts.length !== 1) {

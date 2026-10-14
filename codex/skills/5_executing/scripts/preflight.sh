@@ -340,7 +340,7 @@ fi
 # --- context bundles: verify when compiled (§5 budget gate is HARD) -------
 if [ -f "$BASE/context/bundles.lock.json" ]; then
   if COMPILER="$(resolve_helper compile-context-bundles.mjs)" \
-     && node "$COMPILER" verify "$PROJ" "$THEME" >/dev/null 2>&1; then
+     && node "$COMPILER" check "$PROJ" "$THEME" >/dev/null 2>&1; then
     say "✓ context bundles verify (hashes match, budgets hold)"
   else
     say "❌ context bundles verify FAILED (budget breach, drift, or compiler missing — hard) — condense docs/, recompile (setup subskill step 6a)"
