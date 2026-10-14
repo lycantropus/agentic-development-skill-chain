@@ -70,6 +70,9 @@ sonar="$TMP/sonar"
 mkdir -p "$sonar/specs/PROJ-1-sonar/3-4_plan"
 printf '{"scripts":{"sonar":"set -a; . ./.env.local; set +a; pnpm dlx @sonar/scan@5.0.0"}}\n' >"$sonar/package.json"
 printf '{"sonar_cmd":"pnpm sonar"}\n' >"$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json"
+# A plan folder makes preflight run the hard worker-context check, so it needs a wave plan.
+printf '# Wave 1\n\n**PRDs involved:** PROJ-1-PRD-1\n\n## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n| PROJ-1-PRD-1-US-1 | backend | backend-implementer | sonnet | immediately |\n\n## PROJ-1-PRD-1-US-1: Story\n' \
+  >"$sonar/specs/PROJ-1-sonar/3-4_plan/PROJ-1-wave-1-plan.md"
 printf 'SONAR_TOKEN=test-token\n' >"$sonar/.env.local"
 sonar_output="$(cd "$sonar" && \
   PATH="$FAKE_BIN:/usr/bin:/bin" \
@@ -81,6 +84,27 @@ sonar_output="$(cd "$sonar" && \
   bash "$PREFLIGHT" 1 sonar)"
 grep -q 'npm-wrapped scanner engine' <<<"$sonar_output" \
   || fail "npm-wrapped sonar_cmd was not accepted without standalone sonar-scanner"
+grep -q '✓ worker context check' <<<"$sonar_output" \
+  || fail "preflight did not run the worker context check on a plan folder"
+
+# The retired context-injector hook: never installed, and an existing one is
+# removed with the Ponytail matcher; foreign hooks and env stay; idempotent.
+fresh="$TMP/hook-fresh"
+mkdir -p "$fresh"
+run_preflight "$fresh"
+[ ! -e "$fresh/.claude/settings.json" ] || fail "preflight created .claude/settings.json (no hook is installed any more)"
+legacy="$TMP/hook-legacy"
+mkdir -p "$legacy/.claude"
+cp "$ROOT/scripts/fixtures/injector-hook/settings.json" "$legacy/.claude/settings.json"   # shared with test-compile-context-bundles.sh
+run_preflight "$legacy"
+[ "$(jq -c . "$legacy/.claude/settings.json")" = "$(jq -c . "$ROOT/scripts/fixtures/injector-hook/expected.json")" ] \
+  || fail "preflight must remove only the injector hooks and the Ponytail matcher (same result as compile): $(jq -c . "$legacy/.claude/settings.json")"
+cp "$legacy/.claude/settings.json" "$TMP/settings.once"
+run_preflight "$legacy"
+cmp -s "$TMP/settings.once" "$legacy/.claude/settings.json" || fail "second preflight changed .claude/settings.json"
+printf '{"hooks":{"SubagentStart":[{"hooks":[{"type":"command","command":"node scripts/context-injector.mjs claude"}]}]},"env":{"PONYTAIL_SUBAGENT_MATCHER":"x"}}\n' >"$legacy/.claude/settings.json"
+run_preflight "$legacy"
+[ "$(jq -c . "$legacy/.claude/settings.json")" = '{}' ] || fail "an injector-only settings file must lose hooks and env"
 
 cmp -s "$PREFLIGHT" "$ROOT/claude/skills/5_executing/scripts/preflight.sh" \
   || fail "preflight provider copies are not byte-identical"

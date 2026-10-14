@@ -47,6 +47,15 @@ compile
 [ ! -e "$BASE/context/workers/wave-2" ] || die 'wave-2 directory survived without a plan'
 PROJ=1 THEME=demo STATE_SH=scripts/state.sh
 
+# An older run's state.json with .context.bundles stays valid: state.sh (the
+# schema mirror) accepts it, and the schema keeps the field, only deprecated.
+bash scripts/state.sh set 1 demo .context.bundles \
+  '{"implementer":{"hash":"a1","claude_hash":"b2","codex_hash":"c3","tokens":900,"wave":1,"compiled_at":"2026-01-01T00:00:00Z"}}' >/dev/null \
+  || die 'state.sh rejected an old .context.bundles record'
+jq -e '.properties.context | (has("additionalProperties") | not) and .properties.bundles.deprecated == true
+  and .properties.bundles.additionalProperties.required == ["hash"]' "$ROOT/runner/schemas/state.schema.json" >/dev/null \
+  || die 'state.schema.json must keep .context.bundles (deprecated) and an open .context'
+
 # P6: the finder's text output is stored by the runner and recorded in state.
 eval "$(sed -n '/^store_finder_report() {/,/^}/p' "$ROOT/runner/run-phase.sh")"
 printf '%s\n' '{"source":"qa","severity":"low","summary":"x"}' '## QA Results' 'AC-1 PASS' >"$CASE/finder.out"

@@ -140,11 +140,12 @@
     },
     "context": {
       "type": "object",
-      "description": "Context system state (Stage 2): compiled bundle hashes + ponytail parity result. Written during P0 (5_executing setup subskill / preflight.sh).",
+      "description": "Context system state (Stage 2): ponytail parity result (plus the deprecated bundle hashes of older runs). Written during P0 (preflight.sh).",
       "properties": {
         "bundles": {
           "type": "object",
-          "description": "role -> compiled bundle record (from bundles.lock.json; the canonical hash is what both providers must receive)",
+          "deprecated": true,
+          "description": "DEPRECATED, no longer written: role -> bundle record from the retired bundles.lock.json. Worker context is one compiled file per worker without lock or hashes; kept so state.json files of older runs stay valid.",
           "additionalProperties": {
             "type": "object",
             "required": ["hash"],
