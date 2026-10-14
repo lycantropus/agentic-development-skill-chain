@@ -187,11 +187,13 @@ function act(config, fingerprint) {
   if (action === 'sonar-issues') {
     const sonar = valid('sonar', config, fingerprint);
     if (!kind || !path.posix.normalize(kind).startsWith(`${progress}/`)) throw new Error(`usage: sonar-issues ${progress}/<file> (the saved output of: sonar list issues … --page-size 500)`);
+    if (!fs.realpathSync(kind).startsWith(fs.realpathSync(progress) + path.sep)) throw new Error(`usage: sonar-issues ${progress}/<file> (a symlink out of ${progress}/ is not accepted)`);
     // The list must be fetched after this scan finished: an older saved file is not evidence for it.
     if (fs.statSync(kind).mtimeMs < fs.statSync(evidencePath('sonar')).mtimeMs) throw new Error('sonar issues file is older than the current scan; fetch the list again');
     const data = JSON.parse(fs.readFileSync(kind, 'utf8'));
     if (!Array.isArray(data.issues) || !Number.isInteger(data.paging?.total)) throw new Error('not the output of sonar list issues');
     if (data.issues.length !== data.paging.total) throw new Error(`sonar issues incomplete (${data.issues.length} of ${data.paging.total}); fetch every page`);
+    if (new Set(data.issues.map(issue => issue.key)).size !== data.issues.length) throw new Error('sonar issues contain duplicates (a page pasted twice?); fetch every page once');
     const baseSha = mutationBase(), changed = new Set(git('diff', '-z', '--name-only', `${baseSha}..HEAD`).split('\0').filter(Boolean));
     const open = data.issues.filter(issue => SONAR_OPEN.includes(issue.status) && SONAR_BLOCKING.includes(issue.severity))
       .map(issue => ({ key: issue.key, severity: issue.severity, file: String(issue.component).replace(/^[^:]*:/, ''), line: issue.line ?? null, rule: issue.rule }))

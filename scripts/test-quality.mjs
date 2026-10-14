@@ -163,6 +163,11 @@ try {
     assert.match(bad('sonar-issues', issuesFile([], () => ({ error: 'x' }))), /not the output of sonar list issues/);
     assert.match(bad('sonar-issues', 'issues-outside.json'), /usage: sonar-issues/);
     assert.match(bad('sonar-issues', `${progress}/../issues-outside.json`), /usage: sonar-issues/);
+    assert.match(bad('sonar-issues', issuesFile([], data => { data.issues.push(data.issues[0]); data.paging.total += 1; return data; })), /duplicates/);
+    // A symlink under 5_progress must not smuggle in a file (or a directory) from outside.
+    fs.symlinkSync(path.join(cwd, 'issues-outside.json'), path.join(cwd, progress, 'link.json'));
+    assert.match(bad('sonar-issues', `${progress}/link.json`), /symlink/);
+    fs.symlinkSync(cwd, path.join(cwd, progress, 'linkdir')); assert.match(bad('sonar-issues', `${progress}/linkdir/issues-outside.json`), /symlink/);
     assert.ok(!fs.existsSync(issuesPath), 'a rejected file leaves no record');
     ok('sonar-issues', issuesFile()); ok('check'); assert.equal(seal().status, 0, seal().stderr); // none of the real issues is in a changed file
     // A list saved before the current scan is not evidence for it, even though the file itself is unchanged.
