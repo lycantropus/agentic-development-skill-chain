@@ -162,6 +162,34 @@ jq '.phase_commands=[{"label":"assembled regression","phase":"quality","command"
 mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
 run_validator | grep -F "1 wave(s), 1 AC(s)" >/dev/null
 
+# exported parsers: pure functions on plan text
+node --input-type=module -e '
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const { parseStoryTable, parseStories } = await import(process.argv[1]);
+const read = (name) => readFileSync(`${process.argv[2]}/${name}`, "utf8");
+
+const rows = parseStoryTable(read("stories-valid.md"));
+assert.deepEqual(rows, [
+  { id: "`PROJ-1-PRD-1-US-1`", scope: "backend", agentType: "backend-implementer", complexity: "sonnet", canStart: "immediately", line: 7 },
+  { id: "PROJ-1-PRD-1-US-2", scope: "full-stack", agentType: "`fullstack-implementer`", complexity: "opus (migration)", canStart: "US-1 merged", line: 8 },
+]); // raw cells, fenced row ignored
+assert.equal(parseStoryTable(read("plan-valid.md")), null);
+const legacy = parseStoryTable(read("stories-duplicate.md"));
+assert.deepEqual(legacy.map((row) => [row.id, row.agentType, row.line]), [["PROJ-1-PRD-1-US-1", undefined, 7], ["PROJ-1-PRD-1-US-1", undefined, 8]]);
+
+const [one, two] = parseStories(read("stories-valid.md"));
+assert.deepEqual([one.id, one.heading, one.line, one.scope, one.agent, one.split], ["PROJ-1-PRD-1-US-1", "PROJ-1-PRD-1-US-1: One", 14, "backend", "backend-implementer", "none"]);
+assert.deepEqual(one.acs, [
+  { id: "PROJ-1-PRD-1-US-1-AC-1", text: "single line", line: 19 },
+  { id: "PROJ-1-PRD-1-US-1-AC-2", text: "first line\n  continues here\n\n  and ends after a gap", line: 20 },
+]); // [x] accepted, multi-line kept, fenced AC ignored
+assert.deepEqual([two.scope, two.agent, two.split, two.acs.length], ["full-stack", null, "fan-out", 1]);
+const plain = parseStories(read("plan-valid.md"));
+assert.deepEqual([plain[0].scope, plain[0].agent, plain[0].split], [null, null, null]);
+assert.deepEqual(parseStories(read("stories-duplicate.md")).map((story) => [story.id, story.line]), [["PROJ-1-PRD-1-US-1", 10], ["PROJ-1-PRD-1-US-1", 11]]);
+' "file://$VALIDATOR" "$FIXTURES"
+
 for copy in \
   "$ROOT/claude/skills/4_writing-plans/scripts/validate-wave-plan.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/validate-wave-plan.mjs" \
