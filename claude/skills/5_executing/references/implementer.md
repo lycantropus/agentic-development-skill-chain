@@ -55,7 +55,8 @@ Task tool:
     3. Implement minimal code to make it pass (GREEN)
     4. Run ALL tests — new + existing must pass
     5. Refactor if needed, re-run tests
-    6. Commit: `feat(PROJ-<X>-PRD-<Y>): implement [task name]`
+    6. Sequential wave: commit `feat(PROJ-<X>-PRD-<Y>): implement [task name]`.
+       Parallel wave: do not stage or commit — report; the lead integrates and commits.
 
     After all tasks:
     7. Run one bounded Inner Ralph self-review covering both:

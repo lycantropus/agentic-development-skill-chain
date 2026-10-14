@@ -76,8 +76,8 @@ from `5_executing` and the same scripts enforce them.
    `scripts/story-slice.mjs` (`5_executing` § Input) — and the wave 1 plan; at
    each wave start only that wave's plan, never earlier ones — what previous
    waves built comes from the wave shape plus `progress.md`. Before dispatching wave N:
-   `git tag "wave-${WAVE}-start-PROJ-${PROJ}"` (delete and recreate on a
-   re-run). The gate scopes CodeRabbit to this tag and fails hard without it.
+   `git tag "wave-${WAVE}-start-PROJ-${PROJ}"` unless it exists (keep it on a
+   resume; recreate only after a reset restart). The gate scopes CodeRabbit to this tag and fails hard without it.
    Before any worker starts, compile the wave's worker files (this wave's
    architecture decisions and API contracts; no lock, no hash bookkeeping, no `state.sh`; the file header carries the plan hash):
    `node scripts/compile-context-bundles.mjs compile <X> <theme> --wave <N>`.

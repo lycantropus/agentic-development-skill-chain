@@ -360,10 +360,11 @@ Before spawning any teammate for wave N, tag the current HEAD as the wave base. 
 </HARD-GATE>
 
 ```bash
-git tag "wave-${WAVE}-start-PROJ-${PROJ}"
+git rev-parse -q --verify "refs/tags/wave-${WAVE}-start-PROJ-${PROJ}" >/dev/null \
+  || git tag "wave-${WAVE}-start-PROJ-${PROJ}"
 ```
 
-One tag per (wave, PROJ) pair. Tags are local-only; do not push. If neither `WAVE_BASE_SHA` nor `wave-${WAVE}-start-PROJ-${PROJ}` exists, `wave-gate.sh` fails hard. There is no `HEAD~20`, commit-message, or root-commit fallback. If the tag already exists from a re-run, delete and re-create: `git tag -d "wave-${WAVE}-start-PROJ-${PROJ}"`.
+One tag per (wave, PROJ) pair. Tags are local-only; do not push. If neither `WAVE_BASE_SHA` nor `wave-${WAVE}-start-PROJ-${PROJ}` exists, `wave-gate.sh` fails hard. There is no `HEAD~20`, commit-message, or root-commit fallback. An existing tag stays: `wave-gate.sh` sets the next wave's tag when a gate passes, and on a resume the tag must keep marking the wave base, otherwise workers' commits fall out of the CodeRabbit diff. Delete and re-create it (`git tag -d "wave-${WAVE}-start-PROJ-${PROJ}"`) only when the wave restarts from a reset checkout.
 
 ### 3. Create team and spawn teammates for the wave
 
