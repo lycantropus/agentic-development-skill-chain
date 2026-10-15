@@ -114,7 +114,7 @@ detect_dev_port() {
     echo "$SKILLCHAIN_DEV_PORT"
     return
   fi
-  config="$worktree/specs/PROJ-${proj}-${theme}/3-4_plan/wave-gate-config.json"
+  config="$(plan_config "$worktree" "$proj" "$theme")"
   [ -f "$config" ] || { echo null; return; }
   url="$(jq -r '.frontend.dev_url // empty' "$config" 2>/dev/null || true)"
   [ -n "$url" ] || { echo null; return; }
@@ -128,7 +128,11 @@ detect_dev_port() {
 # Optional wave-gate-config.json keys (validated here again: this runs before the plan gate can be trusted by a resume):
 #   app_root       relative directory holding package.json + lockfile (default ".")
 #   worktree_links [{path,target}] git-ignored symlinks created after the install (e.g. prototype node_modules -> app/node_modules)
-plan_config() { echo "$1/specs/PROJ-$2-$3/3-4_plan/wave-gate-config.json"; }
+plan_config() {
+  local plan_dir="$1/specs/PROJ-$2-$3/3-4_plan"
+  [ -d "$plan_dir" ] || plan_dir="$1/specs/PROJ-$2-$3/6_plan"
+  echo "$plan_dir/wave-gate-config.json"
+}
 
 safe_relpath() { # <label> <value> — repo-relative, no absolute path, no .. segment
   case "$2" in
@@ -180,14 +184,14 @@ dependency_kind() {
 }
 
 install_dependencies() {
-  local worktree="$1/$3" kind="$2"
+  local worktree="$1/$3" kind="$2" config="$4"
   [ ! -L "$worktree/node_modules" ] || die "$worktree/node_modules is a symlink; dependencies must stay isolated"
   case "$kind" in
     none) echo not_applicable ;;
-    npm) (cd "$worktree" && npm ci >&2) || return $?; echo installed ;;
-    pnpm) (cd "$worktree" && corepack pnpm install --frozen-lockfile >&2) || return $?; echo installed ;;
-    yarn) (cd "$worktree" && corepack yarn install --immutable >&2) || return $?; echo installed ;;
-    bun) (cd "$worktree" && bun install --frozen-lockfile >&2) || return $?; echo installed ;;
+    npm) (cd "$worktree" && resource_run "$config" dependency-install npm ci >&2) || return $?; echo installed ;;
+    pnpm) (cd "$worktree" && resource_run "$config" dependency-install corepack pnpm install --frozen-lockfile >&2) || return $?; echo installed ;;
+    yarn) (cd "$worktree" && resource_run "$config" dependency-install corepack yarn install --immutable >&2) || return $?; echo installed ;;
+    bun) (cd "$worktree" && resource_run "$config" dependency-install bun install --frozen-lockfile >&2) || return $?; echo installed ;;
     *) die "internal error: unsupported dependency kind '$kind'" ;;
   esac
 }
@@ -316,7 +320,7 @@ prepare() {
 
   env_hidden="$(hide_env_during_install "$control" "$target" "$env_status")"
   set +e
-  dep_status="$(install_dependencies "$target" "$dep_kind" "$app_root")"
+  dep_status="$(install_dependencies "$target" "$dep_kind" "$app_root" "$(plan_config "$target" "$proj" "$theme")")"
   dep_rc=$?
   set -e
   if [ "$dep_rc" -ne 0 ]; then
@@ -324,7 +328,8 @@ prepare() {
       ln -s "$control/.env.local" "$target/.env.local" \
         || die "dependency install failed and the validated env symlink could not be restored"
     fi
-    die "reproducible dependency install failed with exit $dep_rc; managed env state restored"
+    echo "worktree.sh: reproducible dependency install failed with exit $dep_rc; managed env state restored" >&2
+    return "$dep_rc"
   fi
   link_worktree_assets "$target" "$proj" "$theme"
   # Install before linking secrets: lifecycle/postinstall output can never
@@ -437,6 +442,25 @@ cleanup() {
     retain "$proj" "$theme" "worktree has tracked or untracked changes"
     return 1
   fi
+  pr_number="$(jq -r '.pr.number // empty' "$state")"
+  [ -n "$pr_number" ] \
+    || { retain "$proj" "$theme" "state.pr.number is missing"; return 1; }
+  if ! pr_state="$(gh pr view "$pr_number" --json state --jq .state 2>/dev/null)"; then
+    retain "$proj" "$theme" "could not read authoritative state for PR #$pr_number"
+    return 1
+  fi
+  case "$pr_state" in
+    MERGED) : ;;
+    OPEN)
+      echo "worktree retained: PR #$pr_number is OPEN; cleanup waits for merge" >&2
+      return 2
+      ;;
+    *)
+      retain "$proj" "$theme" "PR #$pr_number state is ${pr_state:-unavailable}, not MERGED"
+      return 1
+      ;;
+  esac
+
   local ignored entry declared_links unexpected=()
   ignored="$(git -C "$worktree" ls-files --others --ignored --exclude-standard)"
   declared_links="$(jq -r '(.worktree_links // [])[].path' "$(plan_config "$worktree" "$proj" "$theme")" 2>/dev/null || true)"
@@ -459,25 +483,6 @@ cleanup() {
     retain "$proj" "$theme" "worktree contains unexpected ignored payloads: ${unexpected[*]}"
     return 1
   fi
-
-  pr_number="$(jq -r '.pr.number // empty' "$state")"
-  [ -n "$pr_number" ] \
-    || { retain "$proj" "$theme" "state.pr.number is missing"; return 1; }
-  if ! pr_state="$(gh pr view "$pr_number" --json state --jq .state 2>/dev/null)"; then
-    retain "$proj" "$theme" "could not read authoritative state for PR #$pr_number"
-    return 1
-  fi
-  case "$pr_state" in
-    MERGED) : ;;
-    OPEN)
-      echo "worktree retained: PR #$pr_number is OPEN; cleanup waits for merge" >&2
-      return 2
-      ;;
-    *)
-      retain "$proj" "$theme" "PR #$pr_number state is ${pr_state:-unavailable}, not MERGED"
-      return 1
-      ;;
-  esac
 
   # --force is necessary for reproducible, ignored dependencies and the
   # managed ignored .env.local link. Every safety predicate above resolves an

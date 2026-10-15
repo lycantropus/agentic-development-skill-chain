@@ -158,6 +158,27 @@ kill_group() { # kill a lane's whole process group, TERM then KILL
 
 # Any signal to the runner must not orphan the setsid lane trees (review fix #5).
 ACTIVE_PIDS=()
+declare -a RECEIPT_PIDS=() RECEIPT_IDS=()
+RUN_ID="$(node -e 'console.log(require("node:crypto").randomUUID())')"
+JOURNAL_DIR="$(abspath "$(git rev-parse --git-common-dir)")/skillchain-runs/PROJ-${PROJ}-${THEME}"
+journal() { node "$RUNNER_DIR/lane-journal.mjs" "$1" "$JOURNAL_DIR" "$RUN_ID" "${@:2}"; }
+(umask 077; mkdir -p "$JOURNAL_DIR")
+if ! COMPAT_LOCK_NO_REAP=1 lock_acquire 18 exclusive 0 "$JOURNAL_DIR/supervisor.lock"; then
+  echo "run-phase.sh: live supervisor or retained orphan tools hold the PROJ lease; inspect the receipts before restarting (without flock, verify and remove a stale supervisor.lock.d manually)" >&2
+  exit 1
+fi
+release_runner_lease() { exec 18>&-; _compat_unlock; _COMPAT_LOCK_DIRS=(); }
+
+finish_receipt() {
+  local i
+  for i in "${!RECEIPT_PIDS[@]}"; do
+    if [ "${RECEIPT_PIDS[$i]}" = "$1" ]; then
+      journal finish "${RECEIPT_IDS[$i]}" "$2" "$TIMED_OUT"
+      unset 'RECEIPT_PIDS[i]' 'RECEIPT_IDS[i]'
+      return
+    fi
+  done
+}
 on_signal() {
   echo "run-phase.sh: interrupted — killing lane process groups" >&2
   local p
@@ -241,31 +262,41 @@ bash scripts/chain render context compile $PROJ $THEME --wave <N>
 LANE_PID=""
 LANE_MODEL=""
 launch_lane() { # provider role promptfile outfile — sets LANE_PID/LANE_MODEL (main shell, so `wait` works)
-  local provider="$1" role="$2" prompt="$3" out="$4"
+  local provider="$1" role="$2" prompt="$3" out="$4" receipt
+  receipt="$(journal start "$$" "$PHASE" "$provider" "$role" "$out")"
+  local admission_rc=0
+  local resource_config="$BASE/3-4_plan/wave-gate-config.json"
+  [ -f "$resource_config" ] || resource_config="$BASE/6_plan/wave-gate-config.json"
+  resource_check "$resource_config" "runner-${PHASE}-${role}" || admission_rc=$?
+  if [ "$admission_rc" -ne 0 ]; then
+    journal finish "$receipt" "$admission_rc" 0
+    stop_run "resource admission refused ${PHASE} ${role} before provider launch (exit ${admission_rc})" "$out"
+  fi
   case "${provider}:${role}" in
     claude:writer)
       LANE_MODEL="$WRITER_MODEL"
-      "${SETSID_BIN[@]}" claude -p "$(cat "$prompt")" --model "$WRITER_MODEL" \
-        --dangerously-skip-permissions </dev/null >"$out" 2>&1 &
+      "${SETSID_BIN[@]}" bash "$RUNNER_DIR/launch-lane.sh" "$JOURNAL_DIR" "$RUN_ID" "$receipt" claude -p "$(cat "$prompt")" --model "$WRITER_MODEL" \
+        --dangerously-skip-permissions </dev/null >"$out" 2>&1 18>&- &
       ;;
     claude:peer)
       local tools="Read,Grep,Glob"
       [ "$PHASE" = "P6" ] && tools="Read,Grep,Glob,Bash"   # the QA finder must run tests/browser
       LANE_MODEL="$REVIEW_MODEL"    # pinned explicitly — never the writer's model (review fix #4)
-      "${SETSID_BIN[@]}" claude -p "$(cat "$prompt")" --model "$LANE_MODEL" \
-        --allowedTools "$tools" </dev/null >"$out" 2>&1 &
+      "${SETSID_BIN[@]}" bash "$RUNNER_DIR/launch-lane.sh" "$JOURNAL_DIR" "$RUN_ID" "$receipt" claude -p "$(cat "$prompt")" --model "$LANE_MODEL" \
+        --allowedTools "$tools" </dev/null >"$out" 2>&1 18>&- &
       ;;
     codex:writer)
       LANE_MODEL="codex-default"
-      "${SETSID_BIN[@]}" codex exec --sandbox workspace-write "$(cat "$prompt")" </dev/null >"$out" 2>&1 &
+      "${SETSID_BIN[@]}" bash "$RUNNER_DIR/launch-lane.sh" "$JOURNAL_DIR" "$RUN_ID" "$receipt" codex exec --sandbox workspace-write "$(cat "$prompt")" </dev/null >"$out" 2>&1 18>&- &
       ;;
     codex:peer)
       LANE_MODEL="codex-default"
-      "${SETSID_BIN[@]}" codex exec --sandbox read-only "$(cat "$prompt")" </dev/null >"$out" 2>&1 &
+      "${SETSID_BIN[@]}" bash "$RUNNER_DIR/launch-lane.sh" "$JOURNAL_DIR" "$RUN_ID" "$receipt" codex exec --sandbox read-only "$(cat "$prompt")" </dev/null >"$out" 2>&1 18>&- &
       ;;
     *) echo "run-phase.sh: unknown lane ${provider}:${role}" >&2; return 1 ;;
   esac
   LANE_PID=$!
+  RECEIPT_PIDS+=("$LANE_PID"); RECEIPT_IDS+=("$receipt")
   ACTIVE_PIDS+=("$LANE_PID")
 }
 
@@ -286,6 +317,7 @@ wait_lanes() { # writer_pid [peer_pid]
     sleep "${SKILLCHAIN_POLL_SECONDS:-5}"
   done
   set +e; wait "$wpid" 2>/dev/null; WRITER_RC=$?; set -e
+  finish_receipt "$wpid" "$WRITER_RC"
   if [ -n "$ppid" ]; then
     if [ "$TIMED_OUT" -eq 1 ] || [ "$WRITER_RC" -ne 0 ]; then
       kill_group "$ppid"
@@ -301,6 +333,7 @@ wait_lanes() { # writer_pid [peer_pid]
       done
     fi
     set +e; wait "$ppid" 2>/dev/null; PEER_RC=$?; set -e
+    finish_receipt "$ppid" "$PEER_RC"
   fi
   ACTIVE_PIDS=()
 }
@@ -345,9 +378,14 @@ open_cross_review_blocking() {
 stop_run() { # reason error_file
   local reason="$1" err="${2:-}"
   step "STOP CONDITION: $reason"
-  local p
-  for p in ${ACTIVE_PIDS[@]+"${ACTIVE_PIDS[@]}"}; do kill_group "$p"; done
+  local p cancelled_rc
+  for p in ${ACTIVE_PIDS[@]+"${ACTIVE_PIDS[@]}"}; do
+    kill_group "$p"
+    cancelled_rc=0; wait "$p" 2>/dev/null || cancelled_rc=$?
+    finish_receipt "$p" "$cancelled_rc"
+  done
   ACTIVE_PIDS=()
+  journal settle failed
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
     # Build the rescue commit through a TEMPORARY index so the working tree
     # is never touched — a checkout dance would delete the untracked
@@ -570,7 +608,9 @@ run_generic() {
     sealed="$(jq -r '.phase + ":" + .status' "$proj_worktree/specs/PROJ-${PROJ}-${THEME}/state.json" 2>/dev/null || true)"
     [ "$sealed" = P0:done ] || stop_run "P0 writer exited but worktree state is ${sealed:-missing}, expected P0:done" "$writer_out"
     step "P0 done — re-entering persistent PROJ worktree exactly once: $proj_worktree"
+    journal settle accepted
     cd "$proj_worktree"
+    release_runner_lease
     exec env SKILLCHAIN_WORKTREE_REEXEC=1 SKILLCHAIN_RUNNER_MANAGED=1 \
       "$RUNNER_DIR/run-phase.sh" "${RUNNER_ARGS[@]}"
   fi
@@ -626,10 +666,8 @@ run_generic() {
   fi
 }
 
-run_one_phase() {
-  PHASE="$1"
-  phase_skill "$PHASE" >/dev/null || { echo "run-phase.sh: phase $PHASE not runnable (use P0/P5/P6/P7/P8)" >&2; exit 64; }
-  if [ "$PHASE" = P0 ] && [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ] && chain_has worktree; then
+reenter_registered_worktree() {
+  if [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ] && chain_has worktree; then
     local existing_worktree existing_lifecycle existing_topology existing_advanced
     existing_worktree="$(chain worktree locate "$PROJ" 2>/dev/null || true)"
     if [ -n "$existing_worktree" ]; then
@@ -644,11 +682,17 @@ run_one_phase() {
       if [ "$existing_advanced" -eq 1 ] && [ "$existing_topology" = true ]; then
         step "registered PROJ worktree is already ${existing_lifecycle} before runner restart — re-entering without launching another P0 writer: $existing_worktree"
         cd "$existing_worktree"
+        release_runner_lease
         exec env SKILLCHAIN_WORKTREE_REEXEC=1 SKILLCHAIN_RUNNER_MANAGED=1 \
           "$RUNNER_DIR/run-phase.sh" "${RUNNER_ARGS[@]}"
       fi
     fi
   fi
+}
+
+run_one_phase() {
+  PHASE="$1"
+  phase_skill "$PHASE" >/dev/null || { echo "run-phase.sh: phase $PHASE not runnable (use P0/P5/P6/P7/P8)" >&2; exit 64; }
   if { [ "$PHASE" = P0 ] && [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" != 1 ]; } || [ "$PHASE" = P8 ]; then
     # P0's control checkout must remain clean until chain worktree prepare runs.
     # Prompt and lane output therefore live outside the repository.
@@ -657,6 +701,10 @@ run_one_phase() {
     LANE_DIR="$BASE/5_progress/lanes"
   fi
   mkdir -p "$LANE_DIR"
+  local journal_rc=0
+  journal reconcile || journal_rc=$?
+  if [ "$journal_rc" -eq 2 ]; then stop_run "pending lane receipt: interrupted supervisor; phase evidence is unverified"; fi
+  [ "$journal_rc" -eq 0 ] || exit 1
   check_precondition
   if [ "$SKIP_PHASE" -eq 1 ]; then
     if [ "$PHASE" = P8 ] && [ "$(state_get '.worktree.cleanup_status // empty')" = removed ] \
@@ -668,8 +716,17 @@ run_one_phase() {
   fi
   setup_providers
   if [ "$PHASE" = "P6" ]; then run_p6; else run_generic; fi
+  journal settle accepted
   step "$PHASE done"
 }
+
+# Route shared-journal recovery to the registered PROJ before any state writes.
+reenter_registered_worktree
+
+journal_rc=0
+journal reconcile || journal_rc=$?
+if [ "$journal_rc" -eq 2 ]; then PHASE="$(state_get .phase)"; stop_run "pending lane receipt: interrupted supervisor; phase evidence is unverified"; fi
+[ "$journal_rc" -eq 0 ] || exit 1
 
 if [ "$PHASE_ARG" = "auto" ]; then
   for ph in P0 P5 P6 P7 P8; do

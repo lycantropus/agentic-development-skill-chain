@@ -372,9 +372,9 @@ function validateMain(args) {
   }
   if (config.resources !== undefined) {
     const r = config.resources;
-    const keys = ["min_available_mb", "max_memory_psi_full_avg10", "wait_seconds", "test_workers"];
-    if (!r || typeof r !== "object" || Array.isArray(r) || !Object.keys(r).every((k) => keys.includes(k)) || !Object.values(r).every((v) => Number.isInteger(v) && v >= 0) || r.test_workers === 0) {
-      fail(`resources must be an object with non-negative integers (test_workers > 0) from: ${keys.join(", ")}`);
+    const keys = ["min_available_mb", "max_memory_psi_full_avg10", "wait_seconds", "test_workers", "max_parallel_commands"];
+    if (!r || typeof r !== "object" || Array.isArray(r) || !Object.keys(r).every((k) => keys.includes(k)) || !Object.values(r).every((v) => Number.isInteger(v) && v >= 0) || r.test_workers === 0 || r.max_parallel_commands === 0) {
+      fail(`resources must be an object with non-negative integers (test_workers and max_parallel_commands > 0) from: ${keys.join(", ")}`);
     }
   }
   for (const key of ["coverage_cmd", "lint_cmd", "complexity_cmd", "arch_rules_cmd", "mutation_cmd"]) {

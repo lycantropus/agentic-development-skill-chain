@@ -18,8 +18,11 @@ In requirements, architecture, plan, QA and documentation mode, write finding
 summaries and review records in English, even for non-English source material.
 Flag newly authored non-English prose in artifacts from Step 2 onward; preserve
 paths, identifiers, quoted evidence and intended product localization. Concept
-reviews keep the concept's chosen language. User-facing explanations may use
-the user's language.
+reviews keep the concept's chosen language. Preserve already CP1-sealed
+PRD/plan ACs verbatim on resume; a later language-policy update alone must not
+reopen approval. New records remain English; changing sealed canonical ACs
+requires explicit user authorization and the owning review. User-facing
+explanations may use the user's language.
 
 ## Modes
 
@@ -108,16 +111,29 @@ When the caller knows the author but must persist the review, pass both
 `--author-provider <claude|codex>` and `--persist`. `--require-provider codex`
 or `claude` makes an unavailable/opposite fallback fail rather than silently
 replacing the required reviewer. For Claude-authored QA, use `qa --personas`:
-it launches six separate Codex reviews in parallel. If Codex is unavailable,
+it launches six separate Codex reviews sequentially. If Codex is unavailable,
 the script prints a degraded-mode warning, records `degraded_fallback: true`,
 and runs the same six personas on the strongest Claude model, even when that is
 the author model (`CLAUDE_MODEL_RANK`, default `fable opus sonnet`; override with
 `CLAUDE_REVIEW_MODEL`); the QA caller must tell the user
 that independent-provider review was unavailable. Codex-authored QA launches
-six separate Claude reviews; when `claude auth status` is not green it runs six
+six separate Claude reviews; when Claude is missing, unauthenticated or runtime quota-exhausted it runs six
 separate Codex reviews instead, flagged degraded. Other Codex-authored modes
 still fail closed without Claude. Keep `--require-provider`
 for handoffs where a fallback must instead stop the gate.
+
+Authentication is not an inference-capacity probe. Adapters return exit 75 for
+recognized failed quota/rate-limit/capacity responses; other failures stay closed.
+Every failed adapter emits a sanitized `cross-review-failed-attempt` JSON record
+on stderr (mode, round, actual provider/model, classification, exit code and time).
+Retain the command log. Failed attempts never append a completed review round.
+Unpinned `qa --personas` may restart all six personas once on the other available
+provider, recording genuine reviewer attribution and `degraded_fallback: true`;
+discard the partial failed panel. Stop at the first failed worker, with no
+same-provider retries or retry fan-out. Required-provider pins and non-QA modes,
+including documentation truth gates, fail closed on runtime unavailability.
+The existing pre-launch model-opposite fallback for Claude-authored non-QA
+reviews remains explicit and must differ from the author model.
 
 ```bash
 bash scripts/chain review docs <X> <theme> \
@@ -168,7 +184,7 @@ its own history.
   as a degraded persistent review. Any route that selects Claude verifies CLI
   availability and authentication before launching the review.
 - `qa --personas` starts six independent workers (security, principal
-  engineering, performance, reliability, architecture, and minimalism), rather
+  engineering, performance, reliability, architecture, and minimalism), sequentially, rather
   than asking one reviewer to impersonate a panel. The Claude-authored route
   prefers Codex and falls back loudly to six Claude workers only when Codex is
   unavailable.
@@ -188,3 +204,9 @@ its own history.
   Claude Code itself imposes a 10 MB stdin transport ceiling; the Claude
   adapter detects it before launch and fails with the exact cause rather than
   truncating or silently narrowing review scope.
+
+For QA, `--diff-base` also embeds a current status-plus-diff snapshot with its
+exact command/pathspecs, matched tracked-path count and HEAD. Distinguish a
+clean change stream from zero selected paths; endpoint matching proves only
+no net selected status/diff change. It does not certify unrecorded earlier endpoints,
+transient reverted writes, untracked-file content changes, ignored/excluded paths or HEAD movement.

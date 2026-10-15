@@ -121,7 +121,7 @@ case "$MODE" in
   requirements) FOCUS='- Coverage and traceability: every approved concept, role, flow, state, constraint and mockup contract is represented exactly once; flag omissions, contradictions and invented scope.\n- Testability: Given/When/Then and acceptance criteria are observable, unambiguous, independently verifiable and include meaningful negative outcomes.\n- Edge behavior: permissions, empty and invalid data, failures, retries, limits, concurrency and security-sensitive paths have explicit expected behavior where relevant.\n- Cross-PRD consistency: identifiers, terminology, dependencies, preconditions and outcomes agree across the full PRD set.\n- Boundary discipline: requirements state product behavior and non-functional constraints without prematurely choosing architecture or implementation.' ;;
   architecture) FOCUS='- Decision completeness: architecture resolves the cross-cutting choices required by the concept and PRDs.\n- Feasibility: proposed data, integrations, APIs, ownership and operations fit the supplied system truth.\n- Traceability: no requirement or constraint is silently lost, contradicted, or overbuilt.\n- Risk: identify unsafe assumptions, missing failure paths, migration concerns, and non-functional gaps.\n- Baseline changes: every decision that contradicts or changes docs/ARCHITECTURE.md (stack, boundaries, data ownership, invariants) carries a Changes baseline line naming that section, and its Summary says what it supersedes; flag silent contradictions.\n- Summary fidelity: each decision'"'"'s and key flow'"'"'s Summary line is the only text implementers receive; flag one that drops, softens or contradicts a binding part of its decision or flow diagram, and an Affects list that omits a PRD it constrains.' ;;
   plan) FOCUS='- Executability: each task has clear file ownership, dependencies, acceptance criteria and verification.\n- Coverage: every relevant requirement and architecture decision is implemented exactly once.\n- Sequencing: waves are dependency-safe and expose shared-file or integration hazards.\n- Scope: reject invented work, hidden technical decisions, and plans that cannot be validated.' ;;
-  qa) FOCUS='- Evidence integrity: QA claims are tied to supplied browser/test evidence, not implementation assertions or an empty selection.\n- Adversarial coverage: acceptance criteria, edge cases, security and regressions have meaningful attempts and negative controls.\n- Finding quality: severity, reproduction and anchors are actionable; do not silently downgrade a release-blocking result.\n- Release decision: reject READY when supplied evidence or the implementation diff leaves a Critical/High risk unaddressed.' ;;
+  qa) FOCUS='- Evidence integrity: QA claims are tied to supplied browser/test evidence, not implementation assertions. A clean change-stream hash can cover many tracked files; distinguish no net endpoint changes from zero matched paths. Matching endpoints do not prove absence of transient reverted writes, untracked-file content changes, ignored/excluded changes or HEAD movement.\n- Adversarial coverage: acceptance criteria, edge cases, security and regressions have meaningful attempts and negative controls.\n- Finding quality: severity, reproduction and anchors are actionable; do not silently downgrade a release-blocking result.\n- Release decision: reject READY when supplied evidence or the implementation diff leaves a Critical/High risk unaddressed.' ;;
   docs) FOCUS='- Factual accuracy: every statement describes supplied ground truth, not merely plans.\n- Stale claims: flag renamed, removed, or changed modules and flows.\n- Cap-gaming: flag load-bearing truth removed to meet a size cap while trivia remains.\n- Wrong promotions: reject durable rules promoted from one-off incidents.\n- Current state, not chronicle: docs/ARCHITECTURE.md describes the system as it is now; flag per-PROJ or "built in PROJ-n" sections and Changes baseline lines of the PROJ architecture whose section was not updated.' ;;
 esac
 
@@ -147,6 +147,16 @@ if [ -n "$DIFF_BASE" ]; then
     MATERIAL+=$'`\n\nOmitted from diff ground truth (may be supplied separately above):\n```text\n'
     MATERIAL+="${OMITTED_PATHS:-none}"
     MATERIAL+=$'\n```\n'
+  fi
+  if [ "$MODE" = qa ]; then
+    SNAPSHOT_PATHS=("${DIFF_PATHS[@]}"); [ ${#SNAPSHOT_PATHS[@]} -gt 0 ] || SNAPSHOT_PATHS=(.)
+    MATCHED_PATHS="$(git ls-files -z -- "${SNAPSHOT_PATHS[@]}" | tr -cd '\0' | wc -c | tr -d ' ')"
+    MATERIAL+=$'\n## Worktree change-stream snapshot (review invocation only)\n'
+    MATERIAL+="Matched tracked paths: $MATCHED_PATHS"$'\n'
+    MATERIAL+='Command: `(git status --porcelain=v1 -- <pathspecs>; git diff --no-ext-diff HEAD -- <pathspecs>) | git hash-object --stdin`'$'\nPathspecs: '
+    MATERIAL+="$(printf '%q ' "${SNAPSHOT_PATHS[@]}")"$'\nHEAD: '"$(git rev-parse HEAD)"$'\nChange-stream hash: '
+    MATERIAL+="$( { git status --porcelain=v1 -- "${SNAPSHOT_PATHS[@]}"; git diff --no-ext-diff HEAD -- "${SNAPSHOT_PATHS[@]}"; } | git hash-object --stdin)"
+    MATERIAL+=$'\nA clean change stream is valid when tracked paths match; zero matched paths does not establish coverage. This records the current endpoint, not historical before/after snapshots. Matching endpoint hashes establish only no net selected status/diff change, not absence of transient reverted writes, untracked-file content changes, ignored/excluded changes or HEAD movement.\n'
   fi
   MATERIAL+=$'\n## Ground truth: git diff '"$DIFF_BASE"$'..HEAD\n```diff\n'
   MATERIAL+="$(git diff --no-ext-diff "$DIFF_BASE..HEAD" ${DIFF_PATHS:+--} "${DIFF_PATHS[@]}")"
@@ -175,7 +185,21 @@ while IFS= read -r line || [ -n "$line" ]; do
   esac
 done <"$TMPL" >"$PROMPT_FILE"
 
-run_adapter() { local provider="${1%%:*}" model="${1#*:}" out="$2" prompt="${3:-$PROMPT_FILE}"; local args=(--prompt "$prompt" --timeout "$TIMEOUT"); [ -n "$model" ] && args+=(--model "$model"); bash "$SCRIPT_DIR/review-with-${provider}.sh" "${args[@]}" >"$out"; }
+RESOURCE_CONFIG="$BASE/3-4_plan/wave-gate-config.json"
+[ -f "$RESOURCE_CONFIG" ] || RESOURCE_CONFIG="$BASE/6_plan/wave-gate-config.json"
+run_adapter() { local provider="${1%%:*}" model="${1#*:}" out="$2" prompt="${3:-$PROMPT_FILE}"; local args=(--prompt "$prompt" --timeout "$TIMEOUT" --resource-config "$RESOURCE_CONFIG"); [ -n "$model" ] && args+=(--model "$model"); bash "$SCRIPT_DIR/review-with-${provider}.sh" "${args[@]}" >"$out"; }
+run_checked_adapter() {
+  local reviewer="$1" out="$2" prompt="${3:-$PROMPT_FILE}" rc=0
+  run_adapter "$reviewer" "$out" "$prompt" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    local classification=adapter-failure
+    [ "$rc" -ne 75 ] || classification=provider-unavailable
+    if [ "$rc" -eq 64 ] || [ "$rc" -eq 77 ]; then classification=infrastructure; fi
+    jq -cn --arg mode "$MODE" --argjson round "$ROUND" --arg provider "${reviewer%%:*}" --arg model "${reviewer#*:}" --arg classification "$classification" --argjson exit_code "$rc" --arg at "$(now_iso)" \
+      '{event:"cross-review-failed-attempt",mode:$mode,round:$round,provider:$provider,model:$model,classification:$classification,exit_code:$exit_code,at:$at}' >&2
+  fi
+  return "$rc"
+}
 RCS=(); OUT_FILES=("$OUT_A" "$OUT_B")
 if [ "$QA_PERSONAS" -eq 1 ]; then
   # Tool-measured concerns leave the persona focus only when the project configured the tool.
@@ -195,17 +219,37 @@ if [ "$QA_PERSONAS" -eq 1 ]; then
     "Elena Rodriguez — Principal Architect|$RODRIGUEZ_FOCUS "'Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what should change for the next PROJ); it counts as a finding, so do not also emit review-clean.'
     "Ken Takahashi — Minimalism Engineer|$TAKAHASHI_FOCUS "'Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what to delete, inline, merge or avoid in the next PROJ); it counts as a finding, so do not also emit review-clean.'
   )
-  OUT_FILES=(); PIDS=()
-  for i in "${!PERSONAS[@]}"; do
-    persona="${PERSONAS[$i]%%|*}"; focus="${PERSONAS[$i]#*|}"
-    persona_prompt="$QA_PERSONA_DIR/$i.prompt"; persona_out="$QA_PERSONA_DIR/$i.out"
-    { cat "$PROMPT_FILE"; printf '\n## Assigned QA persona\nYou are %s. %s\nReview only this discipline; emit the strict machine-readable findings contract.\n' "$persona" "$focus"; } > "$persona_prompt"
-    run_adapter "${REVIEWERS[0]}" "$persona_out" "$persona_prompt" & PIDS+=("$!")
-    OUT_FILES+=("$persona_out")
+  # Sequential workers stop immediately on quota exhaustion; never fan out retries.
+  for panel_attempt in 1 2; do
+    OUT_FILES=(); panel_rc=0
+    for i in "${!PERSONAS[@]}"; do
+      persona="${PERSONAS[$i]%%|*}"; focus="${PERSONAS[$i]#*|}"
+      persona_prompt="$QA_PERSONA_DIR/$i.prompt"; persona_out="$QA_PERSONA_DIR/$i.out"
+      { cat "$PROMPT_FILE"; printf '\n## Assigned QA persona\nYou are %s. %s\nReview only this discipline; emit the strict machine-readable findings contract.\n' "$persona" "$focus"; } > "$persona_prompt"
+      run_checked_adapter "${REVIEWERS[0]}" "$persona_out" "$persona_prompt" || panel_rc=$?
+      [ "$panel_rc" -eq 0 ] || break
+      OUT_FILES+=("$persona_out")
+    done
+    [ "$panel_rc" -ne 0 ] || break
+    if [ "$panel_rc" -eq 75 ] && [ "$panel_attempt" -eq 1 ] && [ -z "$REQUIRED_PROVIDER" ] && [ "$DEGRADED_FALLBACK" = false ]; then
+      alternative=codex; [ "${REVIEWERS[0]%%:*}" != codex ] || alternative=claude
+      if "${alternative}_available"; then
+        REVIEWERS=("$alternative:"); [ "$alternative" != claude ] || REVIEWERS=("claude:$REVIEW_MODEL")
+        DEGRADED_FALLBACK=true
+        echo "cross-review (qa): runtime provider unavailable; restarting all six personas with $alternative (degraded); failed partial outputs are discarded" >&2
+        continue
+      fi
+    fi
+    echo "cross-review.sh: adapter failed (exit $panel_rc) — review did not complete; no round recorded" >&2; if [ "$panel_rc" -eq 64 ] || [ "$panel_rc" -eq 77 ]; then exit "$panel_rc"; fi; exit 1
   done
-  set +e; for pid in "${PIDS[@]}"; do wait "$pid"; RCS+=($?); done; set -e
-elif [ ${#REVIEWERS[@]} -eq 2 ]; then run_adapter "${REVIEWERS[0]}" "$OUT_A" & PID_A=$!; run_adapter "${REVIEWERS[1]}" "$OUT_B" & PID_B=$!; set +e; wait "$PID_A"; RCS+=($?); wait "$PID_B"; RCS+=($?); set -e; else set +e; run_adapter "${REVIEWERS[0]}" "$OUT_A"; RCS+=($?); set -e; fi
-for rc in "${RCS[@]}"; do [ "$rc" -eq 0 ] || { echo "cross-review.sh: adapter failed (exit $rc) — review did not run" >&2; exit 1; }; done
+elif [ ${#REVIEWERS[@]} -eq 2 ]; then
+  run_checked_adapter "${REVIEWERS[0]}" "$OUT_A" & PID_A=$!
+  run_checked_adapter "${REVIEWERS[1]}" "$OUT_B" & PID_B=$!
+  set +e; wait "$PID_A"; RCS+=($?); wait "$PID_B"; RCS+=($?); set -e
+else
+  rc=0; run_checked_adapter "${REVIEWERS[0]}" "$OUT_A" || rc=$?; RCS+=("$rc")
+fi
+for rc in "${RCS[@]}"; do [ "$rc" -eq 0 ] || { echo "cross-review.sh: adapter failed (exit $rc) — review did not complete; no round recorded" >&2; if [ "$rc" -eq 64 ] || [ "$rc" -eq 77 ]; then exit "$rc"; fi; exit 1; }; done
 
 ALL_LINES="$(cat "${OUT_FILES[@]}" 2>/dev/null | jq -cs 'map(select(type == "object") | .source = "cross-review") | unique_by([(.category // ""), (.file // ""), (.line // 0), .summary])[]' 2>/dev/null || true)"
 FINDING_LINES="$(printf '%s\n' "$ALL_LINES" | jq -c 'select(.category != "review-clean")' 2>/dev/null || true)"

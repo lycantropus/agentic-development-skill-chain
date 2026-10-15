@@ -27,7 +27,7 @@ Branch `proj/PROJ-1` from `—`.
 
 ### Provider degradations
 
-⚠ single-provider run (codex unavailable) — cross-review: model-opposite fallback
+⚠ Provider degradation: codex unavailable
 
 ### Worktree isolation
 

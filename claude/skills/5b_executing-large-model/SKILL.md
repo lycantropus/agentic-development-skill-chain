@@ -13,9 +13,12 @@ worker reports, QA evidence summaries, documentation and PR descriptions.
 Converse with the user in their language. Preserve identifiers, file paths,
 verbatim source evidence and the product's required UI/localization language.
 Concepts and discovery inputs may use another language; derive English artifacts
-from them. If canonical PRD ACs are non-English, return them to Requirements
-Engineer for an approved English revision before downstream verbatim copying;
-never silently translate canonical ACs inside a plan.
+from them. Before CP1 approval, return non-English canonical PRD ACs to
+Requirements Engineer for an approved English revision before downstream
+verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
+verbatim; a newer language policy alone must not reopen approval. New records
+remain English. Change sealed canonical ACs only through an explicit user-
+authorized revision and the owning review; never silently translate them.
 
 
 The chain's default execution skill. Same gates as `5_executing`, less

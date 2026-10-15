@@ -44,6 +44,14 @@ try {
     git('tag', 'proj-PROJ-1-base', execFileSync('git', ['rev-list', '--max-parents=0', 'HEAD'], { cwd, encoding: 'utf8' }).trim());
     bad('check'); ok('run', 'build'); assert.match(ok('run', 'build'), /reused/);
     assert.equal(fs.readFileSync(path.join(cwd, `${progress}/counter.log`), 'utf8'), 'build\n');
+    // A wave's operational heartbeat path must not invalidate its recorded build.
+    write(`${progress}/wave-build.log`, 'wave build passed\n');
+    qualityEnv = { ...process.env, SKILLCHAIN_RESOURCE_HEARTBEAT_FILE: `${progress}/gate-heartbeat` };
+    const waveInputs = ok('snapshot').trim();
+    ok('record-build', `${progress}/wave-build.log`, git('rev-parse', 'HEAD').toString().trim(), waveInputs);
+    qualityEnv = process.env;
+    assert.match(ok('run', 'build'), /reused/, 'quality must reuse the wave build without its heartbeat path');
+    assert.equal(fs.readFileSync(path.join(cwd, `${progress}/counter.log`), 'utf8'), 'build\n');
     write('out/build', 'tampered'); assert.doesNotMatch(ok('run', 'build'), /reused/);
     fs.rmSync(path.join(cwd, 'out'), { recursive: true }); assert.doesNotMatch(ok('run', 'build'), /reused/);
     write('.env.local', 'SETTING=new'); assert.doesNotMatch(ok('run', 'build'), /reused/);
@@ -271,6 +279,29 @@ try {
     write(`${progress}/PROJ-1-progress.md`, `# P\n\n## Quality Gate — PROJ-1\n\n### Code Review\nSpec: 0 findings\n\n## Variant Notes\n- note\n`); ok('check');
     assert.match(progressText(), /## Quality Gate — PROJ-1\n\n<!-- quality-status:[\s\S]*<!-- \/quality-status -->\n\n### Code Review\nSpec: 0 findings\n\n## Variant Notes\n- note\n/);
     assert.equal(seal().status, 0, seal().stderr);
+    // SC-10: standalone commands refuse infrastructure pressure before launching any child.
+    config.resources = { test_workers: 0, wait_seconds: 0 };
+    config.lint_cmd = `echo launched > ${progress}/resource-child`;
+    saveConfig(); commit();
+    const resourceRefused = call('run', 'lint');
+    assert.equal(resourceRefused.status, 64, resourceRefused.stderr);
+    assert.ok(!fs.existsSync(path.join(cwd, `${progress}/resource-child`)), 'resource refusal launched lint');
+    const refusal = JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-lint.json`), 'utf8'));
+    assert.equal(refusal.rc, 64); assert.equal(refusal.classification, 'infrastructure');
+    config.resources = { min_available_mb: 1024, wait_seconds: 0 };
+    saveConfig(); commit();
+    const memoryFixture = path.join(temp, `${platform}-meminfo`);
+    fs.writeFileSync(memoryFixture, 'MemAvailable: 100 kB\n');
+    qualityEnv = { ...process.env, SKILLCHAIN_MEMINFO_FILE: memoryFixture, SKILLCHAIN_CGROUP_DIR: path.join(temp, 'no-cgroup'), SKILLCHAIN_RESOURCE_LOCK_DIR: path.join(temp, `${platform}-resources`) };
+    const pressureRefused = call('run', 'lint');
+    assert.equal(pressureRefused.status, 77, pressureRefused.stderr);
+    assert.ok(!fs.existsSync(path.join(cwd, `${progress}/resource-child`)));
+    assert.equal(JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-lint.json`), 'utf8')).rc, 77);
+    qualityEnv = process.env;
+    config.resources = { test_workers: 2, min_available_mb: 0, max_memory_psi_full_avg10: 100, wait_seconds: 0 };
+    config.lint_cmd = `printf '%s' "$VITEST_MAX_WORKERS" > ${progress}/resource-workers`;
+    saveConfig(); commit(); ok('run', 'lint');
+    assert.equal(fs.readFileSync(path.join(cwd, `${progress}/resource-workers`), 'utf8'), '2');
   }
   console.log('quality evidence behavior tests (codex + claude): PASS');
 } finally { fs.rmSync(temp, { recursive: true, force: true }); }

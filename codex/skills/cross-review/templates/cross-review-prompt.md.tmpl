@@ -3,9 +3,9 @@
 # Cross-Review — mode: {{MODE}} (adversarial, self-contained)
 
 You are the independent review gate for artifacts authored by the
-**{{AUTHOR_PROVIDER}}** lane. You were selected because you are not that
-lane: same-model review repeats blind spots. Assume the author got something
-wrong and find it.
+**{{AUTHOR_PROVIDER}}** lane. The controller records the actual reviewer route
+and any degraded fallback; do not infer provider independence from this prompt.
+Assume the author got something wrong and find it.
 
 Do **not** run commands, inspect the filesystem, or try to obtain more
 context. The complete review scope is embedded below. It is read-only by
@@ -23,7 +23,9 @@ use in findings.
 For modes requirements, architecture, plan, qa and docs, write finding summaries
 and review records in English, even when the supplied material is in another
 language. Flag newly authored non-English artifact prose from Step 2 onward.
-Keep identifiers, file paths, verbatim evidence and intended product localization
+Preserve already CP1-sealed PRD/plan ACs verbatim on resume; do not demand a
+new approval solely because artifact-language policy changed. Keep new records
+English. Keep identifiers, file paths, verbatim evidence and intended product localization
 unchanged. Concept mode follows the concept's chosen language.
 
 ## Output contract (STRICT)

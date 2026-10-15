@@ -154,5 +154,5 @@ done
 chain state set 96 stage2 .degraded true >/dev/null
 chain state set 96 stage2 .degraded_reason '"codex unavailable at P7"' >/dev/null
 chain render report morning specs >/dev/null 2>&1
-grep -rq 'cross-review: model-opposite fallback' specs/morning-report-*.md || die 'morning report lacks the degradation flag'
+grep -rq 'Provider degradation: codex unavailable at P7' specs/morning-report-*.md || die 'morning report lacks the degradation flag'
 echo "cross-review-routing: ok"

@@ -13,9 +13,12 @@ worker reports, QA evidence summaries, documentation and PR descriptions.
 Converse with the user in their language. Preserve identifiers, file paths,
 verbatim source evidence and the product's required UI/localization language.
 Concepts and discovery inputs may use another language; derive English artifacts
-from them. If canonical PRD ACs are non-English, return them to Requirements
-Engineer for an approved English revision before downstream verbatim copying;
-never silently translate canonical ACs inside a plan.
+from them. Before CP1 approval, return non-English canonical PRD ACs to
+Requirements Engineer for an approved English revision before downstream
+verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
+verbatim; a newer language policy alone must not reopen approval. New records
+remain English. Change sealed canonical ACs only through an explicit user-
+authorized revision and the owning review; never silently translate them.
 
 
 ## Agent Role
@@ -143,6 +146,22 @@ bash scripts/chain review qa <X> <theme> \
 
 The workers are Chen (security), Weber (architecture), Sharma (performance), Mueller (reliability), Rodriguez (cross-wave architecture), and Takahashi (minimalism). Codex is preferred. If it is missing or unauthenticated, the script prints a visible degraded-mode notice, records `degraded_fallback: true`, and runs the same six personas as six separate Claude workers on the strongest Claude model (rank `fable opus sonnet`, override `CLAUDE_REVIEW_MODEL`) — even when that is the author model; tell the user that independent-provider review was unavailable and which model substituted. In framework runs the QA finder itself already runs on the opposite provider (the runner's peer lane); interactively, run this skill in a session on the other provider or model where possible and treat the persona cross-review as the minimum opposite review. Critical/High findings enter `findings.json` through `chain findings` and block the release decision. Rodriguez and Takahashi also emit one `low` finding with category `retrospective` (their retrospective); it is not a defect and does not keep the loop running. Fix/review orchestration stays with the P6 controller: follow `cross-review`'s automatic loop through round 3 while defect findings of any severity remain, stopping early when clean. QA reports findings; the controller delegates fixes and refreshes evidence before re-review. After round 3, escalate remaining Critical/High findings and report or defer Medium/Low.
 
+Quota/rate-limit exhaustion during inference also means provider unavailability,
+even when authentication passes. `cross-review` runs personas sequentially,
+records sanitized failed-attempt metadata in stderr, and may restart the entire
+panel once with a genuinely available alternative provider, marked degraded.
+A required provider pin fails closed. Retain the command log; failed partial
+outputs never count as a completed review. Do not retry while quota remains
+exhausted or relabel the author/reviewer provider to force routing.
+
+For before/after status-plus-diff evidence, record the exact command and
+pathspecs, matched tracked-path count, HEAD at each endpoint, and clean/dirty
+endpoint meaning. An empty change stream over a nonempty selection is valid.
+Matching hashes establish no net selected status/diff change at the boundaries, not absence
+of transient reverted writes, untracked-file content changes, ignored/excluded changes or HEAD movement. The
+review helper includes a current-endpoint snapshot; it cannot reconstruct an
+unrecorded earlier endpoint.
+
 ### 0. Start Dev Server
 
 Before any browser testing, ensure the dev server is running:
@@ -235,7 +254,7 @@ Scale checks to the feature — not every feature needs all of these:
 **Component Registry hard check:**
 - Run `bash scripts/chain render registry --check` (nested app root: `<app> --check --out docs/components.md`). Non-zero exit → file a Critical bug: either a component lacks its doc block or `docs/components.md` was not regenerated (registry desynced is a process failure). Do not fix it — report it.
 - For every new component, search the registry for semantically similar existing components (Button/PrimaryButton, Card/Panel, Badge/Chip/Tag). Flag any that should have been reused instead.
-- Visit `/dev/components` showcase route via Playwright or the active agent browser: does every registered component render, in **both** light and dark mode? Does every `## Patterns` entry of `docs/DESIGN-SYSTEM.md` have its `#pattern-<name>` section? Any new component not registered?
+- Discover the documented component-review surface and supported themes from `docs/ARCHITECTURE.md`, `docs/DESIGN-SYSTEM.md` and project instructions. Inspect registered components and patterns on that surface using the existing preview service, in the themes the product supports. Do not assume a showcase route, pattern anchors or a second theme. A missing documented surface is a verification gap, not a product defect by itself; report it and inspect the changed UI directly. Respect preview ownership and single-service constraints; never start Storybook or another service automatically.
 
 Look for the design system baseline at `docs/DESIGN-SYSTEM.md` (rules) plus `docs/components.md` (inventory). If found, audit the implemented UI for violations:
 
@@ -246,7 +265,7 @@ Look for the design system baseline at `docs/DESIGN-SYSTEM.md` (rules) plus `doc
 - **Spacing:** Check spacing against the scale in `docs/DESIGN-SYSTEM.md` § Scales, not arbitrary pixel values.
 - **Focus states:** Tab through interactive elements — verify focus states match `docs/DESIGN-SYSTEM.md`.
 
-Compare against the Component Showcase at `/dev/components` using Playwright or the active agent browser if needed.
+Compare against the discovered project review surface using Playwright or the active agent browser if needed.
 
 ### 6. Regression Testing
 

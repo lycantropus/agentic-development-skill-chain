@@ -65,6 +65,18 @@ run_suite() {
     "$work/specs/PROJ-1-test/5_progress/findings.json" >/dev/null || fail "$label: fixed finding was not reopened/escalated"
   grep -q 'REOPENED' "$work/reopen.out" || fail "$label: reopen was not reported"
 
+  # A line identifies a location, not a concern: preserve distinct review text there.
+  printf '%s\n' \
+    '{"source":"coderabbit","severity":"minor","summary":"Validate regular image file","file":"src/catalog.tsx","line":307}' \
+    '{"source":"coderabbit","severity":"major","summary":"Require manual browser provenance","file":"src/catalog.tsx","line":307}' \
+    | (cd "$work" && node "$ledger" add 1 test) >/dev/null
+  jq -e '[.findings[] | select(.file=="src/catalog.tsx")] | length==2 and ([.[].summary]|sort)==["Require manual browser provenance","Validate regular image file"] and ([.[].severity]|sort)==["high","low"]' \
+    "$work/specs/PROJ-1-test/5_progress/findings.json" >/dev/null || fail "$label: different concerns at one line collapsed"
+  printf '%s\n' '{"source":"coderabbit","severity":"critical","summary":"  VALIDATE regular   image file ","file":"src/catalog.tsx","line":307}' \
+    | (cd "$work" && node "$ledger" add 1 test) >/dev/null
+  jq -e '[.findings[] | select(.file=="src/catalog.tsx")] | length==2 and ([.[]|select(.summary=="Validate regular image file")][0].severity=="critical")' \
+    "$work/specs/PROJ-1-test/5_progress/findings.json" >/dev/null || fail "$label: same-line genuine duplicate did not merge/escalate"
+
   # harvest: ponytail: markers become deferred debt findings; idempotent; quiet when there is nothing to do
   local hv="$TMP/$label-harvest"
   mkdir -p "$hv/specs/PROJ-1-test" "$hv/src/deep" "$hv/node_modules/x" "$hv/specs/PROJ-1-test/notes"
@@ -89,6 +101,16 @@ run_suite() {
   (cd "$hv" && node "$ledger" harvest 1 test .) >/dev/null
   [[ $(jq '[.findings[] | select(.file | startswith("node_modules") or startswith("specs"))] | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 0 ]] \
     || fail "$label: harvest of the repo root must still skip node_modules and specs"
+  mkdir -p "$hv/specs/PROJ-1-test/3-4_plan" "$hv/app/src"
+  printf '{"app_root":"app"}\n' >"$hv/specs/PROJ-1-test/3-4_plan/wave-gate-config.json"
+  printf '// ponytail: nested app debt\n' >"$hv/app/src/nested.ts"
+  (cd "$hv" && node "$ledger" harvest 1 test --stage delivery) >/dev/null
+  jq -e '.findings | length == 1 and .[0].file == "app/src/nested.ts"' "$hv/specs/PROJ-1-test/8_delivery/findings.json" >/dev/null || fail "$label: default harvest ignored configured app_root"
+  for invalid_root in '../escape' '..\escape' '/tmp' ' '; do
+    jq -n --arg app_root "$invalid_root" '{app_root:$app_root}' >"$hv/specs/PROJ-1-test/3-4_plan/wave-gate-config.json"
+    if (cd "$hv" && node "$ledger" harvest 1 test >/dev/null 2>&1); then fail "$label: harvest accepted unsafe app_root '$invalid_root'"; fi
+  done
+  (cd "$hv" && node "$ledger" harvest 1 test empty) >/dev/null || fail "$label: explicit harvest root must override app_root"
   before=$(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json")
   mkdir "$hv/huge"; yes 'x ponytail: filler marker text to make the grep output large' | head -c 60000000 >"$hv/huge/big.txt" || true
   set +e; (cd "$hv" && node "$ledger" harvest 1 test huge) >/dev/null 2>&1; rc=$?; set -e

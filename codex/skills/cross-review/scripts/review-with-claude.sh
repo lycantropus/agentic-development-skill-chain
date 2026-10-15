@@ -7,15 +7,18 @@
 # stamped with "provider":"claude". The invocation runs as its own process
 # group and is killed whole (TERM then KILL) on timeout — no orphans.
 #
-# Usage: review-with-claude.sh --prompt <file> [--model M] [--timeout S] [--max-turns N]
-# Exit:  0 valid finding lines on stdout · 1 CLI failed/timeout/zero valid lines · 64 usage
+# Usage: review-with-claude.sh --prompt <file> [--model M] [--timeout S] [--resource-config FILE] [--max-turns N]
+# Exit:  0 valid finding lines on stdout · 1 CLI failed/timeout/zero valid lines · 75 provider quota/capacity unavailable · 77 resource pressure · 64 usage/config
 set -euo pipefail
 _compat_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$_compat_dir/compat.sh" ]; then source "$_compat_dir/compat.sh"; else source "$_compat_dir/../../5_executing/scripts/compat.sh"; fi
+if [ ! -f "$_compat_dir/compat.sh" ]; then _compat_dir="$_compat_dir/../../5_executing/scripts"; fi
+source "$_compat_dir/compat.sh"
 
+RESOURCE_CONFIG="${SKILLCHAIN_RESOURCE_CONFIG:-.framework/wave-gate-config.json}"
 PROMPT="" MODEL="" TIMEOUT=600 MAX_TURNS=5
 while [ $# -gt 0 ]; do
   case "$1" in
+    --resource-config) RESOURCE_CONFIG="${2:?}"; shift 2 ;;
     --prompt)    PROMPT="${2:?}"; shift 2 ;;
     --model)     MODEL="${2:?}"; shift 2 ;;
     --timeout)   TIMEOUT="${2:?}"; shift 2 ;;
@@ -39,7 +42,8 @@ if [ "$PROMPT_BYTES" -gt "$CLAUDE_STDIN_MAX_BYTES" ]; then
 fi
 
 RAW="$(mktemp)"
-trap 'rm -f "$RAW"' EXIT
+RESOURCE_LOG="$(mktemp)"
+trap 'rm -f "$RAW" "$RESOURCE_LOG"' EXIT
 
 kill_tree() { # whole process group, TERM then KILL (mirrors run-phase.sh kill_group)
   kill -TERM -- "-$1" 2>/dev/null || true
@@ -63,10 +67,11 @@ SCHEMA='{"type":"object","properties":{"findings":{"type":"array","minItems":1,"
 # cut the run off as error_max_turns before a valid result ever formed. The
 # default here gives headroom above the observed floor; the wall-clock
 # --timeout below remains the real worst-case bound, not the turn count.
-"${SETSID_BIN[@]}" claude -p ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
+"${SETSID_BIN[@]}" bash -c 'source "$1"; cfg="$2"; raw="$3"; shift 3; provider_command() { "$@" >"$raw" 2>&1; }; resource_run "$cfg" provider-review provider_command "$@"' _ \
+  "$_compat_dir/compat.sh" "$RESOURCE_CONFIG" "$RAW" claude -p ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
   --safe-mode --strict-mcp-config --tools "" --max-turns "$MAX_TURNS" --effort low \
   --no-session-persistence --output-format json --json-schema "$SCHEMA" \
-  <"$PROMPT" >"$RAW" 2>&1 &
+  <"$PROMPT" >"$RESOURCE_LOG" 2>&1 &
 PID=$!
 trap 'kill_tree "$PID"; exit 1' INT TERM
 
@@ -80,7 +85,18 @@ while kill -0 "$PID" 2>/dev/null; do
   sleep "${SKILLCHAIN_POLL_SECONDS:-2}"
 done
 set +e; wait "$PID" 2>/dev/null; RC=$?; set -e
-trap 'rm -f "$RAW"' EXIT
+trap 'rm -f "$RAW" "$RESOURCE_LOG"' EXIT
+cat "$RESOURCE_LOG" >&2
+# Inspect error envelopes only: a finding about rate limits is not provider failure.
+PROVIDER_ERRORS="$(jq -Rsc '. as $raw | [(try ($raw | fromjson) catch ($raw | split("\n")[] | fromjson?)) | select(type == "object" and (.is_error == true or .type == "error" or .type == "turn.failed" or .error? != null))]' "$RAW" 2>/dev/null || true)"
+if [ "$RC" -ne 0 ] && [ -n "$PROVIDER_ERRORS" ] && grep -Eqi 'usage_limit_reached|insufficient_quota|rate_limit_exceeded|overloaded_error|quota[ _-]*(exhausted|exceeded)|usage limit|rate limit|HTTP[ /:_-]*429' <<<"$PROVIDER_ERRORS"; then
+  echo "review-with-claude.sh: provider-unavailable (quota/rate limit/capacity); no review completed" >&2
+  exit 75
+fi
+if [ "$RC" -eq 64 ] || [ "$RC" -eq 77 ]; then
+  cat "$RAW" >&2
+  exit "$RC"
+fi
 if [ "$RC" -ne 0 ]; then
   echo "review-with-claude.sh: claude exited $RC" >&2
   tail -n 5 "$RAW" >&2 || true

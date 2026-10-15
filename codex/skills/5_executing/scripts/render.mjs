@@ -49,7 +49,7 @@ const externalPrerequisites = (base) => {
       return `- External prerequisite (declaration, not a pass): ${ac.id} / wave ${wave} — ${d.reason}; decided by ${d.decided_by} at ${d.decided_at}. Readiness: \`${d.check_command}\`; evidence: 5_progress/ralph-wave-${wave}.json.`;
     }));
 };
-const degradedLine = (s) => `⚠ single-provider run (${s.degraded_reason ?? "codex unavailable"}) — cross-review: model-opposite fallback`;
+const degradedLine = (s) => `⚠ Provider degradation: ${s.degraded_reason ?? "reason not recorded"}`;
 // First existing copy: the project's templates/, next to a synchronized or installed render.mjs, the delivery skill's.
 const templateFile = (name) => {
   const found = ["templates", join(here, "..", "templates"), join(here, "..", "..", "8_delivery", "templates")]
@@ -114,7 +114,7 @@ function pr([projX, theme, templateArg]) {
   const debt = findings.filter((f) => f.status === "deferred");
   const debtSection = debt.length
     ? ["| ID | Severity | File | Summary |", "|---|---|---|---|",
-       ...debt.map((f) => `| ${f.id} | ${f.severity} | ${f.file ?? "—"} | ${f.summary.replaceAll("|", "\\|")} |`),
+       ...debt.map((f) => `| ${f.id} | ${f.severity} | ${f.file ?? "—"} | ${f.summary.replaceAll("|", "\\|").replace(/\r\n|\r|\n/g, "<br>")} |`),
       ].join("\n")
     : "none";
 
