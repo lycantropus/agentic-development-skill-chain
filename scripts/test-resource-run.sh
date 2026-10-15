@@ -29,8 +29,20 @@ unset SKILLCHAIN_CGROUP_MOUNT SKILLCHAIN_SELF_CGROUP_FILE
 printf '{"resources":{"wait_seconds":3,"max_parallel_commands":2}}'  >"$TMP/config"
 export SKILLCHAIN_RESOURCE_HEARTBEAT_FILE="$TMP/heartbeat"
 printf '0\n' >"$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE"
-(sleep 0.5; [[ $(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE") -gt 0 && ! -e "$TMP/recovered" ]] || touch "$TMP/heartbeat-failed"; printf 'max\n' >"$SKILLCHAIN_CGROUP_DIR/memory.max") & recovery=$!
-resource_run "$TMP/config" recovery touch "$TMP/recovered"; wait "$recovery"; [[ -e "$TMP/recovered" && ! -e "$TMP/heartbeat-failed" ]]
+(
+  deadline=$((SECONDS + 10))
+  while [[ $(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE") -eq 0 && "$SECONDS" -lt "$deadline" ]]; do sleep 0.05; done
+  [[ $(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE") -gt 0 && ! -e "$TMP/recovered" ]] || touch "$TMP/heartbeat-failed"
+  printf 'max\n' >"$SKILLCHAIN_CGROUP_DIR/memory.max"
+) & recovery=$!
+# Slow policy reads must not race a fixed-delay telemetry recovery on loaded hosts.
+jq() { sleep 0.6; command jq "$@"; }
+recovery_rc=0; resource_run "$TMP/config" recovery touch "$TMP/recovered" || recovery_rc=$?
+unset -f jq
+wait "$recovery"
+[[ "$recovery_rc" == 0 && -e "$TMP/recovered" && ! -e "$TMP/heartbeat-failed" ]] || {
+  echo "FAIL: recovery handshake rc=$recovery_rc heartbeat=$(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE")" >&2; exit 1;
+}
 unset SKILLCHAIN_RESOURCE_HEARTBEAT_FILE
 # Two commands overlap, a third cannot launch until a slot is released.
 for n in 1 2; do resource_run "$TMP/config" "slot$n" bash -c 'touch "$1"; while [[ ! -e "$2" ]]; do sleep 0.05; done' _ "$TMP/started$n" "$TMP/release" & done
