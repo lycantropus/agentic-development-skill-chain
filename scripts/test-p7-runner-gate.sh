@@ -7,6 +7,7 @@ export SKILLCHAIN_POLL_SECONDS=0.1 # stubs return instantly; production default 
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS="$ROOT/claude/skills"
+source "$SKILLS/5_executing/scripts/compat.sh"
 CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
 die() { echo "p7-runner-gate: $*" >&2; exit 1; }
@@ -66,7 +67,7 @@ EOF
 chmod +x bin/codex
 run_p7() { # <out-file>; prints the runner's exit code
   local rc=0
-  PATH="$FIX/bin:$PATH" timeout --foreground 120 "$ROOT/runner/run-phase.sh" P7 96 stage2 --timeout 60 >"$1" 2>&1 || rc=$?
+  PATH="$FIX/bin:$PATH" "${TIMEOUT_BIN[@]}" --foreground 120 "$ROOT/runner/run-phase.sh" P7 96 stage2 --timeout 60 >"$1" 2>&1 || rc=$?
   echo "$rc"
 }
 mark_open_xr_fixed() {
