@@ -428,7 +428,7 @@ Require plan approval for each implementer before they make changes.
 
 **For waves with a single user story:** Use a regular subagent (no team overhead needed). Use the role from the plan's `Agent Type` column. Local editing is permitted only when delegation is unavailable or prohibited; report that reason explicitly.
 
-Spawn prompt for a story worker (about six lines; everything else is in the file). Keep "Wave <N>" in the text: the global `wave-gate-enforcer` hook reads the wave number from the prompt and abstains without it:
+Spawn prompt for a story worker (about six lines; everything else is in the file). Keep "Wave <N>" in the text: the worker and anyone reading the spawn log must see which wave it belongs to (Codex has no spawn hook; the gate is `chain gate wave`):
 
 ```
 Implementiere <US-ID> (Wave <N>). Dein vollständiger Auftrag steht in `<Pfad>`. Lies ihn

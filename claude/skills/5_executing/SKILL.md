@@ -139,7 +139,7 @@ On success the script appends a `### Wave N Gate — PASSED` block with timestam
 
 **If jq, coderabbit, or agent-browser are missing:** the script prints a clear error and exits non-zero. Install them, do not work around the gate.
 
-**Belt-and-braces enforcement:** A global PreToolUse hook (`~/.claude/hooks/wave-gate-enforcer.js`) inspects every `Agent` spawn. When `subagent_type` is a `skillchain-*implementer` type and the prompt mentions Wave N with N > 1, it refuses the spawn unless `### Wave N-1 Gate — PASSED` exists in `5_progress/PROJ-<X>-progress.md`. The script is the primary gate; the hook is the fail-safe so the main agent cannot accidentally skip it.
+**Optional external enforcement (Claude only, not shipped with this repo or its installers):** if you keep a personal global PreToolUse hook at `~/.claude/hooks/wave-gate-enforcer.js`, it can inspect every `Agent` spawn. When `subagent_type` is a `skillchain-*implementer` type and the prompt mentions Wave N with N > 1, it refuses the spawn unless `### Wave N-1 Gate — PASSED` exists in `5_progress/PROJ-<X>-progress.md`. The script (`chain gate wave`) is the primary and binding gate; without that hook there is no second fail-safe, so the lead must not start wave N+1 before the gate exited 0.
 </HARD-GATE>
 
 ---
@@ -429,7 +429,7 @@ Require plan approval for each implementer before they make changes.
 
 **For waves with a single user story:** Use a regular subagent (no team overhead needed). Use the role from the plan's `Agent Type` column. Local editing is permitted only when delegation is unavailable or prohibited; report that reason explicitly.
 
-Spawn prompt for a story worker (about six lines; everything else is in the file). Keep "Wave <N>" in the text: the global `wave-gate-enforcer` hook reads the wave number from the prompt and abstains without it:
+Spawn prompt for a story worker (about six lines; everything else is in the file). Keep "Wave <N>" in the text: the optional global `wave-gate-enforcer` hook (if installed) reads the wave number from the prompt and abstains without it:
 
 ```
 Implementiere <US-ID> (Wave <N>). Dein vollständiger Auftrag steht in `<Pfad>`. Lies ihn
