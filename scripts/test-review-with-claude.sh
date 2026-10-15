@@ -63,7 +63,7 @@ fails "sandbox/infrastructure failure" || { echo "FAIL: adapter accepted infrast
 stub "echo '{\"is_error\":true,\"terminal_reason\":\"api_error\",\"result\":\"Not logged in\"}'"
 fails "no validated structured findings" || { echo "FAIL: adapter accepted an rc=0 API/auth error envelope" >&2; exit 1; }
 
-truncate -s 10000001 "$CASE/over-limit.md"
+dd if=/dev/null of="$CASE/over-limit.md" bs=1 seek=10000001 2>/dev/null   # sparse file (macOS has no truncate)
 stub "echo unreachable"
 ! out="$(bash "$SCRIPT" --prompt "$CASE/over-limit.md" --timeout 10 2>&1)" && grep -q 'stdin is limited to 10 MB' <<<"$out" \
   || { echo "FAIL: adapter must name the 10 MB stdin ceiling" >&2; exit 1; }
