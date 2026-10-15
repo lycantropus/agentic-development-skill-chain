@@ -19,7 +19,7 @@ for d in PRODUCT ARCHITECTURE GUIDELINES DESIGN-SYSTEM security-baseline test-co
 printf '# Components\n- Button\n' >docs/components.md
 printf '# Rules\n- rule 1\n' >AGENTS.md
 for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
-         6_qa/scripts/findings.mjs 7_documentation/scripts/curation.sh; do
+         6_qa/scripts/findings.mjs 6_qa/scripts/findings-store.mjs 7_documentation/scripts/curation.sh; do
   cp "$SKILLS/$s" scripts/
 done
 chmod +x scripts/*.sh scripts/chain
@@ -70,7 +70,7 @@ run_p7() { # <out-file>; prints the runner's exit code
   echo "$rc"
 }
 mark_open_xr_fixed() {
-  for id in $(jq -r '.findings[] | select(.status=="open" and (.source=="cross-review" or ((.sources // []) | index("cross-review")))) | .id' specs/PROJ-96-stage2/findings.json 2>/dev/null); do
+  for id in $(chain findings list 96 stage2 | jq -r '.findings[] | select(.status=="open" and (.source=="cross-review" or ((.sources // []) | index("cross-review")))) | .id'); do
     chain findings set-status 96 stage2 "$id" fixed deadbeef >/dev/null 2>&1
   done
 }

@@ -13,7 +13,7 @@ Ownership boundary — never blur it:
 ## Loop
 
 1. **Script, no LLM:** findings arrive deduplicated in
-   `specs/<PROJ>/findings.json` via `bash scripts/chain findings add <X> <theme>` (the
+   `specs/<PROJ>/6_qa/findings.json` via `bash scripts/chain findings add <X> <theme> --stage qa` (the
    wave gates and QA lanes already wrote theirs). Get the picture with
    `bash scripts/chain findings stats <X> <theme>` and the fix queue with
    `bash scripts/chain findings queue <X> <theme>` (open Critical/High, clustered by file).
@@ -47,7 +47,7 @@ Ownership boundary — never blur it:
    reported `not scriptable`, plus the batch as a whole where the test
    covers only part of the finding. The fixer never
    certifies its own repair. If re-verification finds the problem again,
-   report it as a fresh open finding via `chain findings add <X> <theme>` — the ledger
+   report it as a fresh open finding via `chain findings add <X> <theme> --stage qa` — the ledger
    REOPENS a `fixed` finding on an open re-report; never leave a failed
    repair marked fixed.
 5. Repeat until `bash scripts/chain findings stats <X> <theme>` shows `open_blocking: 0`.

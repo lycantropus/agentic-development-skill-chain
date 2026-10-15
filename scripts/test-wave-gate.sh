@@ -460,18 +460,18 @@ EOF
   unset CR_FIXTURE
 
   case_dir ledger-cumulative
-  write_config "$(default_config)"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/findings.mjs" "$CASE/scripts/findings.mjs"; commit_case
+  write_config "$(default_config)"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/"findings{,-store}.mjs "$CASE/scripts/"; commit_case
   printf '%s\n' '{"source":"review","severity":"high","summary":"earlier blocker","file":"src/old.ts"}' | (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings add 1 test) >/dev/null
   expect_fail run_gate; grep -q 'cumulative/current open blocking' "$GATE_OUT" || fail "$LABEL: earlier ledger blocker did not block a zero-finding review"
 
   case_dir ledger-deferred
-  config=$(default_config); write_config "$config"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/findings.mjs" "$CASE/scripts/findings.mjs"; commit_case
+  config=$(default_config); write_config "$config"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/"findings{,-store}.mjs "$CASE/scripts/"; commit_case
   printf '%s\n' '{"source":"coderabbit","severity":"major","summary":"same defect","file":"src/a.ts"}' | (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings add 1 test) >/dev/null
-  id=$(jq -r '.findings[0].id' "$CASE/specs/PROJ-1-test/findings.json"); (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings set-status 1 test "$id" deferred) >/dev/null
+  id=$(jq -r '.findings[0].id' "$CASE/specs/PROJ-1-test/5_progress/findings.json"); (cd "$CASE" && bash "$ROOT/$PLATFORM/skills/5_executing/scripts/chain" findings set-status 1 test "$id" deferred) >/dev/null
   CR_FIXTURE="$TMP/$PLATFORM-coderabbit-deferred.jsonl"; export CR_FIXTURE
   printf '%s\n' '{"type":"finding","severity":"major","fileName":"src/a.ts","codegenInstructions":"same defect"}' >"$CR_FIXTURE"
   run_gate >/dev/null || fail "$LABEL: deferred re-report incorrectly blocked"
-  [[ $(jq -r '.findings[0].status' "$CASE/specs/PROJ-1-test/findings.json") == deferred ]] || fail "$LABEL: deferred finding was reopened"
+  [[ $(jq -r '.findings[0].status' "$CASE/specs/PROJ-1-test/5_progress/findings.json") == deferred ]] || fail "$LABEL: deferred finding was reopened"
   unset CR_FIXTURE
 
   case_dir redirect

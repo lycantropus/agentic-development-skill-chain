@@ -127,7 +127,22 @@ A gate is either a **script** (deterministic, same answer every time), an **LLM 
 - **Ground file** — assumptions the plans rely on, each validated against the codebase, limited to what `docs/` does not already say.
 - **Ralph** — the bounded verification loop. *Inner Ralph* is one self-review by each worker; *Outer Ralph* is the lead's wave-scoped pass over the acceptance criteria with four fixed recovery stages.
 - **Quality Gate** — the PROJ-level gate after the last wave: declared quality commands, build, coverage, lint, Sonar and an integration review of `BASE_SHA..HEAD`, sealed by `chain quality seal`.
-- **Ledger** — `findings.json`, the one deduplicated list of findings from every review source.
+- **Ledger** — the stage-local `findings.json` files, read together as one PROJ fix queue.
 - **Cross-review** — a review by the opposite provider (a Claude author is reviewed by Codex and the reverse), started with `chain review`.
 - **degraded** — set in `state.json` when Codex is missing or unauthenticated: the run continues single-provider with a model-opposite review, flagged in the morning report and the PR body, never silent.
 - **BASE_SHA** — the commit the PROJ branch started from; QA and docs review the diff `BASE_SHA..HEAD`.
+
+## Stage-local review findings
+
+Reviews inside a PROJ retain findings beside their phase artifacts: concept in
+`1_concept/`, requirements in `2_PRDs/`, architecture and plans in `3-4_plan/`,
+implementation in `5_progress/`, QA in `6_qa/`, documentation in
+`7_documentation/`, delivery in `8_delivery/`; each file is named `findings.json`.
+`chain findings list <X> <theme>` aggregates all stage ledgers plus an existing
+legacy root ledger. There is no generated central copy. IDs are unique per
+PROJ, status updates preserve the owning file, and gates/reports read the
+aggregate. `chain findings add <X> <theme> --stage <mode>` selects a phase; the
+default is implementation. Concept and requirements persist without runtime
+state; `--persist` additionally records a review round in existing state.json.
+Outside a PROJ directory, cross-review prints findings without saving files or
+creating a project. Clean reviews do not create an empty findings file.

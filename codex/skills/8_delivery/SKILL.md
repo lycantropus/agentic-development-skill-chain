@@ -36,7 +36,7 @@ operational records remain lead-owned through their existing commands.
 ## Input
 
 - `specs/PROJ-<X>-<theme>/state.json` at `P7:done` (or `P8:*` when resuming)
-- `specs/PROJ-<X>-<theme>/findings.json` — the ledger (debt section source)
+- `chain findings list <X> <theme>` — the aggregate of stage-local ledgers (debt section source)
 - The PROJ branch `proj/PROJ-<X>` with all commits including docs
 - `.worktree` metadata from P0: dependencies are isolated in the persistent
   PROJ worktree; `.env.local`, development database, hosted-auth limits, and
@@ -68,7 +68,7 @@ it never touches real branches) and read the JSON verdict:
 
 ### 2. Complete the ledger before rendering
 
-1. `bash scripts/chain findings harvest <X> <theme>` — collect `ponytail:` markers
+1. `bash scripts/chain findings harvest <X> <theme> --stage delivery` — collect `ponytail:` markers
 2. `bash scripts/chain findings auto-defer <X> <theme>` — open Medium/Low → debt (§8)
 3. `bash scripts/chain findings stats <X> <theme>` — **open_blocking MUST be 0.**
    If not, P8 must not deliver: route back to the P6 fix loop; after
@@ -188,7 +188,7 @@ orchestrator) to the PR comments, via
    immediately, concurrently for disjoint files (comment verbatim + file
    paths each), verify, commit. Do not push per comment.
 3. `debt` → `ponytail:` marker + ledger record
-   (`bash scripts/chain findings add <X> <theme>` with status `deferred`),
+   (`bash scripts/chain findings add <X> <theme> --stage delivery` with status `deferred`),
    reply on the comment with the finding id.
 4. `reject` → reply on the PR with the rationale — never silently ignore.
 5. Append each classification to `specs/PROJ-<X>-<theme>/decisions.md`

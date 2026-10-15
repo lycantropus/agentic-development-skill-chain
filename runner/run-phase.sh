@@ -324,19 +324,18 @@ store_finder_report() { # outfile ts — the finder's non-JSON text -> 5_progres
 }
 
 open_blocking_count() {
-  if ! chain_has findings || [ ! -f "$BASE/findings.json" ]; then echo 0; return; fi
-  chain findings stats "$PROJ" "$THEME" 2>/dev/null | jq -r '.open_blocking // 0' || echo 0
+  if ! chain_has findings; then echo 0; return; fi
+  chain findings list "$PROJ" "$THEME" | jq '[.findings[] | select(.status == "open" and (.severity == "critical" or .severity == "high"))] | length'
 }
 
 # P7 gate helpers (Stage 2). Reading findings.json is legal — only WRITES
 # must go through chain findings.
 open_cross_review_blocking() {
-  if [ ! -f "$BASE/findings.json" ]; then echo 0; return; fi
-  jq '[.findings[]
+  chain findings list "$PROJ" "$THEME" | jq '[.findings[]
        | select(.status == "open")
        | select(.severity == "critical" or .severity == "high")
        | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))
-      ] | length' "$BASE/findings.json" 2>/dev/null || echo 0
+      ] | length'
 }
 
 stop_run() { # reason error_file
@@ -419,8 +418,8 @@ setup_providers() {
 }
 
 tree_snapshot() { # read-only proof for the finder: status + content of everything except the ledger and state the QA scripts legitimately write
-  { git status --porcelain -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'
-    git diff HEAD -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'; } 2>/dev/null | sha1sum
+  { git status --porcelain -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'
+    git diff HEAD -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'; } 2>/dev/null | sha1sum
 }
 
 run_p6() {
@@ -443,7 +442,7 @@ run_p6() {
   # Strict, unlike the advisory peer lanes: chain findings add rejects the whole batch on any malformed line.
   grep -q 'Production-ready recommendation' "$finder_out" || stop_run "P6 finder returned no complete QA report" "$finder_out"
   if grep -q '^{' "$finder_out"; then
-    grep '^{' "$finder_out" | chain findings add "$PROJ" "$THEME" || stop_run "P6 finder emitted malformed finding lines — nothing ingested" "$finder_out"
+    grep '^{' "$finder_out" | chain findings add "$PROJ" "$THEME" --stage qa || stop_run "P6 finder emitted malformed finding lines — nothing ingested" "$finder_out"
   fi
   store_finder_report "$finder_out" "$ts"
 

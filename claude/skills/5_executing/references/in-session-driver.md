@@ -22,7 +22,7 @@ and continue at the matching step, so a fresh session resumes anywhere.
       unchanged afterwards; compare this snapshot taken before and right after
       the finder, before any bookkeeping (it excludes only the ledger and state
       the QA scripts write):
-      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | sha1sum`.
+      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | sha1sum`.
       A finder that errors, changes the tree, or fails the ingest is re-run
       once; a second failure is a stop. `chain findings add` rejects the whole
       batch on any malformed line, so nothing partial is recorded:
@@ -30,7 +30,7 @@ and continue at the matching step, so a fresh session resumes anywhere.
       ```bash ingest
       if ! grep -q 'Production-ready recommendation' "$OUT" 2>/dev/null; then
         echo "finder returned no complete QA report"; false
-      elif ! grep -q '^{' "$OUT" || grep '^{' "$OUT" | bash scripts/chain findings add <X> <theme>; then
+      elif ! grep -q '^{' "$OUT" || grep '^{' "$OUT" | bash scripts/chain findings add <X> <theme> --stage qa; then
         REPORT="specs/PROJ-<X>-<theme>/5_progress/qa-finder-$(date +%Y%m%d-%H%M%S).md"
         grep -v '^{' "$OUT" >"$REPORT" || true
         bash scripts/chain state set <X> <theme> .qa.finder_report "$REPORT"

@@ -17,6 +17,7 @@ const inventory = [
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),
   ["cross-review/templates/cross-review-prompt.md.tmpl", "templates/cross-review-prompt.md.tmpl"],
   ["6_qa/scripts/findings.mjs", "scripts/findings.mjs"],
+  ["6_qa/scripts/findings-store.mjs", "scripts/findings-store.mjs"],
   ["7_documentation/scripts/curation.sh", "scripts/curation.sh"],
   ["5_executing/templates/agent-md-entry.md.tmpl", "templates/agent-md-entry.md.tmpl"],
   ...["delivery.sh"].map(name => [`8_delivery/scripts/${name}`, `scripts/${name}`]),

@@ -166,6 +166,11 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
   check_identical "$ROOT/claude/skills/$f" "$ROOT/codex/skills/$f"
 done
 
+check_identical "$ROOT/codex/skills/6_qa/scripts/findings-store.mjs" \
+  "$ROOT/claude/skills/6_qa/scripts/findings-store.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/findings-store.mjs" \
+  "$ROOT/claude/skills/5_executing/scripts/findings-store.mjs"
+
 # Shared pure readers must match every adjacent import copy.
 check_identical "$ROOT/codex/skills/4_writing-plans/scripts/document-parser.mjs" \
   "$ROOT/claude/skills/4_writing-plans/scripts/document-parser.mjs" \
@@ -219,6 +224,7 @@ harness unattended-handoff  bash "$ROOT/scripts/test-unattended-handoff.sh"
 harness p7-runner-gate      bash "$ROOT/scripts/test-p7-runner-gate.sh"
 harness in-session-driver   bash "$ROOT/scripts/test-in-session-driver.sh"
 harness sync-framework      node "$ROOT/scripts/test-sync-framework.mjs"
+harness stage-findings node "$ROOT/scripts/test-stage-findings.mjs"
 harness findings            bash "$ROOT/scripts/test-findings.sh"
 harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"
 harness migration-drift     bash "$ROOT/scripts/test-migration-drift-check.sh"

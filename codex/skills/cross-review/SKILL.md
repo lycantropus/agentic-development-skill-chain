@@ -38,8 +38,32 @@ If `scripts/chain review` has not been installed in the project yet, use
 `~/.codex/skills/5_executing/scripts/chain review` in the commands below.
 Run from the project root so artifact paths resolve correctly.
 
-Before P0, state.json does not exist. Pass the author explicitly; findings are
-written to stdout for the human, never to a ledger:
+Before P0, pass the author explicitly. In an existing PROJ directory, findings
+are saved through `chain findings add --stage <mode>` even without state.json.
+Outside a PROJ structure (no `specs/PROJ-<X>-<theme>/`), report findings only;
+never create a project directory, ledger or runtime state for a free-standing review.
+A clean review creates no findings file.
+
+Storage inside a PROJ:
+
+| Review | Ledger |
+|---|---|
+| Concept | `1_concept/findings.json` |
+| Requirements | `2_PRDs/findings.json` |
+| Architecture and plans | `3-4_plan/findings.json` |
+| Implementation, CodeRabbit, Sonar and debt | `5_progress/findings.json` |
+| QA | `6_qa/findings.json` |
+| Documentation | `7_documentation/findings.json` |
+| Delivery | `8_delivery/findings.json` |
+
+`chain findings list` aggregates these files and an existing legacy root ledger
+without writing a central copy. IDs remain unique per PROJ; status and attempt
+updates find the owning file automatically. Use `list --stage <mode>` for one
+stage. Review the aggregated ledger when reconciling open findings. Retain fixed
+and deferred records in their original folder. Existing legacy folders remain
+in use; no automatic move of existing ledgers.
+
+Example:
 
 ```bash
 bash scripts/chain review concept <X> <theme> \

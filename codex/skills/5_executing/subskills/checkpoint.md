@@ -111,8 +111,7 @@ first):
    `chain review` itself uses to decide BLOCKING — reuse it rather than
    inventing a second definition of "clean":
    ```bash
-   jq '[.findings[]? | select(.status == "open") | select(.severity == "critical" or .severity == "high") | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))] | length' \
-     specs/PROJ-<X>-<theme>/findings.json 2>/dev/null || echo 0
+   bash ~/.codex/skills/5_executing/scripts/chain findings list <X> <theme> | jq '[.findings[]? | select(.status == "open") | select(.severity == "critical" or .severity == "high") | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))] | length'
    ```
    Nonzero (a finding needed a human decision and nobody resolved it in the
    ledger) → no fast path, continue at Step 1.

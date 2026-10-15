@@ -231,7 +231,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 | `5_executing/templates/decisions.md.tmpl`, `morning-report.md.tmpl`, `stop-report.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
 | `cross-review/templates/cross-review-prompt.md.tmpl` | `templates/` |
-| `6_qa/scripts/findings.mjs` | `scripts/` |
+| `6_qa/scripts/findings.mjs`, `findings-store.mjs` | `scripts/` |
 | `7_documentation/scripts/curation.sh` | `scripts/` |
 | `5_executing/templates/agent-md-entry.md.tmpl` | `templates/` |
 | `8_delivery/scripts/delivery.sh` | `scripts/` |

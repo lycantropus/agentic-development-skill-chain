@@ -20,7 +20,7 @@ set_state .docs_changed '["docs/A.md"]'
 set_state .lanes '[{"provider":"claude","role":"writer","phase":"P5","exit_code":1,"output_file":"o.out"}]'
 printf '%s\n' '{"source":"review","severity":"high","summary":"a | pipe","file":"src/a.ts"}' \
   '{"source":"review","severity":"low","summary":"low one","file":"src/b.ts"}' | $CHAIN findings add 1 demo >/dev/null
-id="$(jq -r '.findings[] | select(.severity == "low") | .id' specs/PROJ-1-demo/findings.json)"
+id="$(jq -r '.findings[] | select(.severity == "low") | .id' specs/PROJ-1-demo/5_progress/findings.json)"
 $CHAIN findings set-status 1 demo "$id" deferred >/dev/null
 cat > specs/PROJ-1-demo/3-4_plan/wave-gate-config.json <<'EOF'
 {"waves":{"1":{"ac_commands":[{"id":"AC-1","cmd":"true","external_dependency":{"reason":"needs sso","decided_by":"me","decided_at":"2026","check_command":"curl x"}}]}}}

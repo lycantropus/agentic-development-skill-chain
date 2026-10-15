@@ -313,9 +313,13 @@ Before the user reviews it, check the written concept and fix issues inline; ask
 7. **Boundary:** nothing from the [Boundary](#boundary) "does not own" list leaked in; implementation success reads as product constraints or risks, not technical design.
 
 ## Automatic Cross-Review
+In a PROJ, save review findings to `1_concept/findings.json` through
+`chain findings`; status updates stay in that file. For a free-standing review
+outside a PROJ structure, report findings without saving a file.
 
 Immediately after saving the concept, check the cap and invoke `cross-review` in the same turn,
-before user review or transition:
+before user review or transition. Do not end the turn after saving with an offer
+to run the review later:
 
 ```bash
 [ "$(wc -l < specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md)" -le 150 ] || echo "concept over 150 lines — cut before cross-review"
@@ -349,7 +353,9 @@ Ask:
 
 > "Concept written and committed to `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md`. Automatic cross-review is complete. Please review the concept before we continue. Let me know if you want to make any changes."
 
-Apply requested changes and self-review again; proceed only after approval. Then:
+Apply requested changes, self-review and check the cap again, then automatically
+run cross-review on the revised concept in the same turn before presenting it
+again. Proceed only after user approval. Then:
 
 - UI feature → invoke `visual-companion`; with `Candidate Directions`, tell it to prototype each candidate. Pure backend/API → invoke `requirements-engineer`.
 - If the PROJ depends on an uncreated or unapproved sibling, create or approve that prerequisite first.

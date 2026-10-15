@@ -20,7 +20,7 @@ git init -q -b main; git config user.email t@local; git config user.name t
 printf '# Architecture\nsrc/queue.js implements exponential backoff with a dead-letter queue for failed events.\n' >docs/ARCHITECTURE.md
 printf '# Rules\n- rule 1\n' >AGENTS.md
 for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
-         6_qa/scripts/findings.mjs cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
+         6_qa/scripts/findings.mjs 6_qa/scripts/findings-store.mjs cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh; do
   cp "$SKILLS/$s" scripts/
 done
@@ -74,13 +74,13 @@ chain state set 96 stage2 .authorship '{"docs-delta":{"author_provider":"claude"
 # Claude-authored -> Codex reviews; the round and the provider-stamped finding land in state and ledger.
 review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key docs-delta --round 1 >/dev/null 2>&1 || die 'claude-authored docs review failed'
 [ "$(xr '.cross_review[-1].reviewer_provider')" = codex ] || die 'claude-authored review not routed to codex'
-[ "$(jq -r '[.findings[] | select(.source == "cross-review" and .provider == "codex")] | length' specs/PROJ-96-stage2/findings.json)" -ge 1 ] \
+[ "$(jq -r '[.findings[] | select(.source == "cross-review" and .provider == "codex")] | length' specs/PROJ-96-stage2/7_documentation/findings.json)" -ge 1 ] \
   || die 'codex finding missing from the ledger with source=cross-review and provider'
 
 # Codex-authored -> authenticated Claude reviews, is recorded and ingested.
 CLAUDE_STUB_SEVERITY=medium review docs 96 stage2 --artifacts docs/ARCHITECTURE.md --author-key codex-delta --round 1 >/dev/null 2>&1 || die 'codex-authored docs review failed'
 [ "$(xr '.cross_review[-1].reviewer_provider')" = claude ] || die 'codex-authored review not routed to claude'
-[ "$(jq -r '[.findings[] | select(.source == "cross-review" and .provider == "claude")] | length' specs/PROJ-96-stage2/findings.json)" -ge 1 ] \
+[ "$(jq -r '[.findings[] | select(.source == "cross-review" and .provider == "claude")] | length' specs/PROJ-96-stage2/7_documentation/findings.json)" -ge 1 ] \
   || die 'claude finding missing from the ledger'
 
 # QA starts six separate persona workers on the opposite provider (auth probes are no workers).
@@ -123,11 +123,17 @@ cat >"$STUB/codex" <<'EOS'
 echo '{"severity":"medium","category":"stale-claim","file":"docs/ARCHITECTURE.md","line":2,"summary":"stub codex finding"}'
 EOS
 
-# Before P0 there is no state.json: an explicit author routes the review and findings go to stdout only.
+# Before P0, persist concept findings without creating runtime state.
+mkdir -p specs/PROJ-97-pre-p0
 OUT="$(review concept 97 pre-p0 --artifacts docs/ARCHITECTURE.md --author-provider claude 2>/dev/null)" || die 'pre-P0 review failed'
 printf '%s\n' "$OUT" | jq -e 'select(.provider == "codex" and .source == "cross-review")' >/dev/null \
-  && [ ! -e specs/PROJ-97-pre-p0/findings.json ] && [ ! -e specs/PROJ-97-pre-p0/state.json ] \
-  || die 'pre-P0 review must report to stdout without state.json or ledger'
+  && [ -e specs/PROJ-97-pre-p0/1_concept/findings.json ] && [ ! -e specs/PROJ-97-pre-p0/state.json ] \
+  || die 'pre-P0 review must save a local ledger without state.json'
+
+# A free-standing review outside any PROJ must not create project files.
+OUT="$(review concept 98 standalone --artifacts docs/ARCHITECTURE.md --author-provider claude 2>/dev/null)" || die 'standalone review failed'
+printf '%s\n' "$OUT" | jq -e 'select(.source == "cross-review")' >/dev/null || die 'standalone findings missing'
+[ ! -e specs/PROJ-98-standalone ] || die 'standalone review created a PROJ directory'
 
 # Requirements mode: a prompt above the former 128 KiB default streams to Claude; an explicit cap still bites.
 { awk 'BEGIN { for (i = 0; i < 150000; i++) printf "x" }'; echo END-OF-LARGE-ARTIFACT; } >docs/large-requirements.md

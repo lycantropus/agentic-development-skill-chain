@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SkillChain findings ledger",
-  "description": "The ONE deduplicated findings ledger per PROJ, at specs/PROJ-<X>-<theme>/findings.json. All review sources flow into it (CONCEPT.md §7); written ONLY via chain findings (skill 6_qa). PR body, debt section, and reports are rendered FROM this file, never maintained by hand.",
+  "description": "A stage-local findings ledger under specs/PROJ-<X>-<theme>/<stage>/findings.json, written ONLY via chain findings. Readers aggregate known stage folders and an existing legacy root ledger. IDs are unique per PROJ; PR bodies and reports use the aggregate without creating another ledger.",
   "type": "object",
   "required": ["proj", "updated_at", "findings"],
   "properties": {

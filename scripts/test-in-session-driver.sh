@@ -19,7 +19,7 @@ block stop   >"$CASE/stop.sh";   [ -s "$CASE/stop.sh" ]   || die 'stop block mis
 
 # --- fixture: a PROJ sitting at P5:running (quality gate passed) -----------
 mkdir -p "$CASE/repo/scripts" "$CASE/repo/specs/PROJ-1-demo/5_progress" "$CASE/bin"
-cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$CASE/repo/scripts/"
+cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$ROOT/claude/skills/6_qa/scripts/findings-store.mjs" "$CASE/repo/scripts/"
 cd "$CASE/repo"
 S="bash scripts/chain state"
 $S init 1 demo >/dev/null
@@ -61,7 +61,7 @@ cp scripts/findings.mjs "$CASE/ledger.real"; printf 'process.exit(1)\n' >scripts
 ingest_fails 'a failing ledger' "$CASE/finder.out"
 cp "$CASE/ledger.real" scripts/findings.mjs
 OUT="$CASE/finder.out" bash "$CASE/ingest.sh" >/dev/null 2>&1 || die 'ingest block failed on a well-formed report'
-[ "$(jq '.findings | length' specs/PROJ-1-demo/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 findings'
+[ "$(jq '.findings | length' specs/PROJ-1-demo/6_qa/findings.json)" = 2 ] || die 'ledger must hold exactly the 2 findings'
 rep="$(recorded)"
 [ -f "$rep" ] || die "recorded finder report missing: $rep"
 grep -q '^## QA Results' "$rep" && ! grep -q '^{' "$rep" || die 'report must hold the prose only'
@@ -70,7 +70,7 @@ grep -q '^## QA Results' "$rep" && ! grep -q '^{' "$rep" || die 'report must hol
 #    then P7 -> P8 -> done is legal in order.
 if bash "$CASE/seal.sh" >/dev/null 2>&1; then die 'seal must refuse an open High finding'; fi
 [ "$($S get 1 demo '.phase + ":" + .status' | tr -d '"')" = 'P6:running' ] || die 'refused seal must leave P6 running'
-id="$(jq -r '.findings[] | select(.severity == "high") | .id' specs/PROJ-1-demo/findings.json)"
+id="$(jq -r '.findings[] | select(.severity == "high") | .id' specs/PROJ-1-demo/6_qa/findings.json)"
 bash scripts/chain findings set-status 1 demo "$id" fixed abc1234 >/dev/null || die 'set-status failed'
 bash "$CASE/seal.sh" >/dev/null || die 'seal must accept once no Critical/High is open'
 for p in "P7 running" "P7 done" "P8 running" "P8 done"; do $S transition 1 demo $p >/dev/null || die "illegal transition $p"; done

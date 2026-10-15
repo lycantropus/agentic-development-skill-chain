@@ -62,7 +62,7 @@ TMPL="$(resolve templates/cross-review-prompt.md.tmpl ../templates/cross-review-
 BASE="specs/PROJ-${PROJ}-${THEME}"
 
 # A supplied author is the pre-P0 path. It deliberately emits findings to the
-# human instead of creating phase state or ledger data.
+# stage ledger without creating phase state.
 PERSIST=0
 if { [ "$EXPLICIT_AUTHOR" -eq 0 ] || [ "$PERSIST_REQUESTED" -eq 1 ]; } && [ -f "$BASE/state.json" ]; then
   [ -f "$STATE_SH" ] && [ -f "$LEDGER" ] || { echo "cross-review.sh: state exists but state.sh or findings.mjs is unavailable" >&2; exit 1; }
@@ -210,15 +210,22 @@ FINDING_LINES="$(printf '%s\n' "$ALL_LINES" | jq -c 'select(.category != "review
 FINDINGS_ADDED="$(printf '%s\n' "$FINDING_LINES" | grep -c '^{' || true)"
 ROUND_BLOCKING="$(printf '%s\n' "$FINDING_LINES" | jq -s '[.[] | select(.severity == "critical" or .severity == "high")] | length' 2>/dev/null || echo 0)"
 
-if [ "$PERSIST" -eq 0 ]; then
+# Free-standing reviews have no PROJ directory and must not create one.
+if [ ! -d "$BASE" ]; then
   [ -z "$FINDING_LINES" ] || printf '%s\n' "$FINDING_LINES"
-  if [ "$ROUND_BLOCKING" -gt 0 ]; then echo "cross-review (${MODE}): ${ROUND_BLOCKING} Critical/High finding(s) for human resolution" >&2; exit 3; fi
-  echo "cross-review (${MODE}): clean — ${FINDINGS_ADDED} non-blocking finding(s) reported to the human" >&2
+  [ "$ROUND_BLOCKING" -eq 0 ] || { echo "cross-review (${MODE}): ${ROUND_BLOCKING} blocking finding(s)" >&2; exit 3; }
+  echo "cross-review (${MODE}): clean — ${FINDINGS_ADDED} non-blocking finding(s) reported without a PROJ ledger" >&2
   exit 0
 fi
 
-if [ -n "$FINDING_LINES" ]; then printf '%s\n' "$FINDING_LINES" | node "$LEDGER" add "$PROJ" "$THEME"; fi
-BLOCKING="$(jq '[.findings[]? | select(.status == "open") | select(.severity == "critical" or .severity == "high") | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))] | length' "$BASE/findings.json" 2>/dev/null || echo 0)"
+if [ -n "$FINDING_LINES" ]; then printf '%s\n' "$FINDING_LINES" | node "$LEDGER" add "$PROJ" "$THEME" --stage "$MODE" >&2; fi
+BLOCKING="$(node "$LEDGER" list "$PROJ" "$THEME" | jq '[.findings[]? | select(.status == "open") | select(.severity == "critical" or .severity == "high") | select(.source == "cross-review" or ((.sources // []) | index("cross-review")))] | length')"
+if [ "$PERSIST" -eq 0 ]; then
+  [ -z "$FINDING_LINES" ] || printf '%s\n' "$FINDING_LINES"
+  [ "$BLOCKING" -eq 0 ] || { echo "cross-review (${MODE}): ${BLOCKING} open blocking finding(s)" >&2; exit 3; }
+  echo "cross-review (${MODE}): findings saved in the stage folder; ${FINDINGS_ADDED} reported" >&2
+  exit 0
+fi
 REVIEWER_PROVIDER="${REVIEWERS[0]%%:*}"; REVIEWER_MODEL="${REVIEWERS[0]#*:}"; [ ${#REVIEWERS[@]} -eq 2 ] && { REVIEWER_PROVIDER="claude+codex"; REVIEWER_MODEL="$REVIEW_MODEL"; }; [ "$REVIEWER_PROVIDER" = codex ] && REVIEWER_MODEL="codex-default"
 CURRENT="$(bash "$STATE_SH" get "$PROJ" "$THEME" '.cross_review // []' 2>/dev/null || echo '[]')"
 RECORD="$(jq -n --arg mode "$MODE" --argjson round "$ROUND" --arg rp "$REVIEWER_PROVIDER" --arg rm "$REVIEWER_MODEL" --argjson deg "$DEGRADED_FALLBACK" --argjson fa "$FINDINGS_ADDED" --arg at "$(date -Iseconds)" '{mode:$mode,round:$round,reviewer_provider:(if $rp == "claude+codex" then "claude" else $rp end),reviewer_model:$rm,joint:($rp == "claude+codex"),degraded_fallback:$deg,findings_added:$fa,at:$at}')"

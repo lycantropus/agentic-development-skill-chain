@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// findings.mjs — the SOLE write path to specs/PROJ-<X>-<theme>/findings.json.
+// findings.mjs — the SOLE write path to stage-local findings.json files.
 //
-// ONE deduplicated findings ledger per PROJ (CONCEPT.md §7): CodeRabbit,
+// Stage-local findings ledgers, aggregated per PROJ (CONCEPT.md §7): CodeRabbit,
 // Sonar, code review, QA, merge gate, cross-review, CI, and debt markers
 // all flow in here. The PR body, debt section, and reports are rendered
-// FROM this file — never maintained by hand. Plain node, no dependencies.
+// FROM the selected ledgers — never maintained by hand. Plain node, no dependencies.
 //
 // Usage:
 //   node findings.mjs add            <proj-x> <theme> [--wave N]    read raw findings as JSON lines on stdin, dedupe + merge
@@ -38,6 +38,7 @@
 // Exit codes: 0 ok · 1 invalid input / unknown severity / lock timeout (nothing written) · 2 findings.json missing · 64 usage
 import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { stageDirectory, readFindingLedgers } from "./findings-store.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
@@ -53,7 +54,8 @@ const SOURCES = ["coderabbit", "sonar", "review", "qa", "merge-gate", "cross-rev
 
 function usage() {
   console.error(
-    "Usage: findings.mjs <add|set-status|record-attempt|auto-defer|queue|stats|harvest> <proj-x> <theme> [args]\n" +
+    "Usage: findings.mjs <add|list|set-status|record-attempt|auto-defer|queue|stats|harvest> <proj-x> <theme> [args]\n" +
+    "  --stage <concept|requirements|architecture|plan|implementation|qa|docs|delivery> selects the add/list location\n" +
     "  add            [--wave N]   (raw findings as JSON lines on stdin)\n" +
     "  harvest        [search-root]   (ponytail: markers -> deferred debt findings)\n" +
     "  set-status     <id> <open|fixed|deferred|false-positive> [fix-commit]\n" +
@@ -68,7 +70,16 @@ if (!cmd || !projX || !theme) usage();
 
 const proj = `PROJ-${projX}`;
 const base = `specs/${proj}-${theme}`;
-const file = join(base, "findings.json");
+const stageIndex = rest.indexOf("--stage");
+const stage = stageIndex < 0 ? null : rest[stageIndex + 1];
+if (stageIndex >= 0) {
+  if (!stage || stage.startsWith("--")) usage();
+  rest.splice(stageIndex, 2);
+}
+let target;
+try { target = join(stageDirectory(base, stage ?? "implementation"), "findings.json"); }
+catch (error) { fail(error.message); }
+let origins = new Map(), originals = new Map();
 const now = new Date().toISOString();
 
 function fail(msg) { console.error(`findings.mjs: ${msg}`); process.exit(1); }
@@ -104,11 +115,15 @@ function withLock(fn) {
 }
 
 function load({ mustExist = false } = {}) {
-  if (!existsSync(file)) {
-    if (mustExist) { console.error(`findings.mjs: ${file} missing`); process.exit(2); }
-    return { proj, updated_at: now, findings: [] };
+  let entries;
+  try { entries = readFindingLedgers(base); } catch (error) { fail(error.message); }
+  if (mustExist && !entries.length) { console.error(`findings.mjs: no findings ledger in ${base}`); process.exit(2); }
+  origins = new Map(); originals = new Map();
+  for (const { file, ledger } of entries) {
+    originals.set(file, JSON.stringify(ledger.findings));
+    for (const finding of ledger.findings) origins.set(finding.id, file);
   }
-  return JSON.parse(readFileSync(file, "utf8"));
+  return { proj, updated_at: now, findings: entries.flatMap(({ ledger }) => ledger.findings) };
 }
 
 // Every record must satisfy the findings.schema.json contract before it
@@ -126,11 +141,20 @@ function validateLedger(ledger) {
 }
 
 function save(ledger) {
-  ledger.updated_at = now;
   validateLedger(ledger);
-  const tmp = join(dirname(file), `.findings.${process.pid}.tmp`);
-  writeFileSync(tmp, JSON.stringify(ledger, null, 2) + "\n");
-  renameSync(tmp, file);
+  const groups = new Map();
+  for (const finding of ledger.findings) {
+    const file = origins.get(finding.id) ?? target;
+    if (!groups.has(file)) groups.set(file, []);
+    groups.get(file).push(finding);
+  }
+  for (const [file, findings] of groups) {
+    if (originals.get(file) === JSON.stringify(findings)) continue;
+    mkdirSync(dirname(file), { recursive: true });
+    const tmp = join(dirname(file), `.findings.${process.pid}.tmp`);
+    writeFileSync(tmp, JSON.stringify({ proj, updated_at: now, findings }, null, 2) + "\n");
+    renameSync(tmp, file);
+  }
 }
 
 const summaryFingerprint = (summary) => createHash("sha256")
@@ -226,7 +250,7 @@ if (cmd === "add" || cmd === "harvest") {
 
   withLock(() => {
     const ledger = load();
-    const byKey = new Map(ledger.findings.map((f) => [dedupeKey(f), f]));
+    const byKey = new Map(ledger.findings.filter(f => (origins.get(f.id) ?? target) === target || (!stage && origins.get(f.id) === join(base, "findings.json"))).map((f) => [dedupeKey(f), f]));
     let added = 0, merged = 0, reopened = 0, changed = false;
 
     for (const incoming of incomingRecords) {
@@ -302,6 +326,10 @@ if (cmd === "add" || cmd === "harvest") {
     if (n > 0) save(ledger);
     console.log(`findings.mjs: ${n} medium/low findings auto-deferred (decided at Checkpoint 2, not mid-run)`);
   });
+} else if (cmd === "list") {
+  const ledger = load();
+  if (stage) ledger.findings = ledger.findings.filter(f => origins.get(f.id) === target);
+  console.log(JSON.stringify(ledger, null, 2));
 } else if (cmd === "queue") {
   const ledger = load({ mustExist: true });
   const open = ledger.findings.filter(

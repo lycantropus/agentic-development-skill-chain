@@ -168,7 +168,10 @@ Template:
 
 Each user story owns its own acceptance criteria. Do not create one global acceptance-criteria section. Derive ACs directly from the story's Given/When/Then/And clauses and make them testable.
 
-### 5. Review With The User And Opposite Provider
+### 5. Automatic Cross-Review, Then User Review
+In a PROJ, save review findings to `2_PRDs/findings.json` through
+`chain findings`; status updates stay in that file. For a free-standing review
+outside a PROJ structure, report findings without saving a file.
 
 Before presenting the PRDs to the user or starting provider review, run:
 
@@ -181,12 +184,12 @@ blocks review and handoff; fix structure in this skill. The gate checks the
 complete PRD set without architecture, waves or runtime state. It checks format,
 not completeness or quality of the requirements.
 
-Ask the user to review the PRDs. If changes are requested, update the PRDs and present them again.
-
-After incorporating the user's first review, run the required opposite-provider
-cross-review before handoff. Do not ask the user to copy PRDs into another
-model manually. Review the complete PRD set; omitting one PRD makes dependency
-and consistency findings unreliable.
+Immediately after saving the complete PRD set and passing the structure gate,
+start the required opposite-provider cross-review in the same turn, before
+presenting the PRDs for user review or handoff. Do not ask whether to start it,
+wait for user approval, or end the turn with an offer to run it later. Do not ask
+the user to copy PRDs into another model manually. Review the complete PRD set;
+omitting one PRD makes dependency and consistency findings unreliable.
 
 Build the ground-truth list from files that exist. Always include the concept.
 For UI work, add the compact UI contracts (`implementation-handoff.md`,
@@ -222,6 +225,11 @@ Exit `1` means the review did not run: fix infrastructure before handoff.
 Three rounds is the automatic maximum; additional manually requested rounds
 have no limit. The review is read-only and does not replace final
 product-owner approval.
+
+After the automatic review loop, present the PRDs and review result to the user
+for approval. If the user requests changes, update the PRDs, repeat the structure
+gate and automatically run cross-review on the revised set before presenting it
+again. Final user approval remains required before handoff.
 
 ### 6. Handoff
 

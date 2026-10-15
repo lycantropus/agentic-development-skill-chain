@@ -126,7 +126,7 @@ file-disjoint stories may run as a shared-checkout team inside the
 writer lane (Mode 2, cheap); isolated writer processes with worktrees
 and a merge gate (Mode 3) are opt-in, enabled only if telemetry proves
 the nightly window overflows. All review sources flow
-into ONE deduplicated findings ledger with a single fix queue;
+into stage-local findings ledgers aggregated per PROJ with a single fix queue;
 Medium/Low findings are automatically deferred as marked debt instead
 of prompting the user. Requirements, QA evidence, pre-mortems, and curated
 docs additionally pass provider-opposite adversarial review via
@@ -792,7 +792,7 @@ specs/PROJ-<X>-<theme>/        ← PROJ artifacts
 ├── api-contracts.md           ← interfaces between parallel stories
 ├── ground-file.md             ← validated assumptions
 ├── state.json                 ← state machine
-└── findings.json              ← findings ledger
+└── <stage>/findings.json      ← review history beside its phase artifacts
 
 src/**/agent.md                ← local; NEVER injected
 ```
@@ -1159,7 +1159,10 @@ verification, architecture prose, agent.md learnings — but it always lands
 INSIDE a template frame or a schema field, never as an unstructured
 document of its own.
 
-### Findings Ledger (`findings.json`)
+### Findings Ledgers (`<stage>/findings.json`)
+Each review step stores its ledger in its own subfolder; free-standing reviews
+outside a PROJ report findings without creating files. Fixed and deferred
+records remain in the owning ledger. All writes go through `chain findings`.
 One record per finding — source, location, category, normalized severity,
 status (`open` / `fixed` / `deferred` / `false-positive`), fix commit,
 debt-marker reference — written only through `chain findings`, which

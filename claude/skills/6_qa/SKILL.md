@@ -311,7 +311,7 @@ Also document `### Sonar Quality Input`:
 
 **Findings ledger (framework runs):** when `bash scripts/chain --where findings` succeeds,
 additionally emit every bug as a ledger record — one JSON line per bug
-piped to `bash scripts/chain findings add <X> <theme>` with
+piped to `bash scripts/chain findings add <X> <theme> --stage qa` with
 `source: "qa"`, the normalized severity, the file plus symbol **anchor**
 (not a line number), and the BUG-ID in the summary. The ledger is the
 single fix queue the P6 controller works from; markdown bug entries

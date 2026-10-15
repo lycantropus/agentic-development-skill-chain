@@ -218,7 +218,7 @@ provider_rate_limited() {
 
 is_evidence_path() {
   case "$1" in
-    "$BASE/5_progress/quality-"*|"$PROGRESS"|"$BASE/findings.json"|"$BASE/.findings.lock"|"$BASE/5_progress/ralph-wave-${WAVE}"*|"$BASE/5_progress/coderabbit-wave-${WAVE}-attempt-"*|"$BASE/5_progress/build-wave-${WAVE}-attempt-"*|"$BASE/5_progress/dev-server-wave-${WAVE}.log") return 0 ;;
+    "$BASE/5_progress/quality-"*|"$PROGRESS"|"$BASE/findings.json"|"$BASE/"*/findings.json|"$BASE/.findings.lock"|"$BASE/5_progress/ralph-wave-${WAVE}"*|"$BASE/5_progress/coderabbit-wave-${WAVE}-attempt-"*|"$BASE/5_progress/build-wave-${WAVE}-attempt-"*|"$BASE/5_progress/dev-server-wave-${WAVE}.log") return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -657,8 +657,8 @@ if [[ "$RAW_FINDINGS" -gt 0 && "$LEDGER_AVAILABLE" == true ]]; then
   node scripts/findings.mjs add "$PROJ" "$THEME" --wave "$WAVE" <"$CR_NORMALIZED" >/dev/null || fail "ledger ingestion failed"
 fi
 CUMULATIVE_BLOCKING=0
-if [[ "$LEDGER_AVAILABLE" == true && -f "$BASE/findings.json" ]]; then
-  CUMULATIVE_BLOCKING=$(jq --argjson advisory "$ADVISORY_JSON" '[.findings[] | select(.status=="open") | .severity as $s | select(($advisory | index($s) | not))] | length' "$BASE/findings.json")
+if [[ "$LEDGER_AVAILABLE" == true ]]; then
+  CUMULATIVE_BLOCKING=$(node scripts/findings.mjs list "$PROJ" "$THEME" | jq --argjson advisory "$ADVISORY_JSON" '[.findings[] | select(.status=="open") | .severity as $s | select(($advisory | index($s) | not))] | length')
 elif [[ "$LEDGER_AVAILABLE" == false ]]; then
   CUMULATIVE_BLOCKING=$(jq -s --argjson advisory "$ADVISORY_JSON" '[.[] | .severity as $s | select(($advisory | index($s) | not))] | length' "$CR_NORMALIZED")
 fi

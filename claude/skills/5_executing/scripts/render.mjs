@@ -20,6 +20,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFindings } from "./findings-store.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const [kind, ...args] = process.argv.slice(2);
@@ -35,8 +36,7 @@ const usage = () => {
 
 // ---- shared ---------------------------------------------------------------
 const readJson = (p) => JSON.parse(readFileSync(p, "utf8"));
-const findingsFor = (base) =>
-  existsSync(join(base, "findings.json")) ? readJson(join(base, "findings.json")).findings : [];
+const findingsFor = readFindings;
 const gateConfigPath = (base) =>
   ["3-4_plan", "6_plan"].map((dir) => join(base, dir, "wave-gate-config.json")).find(existsSync);
 // One line per declared external prerequisite: a declaration, never a pass.

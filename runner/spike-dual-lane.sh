@@ -167,20 +167,20 @@ mkdir -p "$LWORK/specs/PROJ-96-spike"
   done
   wait
 )
-if [ "$(jq '.findings | length' "$LWORK/specs/PROJ-96-spike/findings.json")" = "20" ]; then
+if [ "$(jq '.findings | length' "$LWORK/specs/PROJ-96-spike/5_progress/findings.json")" = "20" ]; then
   ok "20/20 concurrent ledger adds survived (locked read-modify-write)"
 else
-  bad "concurrent ledger adds lost records: $(jq '.findings | length' "$LWORK/specs/PROJ-96-spike/findings.json")/20"
+  bad "concurrent ledger adds lost records: $(jq '.findings | length' "$LWORK/specs/PROJ-96-spike/5_progress/findings.json")/20"
 fi
 # IDs are assigned in completion order under parallel adds — resolve the
 # f1.ts record's id instead of assuming it is -001.
-REOPEN_ID="$(jq -r '.findings[] | select(.file == "f1.ts") | .id' "$LWORK/specs/PROJ-96-spike/findings.json")"
+REOPEN_ID="$(jq -r '.findings[] | select(.file == "f1.ts") | .id' "$LWORK/specs/PROJ-96-spike/5_progress/findings.json")"
 (
   cd "$LWORK"
   bash "$CHAIN" findings set-status 96 spike "$REOPEN_ID" fixed deadbee >/dev/null
   echo '{"source":"review","severity":"high","summary":"s1","file":"f1.ts","line":1,"category":"c1"}' | bash "$CHAIN" findings add 96 spike >/dev/null
 )
-if [ "$(jq -r --arg id "$REOPEN_ID" '.findings[] | select(.id == $id) | .status' "$LWORK/specs/PROJ-96-spike/findings.json")" = "open" ]; then
+if [ "$(jq -r --arg id "$REOPEN_ID" '.findings[] | select(.id == $id) | .status' "$LWORK/specs/PROJ-96-spike/5_progress/findings.json")" = "open" ]; then
   ok "re-reported finding REOPENED after being marked fixed"
 else
   bad "fixed finding stayed fixed despite an open re-report"

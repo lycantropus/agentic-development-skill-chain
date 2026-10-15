@@ -22,7 +22,7 @@ const progress = `${base}/5_progress`;
 const configPath = `${base}/3-4_plan/wave-gate-config.json`;
 const progressFile = `${progress}/PROJ-${proj}-progress.md`;
 const evidencePath = key => `${progress}/quality-${encodeURIComponent(key)}.json`;
-const operational = name => name.startsWith(`${progress}/`) || [`${base}/state.json`, `${base}/findings.json`, `${base}/.findings.lock`].includes(name);
+const operational = name => (name.startsWith(`${base}/`) && name.endsWith("/findings.json")) || name.startsWith(`${progress}/`) || [`${base}/state.json`, `${base}/findings.json`, `${base}/.findings.lock`].includes(name);
 function snapshotFile(name) {
   const stat = fs.lstatSync(name);
   if (stat.isSymbolicLink()) throw new Error(`artifact/input symlink unsupported: ${name}`);
