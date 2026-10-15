@@ -218,7 +218,7 @@ try {
     ok('run', 'build'); ok('run', 'lint'); scan(); ok('review', `${progress}/review.md`);
 
     // Sonar policy is checked independently of plan validation, including by the seal.
-    qualityEnv = { ...process.env, PATH: '/usr/bin:/bin' };
+    qualityEnv = { ...process.env, PATH: `${execFileSync('bash', ['-c', 'dirname "$BASH"'], { encoding: 'utf8' }).trim()}:/usr/bin:/bin` }; // keep the running bash (macOS /bin/bash is 3.2)
     assert.notEqual(spawnSync('bash', ['-c', 'command -v sonar && command -v sonar-scanner'], { env: qualityEnv }).status, 0, 'fixture PATH must omit a Sonar CLI');
     ok('run', 'build'); ok('run', 'lint'); ok('review', `${progress}/review.md`);
     ok('skip-sonar', 'sonar CLI unavailable'); ok('check');
