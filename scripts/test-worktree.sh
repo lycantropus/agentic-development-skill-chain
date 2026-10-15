@@ -9,7 +9,7 @@ HELPER="$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 STATE_SOURCE="$ROOT/codex/skills/5_executing/scripts/state.sh"
 CHAIN_SOURCE="$ROOT/codex/skills/5_executing/scripts/chain"
 PLAN_FIXTURES="$ROOT/scripts/fixtures/wave-plan-validator"
-TMP_ROOT="$(mktemp -d)"
+TMP_ROOT="$(cd -P "$(mktemp -d)" && pwd)" # physical path: macOS /var -> /private/var
 cleanup_tmp() { rm -rf "$TMP_ROOT"; }
 trap cleanup_tmp EXIT
 
