@@ -8,8 +8,9 @@
 // `sonar list issues` to the current scan; `seal` then checks the carry-forward notes in progress.md against both.
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync, spawn } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const [proj, theme, action = 'check', kind, ...args] = argv[0] === 'seal' ? [argv[1], argv[2], 'seal'] : argv;
@@ -148,7 +149,7 @@ function verifyAll(config, fingerprint) {
     if (!canSkip(skip.reason)) throw new Error('Sonar skip no longer valid');
   } else { valid('sonar', config, fingerprint); valid('sonar-issues', config, fingerprint); }
 }
-function main() {
+async function main() {
   if (action === 'seal' && (!proj || !theme)) { console.error('Usage: quality.mjs seal PROJ THEME'); process.exit(64); }
   if (!proj || !theme || !/^[\w-]+$/.test(proj) || !/^[\w-]+$/.test(theme)) throw new Error('Usage: quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON|sonar-issues FILE] | seal PROJ THEME');
   if (fs.realpathSync('.') !== fs.realpathSync(git('rev-parse', '--show-toplevel'))) throw new Error('run from the worktree root');
@@ -156,11 +157,11 @@ function main() {
   if (action === 'seal') loadEnvLocal(); // the fingerprint hashes the environment the commands ran in
   const fingerprint = inputs();
   if (!['snapshot', 'record-build', 'seal'].includes(action)) {
-    act(config, fingerprint); // a failed action leaves the block alone, so a wrong environment cannot overwrite a green report
+    await act(config, fingerprint); // a failed action leaves the block alone, so a wrong environment cannot overwrite a green report
     refreshProgress(config, fingerprint);
-  } else act(config, fingerprint);
+  } else await act(config, fingerprint);
 }
-function act(config, fingerprint) {
+async function act(config, fingerprint) {
   if (action === 'snapshot') { console.log(fingerprint); return; }
   if (action === 'check') {
     verifyAll(config, fingerprint);
@@ -245,11 +246,39 @@ function act(config, fingerprint) {
       if (!config.auth_budget?.preflight_cmd || !fs.existsSync('scripts/worktree.sh')) throw new Error('auth quality command requires preflight and shared lock helper');
       invocation = ['bash', 'scripts/worktree.sh', 'with-shared-lock', '--', 'bash', '-c', 'bash -c "$1" && bash -c "$2"', '_', config.auth_budget.preflight_cmd, command];
     }
-    // Mutation gets the changed files as env: BASE_SHA (the P0 base tag) and CHANGED_FILES (newline-separated, deleted files excluded).
-    // Passed to the child only, so the input fingerprint (which hashes process.env) is unaffected.
-    const env = isMut ? { ...process.env, BASE_SHA: baseSha, CHANGED_FILES: git('diff', '--name-only', '--diff-filter=d', `${baseSha}..HEAD`) } : process.env;
-    const result = spawnSync('timeout', ['--kill-after=5s', String(seconds), ...invocation], { stdio: ['ignore', fd, fd], env });
-    fs.closeSync(fd); rc = result.status ?? 1;
+    let changedDir;
+    try {
+      let env = process.env;
+      if (isMut) {
+        changedDir = fs.mkdtempSync(path.join(path.resolve(os.tmpdir()), 'skillchain-mutation-'));
+        const changedFile = path.join(changedDir, 'changed-files');
+        fs.writeFileSync(changedFile, execFileSync('git', ['diff', '-z', '--name-only', '--diff-filter=d', `${baseSha}..HEAD`]));
+        // Child-only handoff preserves the input fingerprint; never inherit a legacy scope.
+        env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES_FILE: changedFile };
+        delete env.CHANGED_FILES;
+      }
+      const timeoutArgs = ['--kill-after=5s', String(seconds), ...invocation];
+      if (isMut) {
+        // Await the child so cancellation reaches timeout and still runs our cleanup.
+        rc = await new Promise((resolve, reject) => {
+          const child = spawn('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env });
+          let interrupted = 0;
+          const interrupt = () => { interrupted = 130; child.kill('SIGTERM'); };
+          const terminate = () => { interrupted = 143; child.kill('SIGTERM'); };
+          process.once('SIGINT', interrupt); process.once('SIGTERM', terminate);
+          child.once('error', reject);
+          child.once('close', (status, signal) => {
+            process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', terminate);
+            resolve(interrupted || (status ?? (signal ? 128 + os.constants.signals[signal] : 2)));
+          });
+        });
+      } else {
+        rc = spawnSync('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env }).status ?? 1;
+      }
+    } finally {
+      fs.closeSync(fd);
+      if (changedDir) fs.rmSync(changedDir, { recursive: true, force: true });
+    }
   }
   const output = fs.readFileSync(log, 'utf8');
   const count = isMut ? mutants(output) : selected(output);
@@ -270,4 +299,4 @@ function act(config, fingerprint) {
   if (key === 'sonar') fs.rmSync(evidencePath('sonar-skip'), { force: true });
   console.log(`✓ ${key}: ${log}`);
 }
-try { main(); } catch (error) { console.error(`quality: ${error.message}`); process.exitCode = 1; }
+try { await main(); } catch (error) { console.error(`quality: ${error.message}`); process.exitCode = 1; }
