@@ -77,7 +77,7 @@ start=$SECONDS
 launched="$(bash launch.sh)"
 [ $((SECONDS - start)) -lt 2 ] || die 'launch blocked until the runner finished (not detached)'
 LOG="$(printf '%s\n' "$launched" | sed -n 's/^log: \(.*\)  pid: [0-9]*$/\1/p')"
-case "$LOG" in "$CASE"/skillchain-auto-PROJ-1.*.log) ;; *) die "launch must print a private log path and pid, got: $launched" ;; esac
+case "$LOG" in "$CASE"/skillchain-auto-PROJ-1.*) ;; *) die "launch must print a private log path and pid, got: $launched" ;; esac
 pid="$(printf '%s\n' "$launched" | sed -n 's/.*pid: \([0-9]*\).*/\1/p')"
 for _ in $(seq 1 20); do grep -q '^stdin:' "$LOG" 2>/dev/null && break; sleep 0.2; done
 grep -qx 'args: auto 1 demo' "$LOG" || die "runner not started as 'auto 1 demo': $(cat "$LOG")"

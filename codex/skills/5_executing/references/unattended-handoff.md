@@ -50,8 +50,9 @@ and a background call at 2 hours, and an overnight run outlives both.
 
 ```bash launch
 RUN="${SKILLCHAIN_RUNNER:-$(for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do [ -x "$c" ] && { echo "$c"; break; }; done)}"
-LOG="$(mktemp --suffix=.log "${TMPDIR:-/tmp}/skillchain-auto-PROJ-<X>.XXXXXX")"
-setsid nohup "$RUN" auto <X> <theme> >"$LOG" 2>&1 </dev/null &
+LOG="$(mktemp "${TMPDIR:-/tmp}/skillchain-auto-PROJ-<X>.XXXXXX")"
+S=(setsid); command -v setsid >/dev/null || S=(perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' --)  # macOS has no setsid
+"${S[@]}" nohup "$RUN" auto <X> <theme> >"$LOG" 2>&1 </dev/null &
 echo "log: $LOG  pid: $!"
 ```
 
