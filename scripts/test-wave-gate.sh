@@ -119,7 +119,7 @@ EOF
   cat >"$CASE/bin/coderabbit" <<'EOF'
 #!/usr/bin/env bash
 touch "$PARALLEL_DIR/review-started"
-[[ -f "$PARALLEL_DIR/build-started" ]] || sleep .1
+for ((i=0; i<100; i++)); do [[ -f "$PARALLEL_DIR/build-started" ]] && break; sleep .02; done   # up to 2s: loaded CI runners start slowly
 [[ -f "$PARALLEL_DIR/build-started" ]] || exit 9
 echo review-diagnostic >&2
 EOF
