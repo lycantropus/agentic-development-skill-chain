@@ -12,6 +12,16 @@ P0 is script-driven: run the scripts and record their results. Bounded
 judgment validates the ground file (step 6a) and selects a safe fallback
 negative control when no auth budget is configured. There are no user questions in P0.
 
+
+**Split-helper upgrades:** sync backs up the unchanged retired monolith to
+`scripts/plan.mjs.pre-split`. Keep that backup for review, then remove it manually
+after verification. A modified, adopted or unknown old helper blocks sync:
+rename it to that backup path, sync fresh helpers, transfer relevant changes,
+run tests and `chain sync --adopt <new-path>` for every reviewed adaptation.
+Do not start a PROJ until this is complete. If copies from before consolidation
+already occupy the new paths, back them up under other names first and follow
+the same sync/transfer/test/adopt procedure; never adopt old copies blindly.
+
 ## Subagent Contract
 
 - **Input from the orchestrator:** `<X> <theme>` and the control checkout
@@ -207,7 +217,9 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 
 | From (installed skill) | To |
 |---|---|
-| `5_executing/scripts/chain`, `render.mjs`, `plan.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
+| `2_requirements-engineer/scripts/validate-prds.mjs`; `3_architecture/scripts/validate-architecture.mjs` | `scripts/` |
+| `4_writing-plans/scripts/validate-wave-plan.mjs`, `document-parser.mjs`; `3_architecture/scripts/architecture-parser.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `render.mjs`, `compile-context.mjs`, `story-slice.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl`, `morning-report.md.tmpl`, `stop-report.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |

@@ -170,6 +170,17 @@ Each user story owns its own acceptance criteria. Do not create one global accep
 
 ### 5. Review With The User And Opposite Provider
 
+Before presenting the PRDs to the user or starting provider review, run:
+
+```bash
+bash ~/.codex/skills/5_executing/scripts/chain check prds specs/PROJ-<X>-<theme>/2_PRDs
+```
+
+Re-run after every PRD change, including review reconciliation. A non-zero exit
+blocks review and handoff; fix structure in this skill. The gate checks the
+complete PRD set without architecture, waves or runtime state. It checks format,
+not completeness or quality of the requirements.
+
 Ask the user to review the PRDs. If changes are requested, update the PRDs and present them again.
 
 After incorporating the user's first review, run the required opposite-provider

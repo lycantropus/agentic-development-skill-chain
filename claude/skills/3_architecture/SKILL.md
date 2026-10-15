@@ -54,6 +54,15 @@ that plan and implement from it (writing-plans, implementers).
 6. Approved concept/PRD/architecture of blocking sibling PROJs, as dependency
    context only.
 
+Before processing the PRD inputs, run:
+
+```bash
+bash ~/.claude/skills/5_executing/scripts/chain check prds specs/PROJ-<X>-<theme>/2_PRDs
+```
+
+A non-zero exit blocks architecture work; return malformed PRDs to
+`requirements-engineer` for correction.
+
 Ask the user (`AskUserQuestion`) only about open cross-cutting questions, e.g.
 accounts and roles, cross-device sync, third-party integrations, migration
 rollback policy, or a UI handoff that conflicts with § Stack.
@@ -163,7 +172,22 @@ note when it `Changes baseline`, filtered to the PRDs of the running wave. So:
 
 ## Cross-Review (automatic, same turn)
 
-Right after saving, without asking:
+After writing and after every architecture change, run this structure gate
+before provider review (failure blocks review and handoff):
+
+```bash
+bash ~/.claude/skills/5_executing/scripts/chain check architecture \
+  specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md \
+  specs/PROJ-<X>-<theme>/2_PRDs
+```
+
+It requires the complete local PRD set, Overview, PRDs Covered and Cross-Cutting
+Tech Decisions, and checks IDs and fields. `PRDs Covered` uses full
+`PROJ-X-PRD-Y` IDs; `Affects` uses comma-separated `PRD-Y` IDs or `all` alone.
+Optional sections remain optional. Technical sense and whether a baseline
+override is needed remain review decisions.
+
+Then, without asking:
 
 ```bash
 bash scripts/chain review architecture <X> <theme> \

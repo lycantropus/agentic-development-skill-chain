@@ -11,13 +11,13 @@ Every script is reached through one entry point, **`chain <verb> [<sub>] [args�
 
 ## The five script kinds
 
-Every dispatcher action belongs to exactly one kind. A script can implement actions of different kinds: `chain check plan` validates plans and `chain render context` renders context through the same helper; `chain quality` records evidence while `chain quality seal` checks it. Only Record actions directly write `state.json`, `findings.json` and `quality-*.json`; other helpers delegate changes to those writers. Other outputs, such as `ralph-wave-N.json`, belong to the gate producing them; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files); Gates answer with an exit code and a report.
+Every dispatcher action belongs to exactly one kind. A script can implement actions of different kinds: `chain quality` records evidence while `chain quality seal` checks it. Only Record actions directly write `state.json`, `findings.json` and `quality-*.json`; other helpers delegate changes to those writers. Other outputs, such as `ralph-wave-N.json`, belong to the gate producing them; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files); Gates answer with an exit code and a report.
 
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
 | **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality.mjs |
-| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check plan` → plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
-| **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` and `chain render slice` → plan.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
+| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
+| **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` → compile-context.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
 
@@ -25,13 +25,17 @@ Stack-specific add-ons are separate scripts on purpose, so projects without that
 
 Not behind `chain`: `env-local.sh` (a library the gates `source`), `merge-project-settings.sh` (Claude only, run once per project by hand), and the phase runner `runner/run-phase.sh`, which drives unattended runs.
 
+Document structure is checked where it is produced: Step 2 runs `chain check prds <prd-directory>` before user/provider review and after edits. Step 3 validates its PRD inputs, then runs `chain check architecture <architecture-file> <prd-directory>` before architecture review. Step 4 checks both inputs before planning and checks its plan/config output. CP1 repeats all three gates before approval. These gates do not judge completeness or technical sense. New validators exit 0 for valid structure, 1 for invalid documents, 2 for unreadable input and 64 for wrong invocation; they write nothing.
+
+The shared document and architecture readers do no I/O or process control. Their adjacent copies are byte-checked, and sync installs one copy of each into the project's flat scripts directory. Context compilation and story slicing use the same readers while keeping historical exit codes and legacy architecture fallbacks. Older artifacts passed back into Steps 3, 4 or CP1 must be corrected by the owning skill; already approved P5 runs gain no retrospective document gate.
+
 ## The phases at a glance
 
 The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder; it stays `CP1:pending` through steps 1–4 until Checkpoint 1 approves the plan. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
 
 | Phase | Call | Reads | Writes |
 |---|---|---|---|
-| **CP1** — approve the plan | `chain check plan`, `chain render context check`, then `chain state transition … CP1 approved` | wave plans, `wave-gate-config.json`, PRDs | `state.json` via `chain state` (phase, and the path of the decision log); the log itself, `decisions.md`, is written by the checkpoint subskill |
+| **CP1** — approve the plan | `chain check prds`, `chain check architecture`, `chain check plan`, `chain render context check`, then `chain state transition … CP1 approved` | wave plans, `wave-gate-config.json`, PRDs | `state.json` via `chain state` (phase, and the path of the decision log); the log itself, `decisions.md`, is written by the checkpoint subskill |
 | **P0** — setup | see the P0 diagram below | the approved plans, `docs/` | worktree, `state.json`, `scripts/`, worker files |
 | **P5** wave start | git tag `wave-N-start-PROJ-X`, `chain render context compile <X> <theme> --wave N` | the wave plan, `progress.md` | `context/workers/wave-N/*.md` |
 | **P5** worker | reads its one file; `chain worktree with-shared-lock -- <cmd>` for migrations and auth commands | its worker file | code and tests |

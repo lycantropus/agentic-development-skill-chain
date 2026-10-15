@@ -18,6 +18,19 @@ All under `specs/PROJ-<X>-<theme>/`:
 | `1d_prototypes/implementation-handoff.md` (UI PROJs) | project mode, reuse, new component candidates, tokens, interaction contract, mockup tolerance |
 | `3-4_plan/PROJ-<X>-migration-design.md` (if present) | migration SQL/trigger detail — cite by decision, never copy |
 
+Before processing the inputs, run both structure gates:
+
+```bash
+bash ~/.claude/skills/5_executing/scripts/chain check prds specs/PROJ-<X>-<theme>/2_PRDs
+bash ~/.claude/skills/5_executing/scripts/chain check architecture \
+  specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md \
+  specs/PROJ-<X>-<theme>/2_PRDs
+```
+
+Failure blocks planning. Return malformed inputs to the owning skill and its
+review, then repeat these checks. Older documents need their missing fields
+corrected explicitly; no automatic rewrite or bypass.
+
 Also read the feature's `agent.md` (e.g. `src/features/<feature>/agent.md`) if present and carry its gotchas into tasks. For any UI work (`frontend.routes` or frontend-implementer tasks), regenerate the component registry first — even on greenfield, where it writes an empty one:
 
 ```bash

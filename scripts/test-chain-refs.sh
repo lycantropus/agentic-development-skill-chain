@@ -17,6 +17,8 @@ rejects() { printf '%s\n' "$3" >"$DOC"; if check; then fail "accepted: $1"; fi; 
 
 accepts "chain verbs"            'Run `bash scripts/chain state get 1 x .phase`, then `chain gate wave 2 1 x` and `chain findings add 1 x`.'
 accepts "script names in a table" '| `5_executing/scripts/state.sh`, `findings.mjs` | `scripts/` |'
+accepts "retired backup path"    'Review `scripts/plan.mjs.pre-split` before removing the backup.'
+accepts "new document gates"     'Run `chain check prds input`, then `chain check architecture arch input`.'
 accepts "plain prose"            'Nothing here calls a helper.'
 rejects "script name in prose"   "names script 'state.sh'"          'Run `bash scripts/state.sh get 1 x`.'
 rejects "bare script name"       "names script 'findings.mjs'"          'Findings go through `findings.mjs`.'

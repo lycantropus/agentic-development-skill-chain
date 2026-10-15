@@ -170,9 +170,10 @@ validate_wave_plan() {
   [ -d "$plan_dir" ] || plan_dir="$control/specs/PROJ-${proj}-${theme}/6_plan"
   [ -d "$plan_dir" ] || die "wave plan directory is missing (expected 3-4_plan/ or legacy 6_plan/)"
   self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  validator="$self_dir/plan.mjs"
-  [ -f "$validator" ] || die "plan.mjs is missing beside the setup worktree helper"
-  node "$validator" validate "$plan_dir" || die "wave plan consistency validation failed"
+  validator="$self_dir/validate-wave-plan.mjs"
+  if [ ! -f "$validator" ]; then validator="$self_dir/../../4_writing-plans/scripts/validate-wave-plan.mjs"; fi
+  [ -f "$validator" ] || die "validate-wave-plan.mjs is missing beside the setup worktree helper"
+  node "$validator" "$plan_dir" || die "wave plan consistency validation failed"
 }
 
 link_env() {

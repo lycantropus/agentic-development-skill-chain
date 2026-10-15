@@ -55,7 +55,7 @@ for (const file of files) {
       const [, skill, name] = m, file2 = name.replace(/\.+$/, "");
       if (skills.includes(skill) && !["claude", "codex"].some(p => fs.existsSync(path.join(root, p, "skills", skill, "scripts", file2)))) problems.push(`${at}: ${skill}/scripts/${file2} does not exist`);
     }
-    for (const m of line.matchAll(/(?<![\w$./-])scripts\/([\w-]+\.(?:sh|mjs))/g)) {
+    for (const m of line.matchAll(/(?<![\w$./-])scripts\/([\w-]+\.(?:sh|mjs))(?![\w.-])/g)) {
       if (!scriptFiles.has(m[1])) problems.push(`${at}: scripts/${m[1]} does not exist in any skill, runner/ or scripts/`);
     }
     // inside a code fence a command may also start with a bare `chain` or run through "$CHAIN"

@@ -73,7 +73,7 @@ itself.
 
 ## Input
 
-1. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (legacy PROJs may still carry an `architecture-delta.md`)
+1. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (legacy delta-only projects must first return to `architecture` to supply this document)
 2. `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md` (all waves) + `wave-gate-config.json`
 3. `specs/PROJ-<X>-<theme>/api-contracts.md` (if present)
 4. Open pre-mortem risks / plan self-review findings (if present)
@@ -109,8 +109,8 @@ first):
    ```
    Nonzero (a finding needed a human decision and nobody resolved it in the
    ledger) → no fast path, continue at Step 1.
-4. Run the machine consistency validator and the bundle check (exact commands
-   in Step 4 below). Any error → no fast path, continue at Step 1.
+4. Run all three document structure gates (PRDs, architecture, plan) and the
+   context check (exact commands in Step 4 below). Any error → no fast path, continue at Step 1.
 
 If all four hold: skip the interactive walk-through (Steps 1-2) and the
 cascade (Step 4 — nothing changed, so there is nothing to cascade). Append one
@@ -172,16 +172,23 @@ check from writing-plans, 4): story/dependency/contract consistency
 across all waves. A checkpoint that edits a wave plan but not the gate
 config produces an overnight run that gates against a stale plan.
 
-Run the machine consistency validator after every cascade and once more even
+Run all three document structure gates before plan approval, after every cascade and once more even
 when the round adopted every point unchanged:
 
 ```bash
+bash ~/.claude/skills/5_executing/scripts/chain check prds specs/PROJ-<X>-<theme>/2_PRDs
+bash ~/.claude/skills/5_executing/scripts/chain check architecture \
+  specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md \
+  specs/PROJ-<X>-<theme>/2_PRDs
 bash ~/.claude/skills/5_executing/scripts/chain check plan \
   specs/PROJ-<X>-<theme>/3-4_plan
 bash ~/.claude/skills/5_executing/scripts/chain render context check <X> <theme>
 ```
 
-The `check` compiles every wave's worker and role files in memory (it writes
+Malformed PRDs or architecture return to their owning skill; repeat its review
+before approving. These gates also catch direct edits made after review.
+
+The context `check` compiles every wave's worker and role files in memory (it writes
 nothing) and fails when a role would exceed its budget at P0, a decision or key
 flow is malformed, or one reaches no wave. It also fails (exit 2) when a story
 cannot be assigned to a role from the plan table's `Agent Type` column
@@ -193,8 +200,8 @@ lacks the design system in `implementer`: take the current manifest via
 This is a hard pre-approval gate. It checks unique AC IDs, their task/command
 mapping, bidirectional task/test-file agreement, broad regressions, auth-budget
 hooks, and protected-route coverage through auth state or mapped authenticated
-E2E files. Do not seal CP1 while it is red. For a legacy layout, pass the
-existing `6_plan/` directory instead.
+E2E files. Do not seal CP1 while it is red. For a legacy layout, use the
+existing `6_plan/` directory for both architecture and plan paths instead.
 </HARD-GATE>
 
 ### 5. Seal the approval

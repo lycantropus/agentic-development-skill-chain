@@ -31,7 +31,7 @@ run_preflight() {
     bash "$PREFLIGHT" 1 biome >/dev/null)
 }
 
-ignored='[".claude/settings.json","scripts/plan.mjs","scripts/gen-component-registry.mjs","scripts/findings.mjs","scripts/render.mjs", "scripts/sync-framework.mjs", "scripts/quality.mjs", ".skillchain-helpers.json"]'
+ignored='[".claude/settings.json","scripts/compile-context.mjs","scripts/story-slice.mjs","scripts/validate-wave-plan.mjs","scripts/validate-prds.mjs","scripts/validate-architecture.mjs","scripts/document-parser.mjs","scripts/architecture-parser.mjs","scripts/gen-component-registry.mjs","scripts/findings.mjs","scripts/render.mjs", "scripts/sync-framework.mjs", "scripts/quality.mjs", ".skillchain-helpers.json"]'
 
 biome1="$TMP/biome1"
 mkdir -p "$biome1"
@@ -86,6 +86,27 @@ grep -q 'npm-wrapped scanner engine' <<<"$sonar_output" \
   || fail "npm-wrapped sonar_cmd was not accepted without standalone sonar-scanner"
 grep -q '✓ worker context check' <<<"$sonar_output" \
   || fail "preflight did not run the worker context check on a plan folder"
+
+# A lone project preflight can resolve the new compiler from an installed tree.
+installed="$TMP/installed/5_executing"
+mkdir -p "$installed/scripts" "$sonar/scripts"
+cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$sonar/scripts/"
+cp "$ROOT/codex/skills/5_executing/scripts/ponytail-check.sh" \
+  "$ROOT/codex/skills/5_executing/scripts/compile-context.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/document-parser.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/architecture-parser.mjs" "$installed/scripts/"
+cp -R "$ROOT/codex/skills/5_executing/manifests" "$installed/"
+node - "$PREFLIGHT" "$sonar/scripts/preflight.sh" "$installed" <<'NODE'
+const fs = require("node:fs");
+let text = fs.readFileSync(process.argv[2], "utf8");
+text = text.replaceAll('$HOME/.claude/skills/5_executing', process.argv[4]).replaceAll('$HOME/.codex/skills/5_executing', process.argv[4]);
+fs.writeFileSync(process.argv[3], text);
+NODE
+fallback_output="$(cd "$sonar" && PATH="$FAKE_BIN:/usr/bin:/bin" \
+  PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
+  PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
+  bash scripts/preflight.sh 1 sonar)"
+grep -q '✓ worker context check' <<<"$fallback_output" || fail "installed compiler fallback failed"
 
 # No SubagentStart hook is installed, and settings.json is neither created nor changed.
 fresh="$TMP/hook-fresh"

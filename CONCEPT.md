@@ -60,8 +60,9 @@ conservative default input cap with explicit diff omissions, and handling of Cla
 ceiling)*
 *(v0.22: `4a_checkpoint` and `4b_setup` folded into `5_executing` as
 subskills (`subskills/checkpoint.md`, `subskills/setup.md`) run in
-subagents; the orchestrator keeps the CP user dialogue; helpers
-deduplicated into `5_executing/scripts/`; § references below use the new
+subagents; the orchestrator keeps the CP user dialogue; execution helpers
+deduplicated into `5_executing/scripts/`; document validators live with their
+producing skills (2–4), sharing pure readers with the execution context compiler; § references below use the new
 names, the roadmap and version notes keep the historical ones;
 `5b_executing-large-model` becomes the default Step 5 and runner P5 skill,
 `5_executing` the full-procedure alternative for weaker writer models)*
@@ -69,6 +70,13 @@ names, the roadmap and version notes keep the historical ones;
 **Date:** 2026-10-08
 **Basis:** the repository's aligned Codex + Claude SkillChain 0–8
 (`codex/skills/`, `claude/skills/`) at the current main branch
+
+Document gates: Step 2 checks PRD structure before user/provider review; Step 3
+checks PRD inputs and architecture output; Step 4 checks both inputs and its
+plan/config output. CP1 repeats all three before approval. Review owns meaning
+and completeness. Context compilation remains with execution and preserves
+legacy behavior for approved P5 runs; new explicit gates require older artifacts
+to be corrected by their owning skill.
 
 **Settled decisions (v0.2):**
 - The framework is optimized against our own product; distributability

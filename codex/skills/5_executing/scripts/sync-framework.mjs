@@ -7,7 +7,11 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
 const inventory = [
-  ...["chain", "render.mjs", "plan.mjs", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "worktree.sh", "migration-drift-check.sh", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
+  ["2_requirements-engineer/scripts/validate-prds.mjs", "scripts/validate-prds.mjs"],
+  ["3_architecture/scripts/validate-architecture.mjs", "scripts/validate-architecture.mjs"],
+  ...["validate-wave-plan.mjs", "document-parser.mjs"].map(name => [`4_writing-plans/scripts/${name}`, `scripts/${name}`]),
+  ["3_architecture/scripts/architecture-parser.mjs", "scripts/architecture-parser.mjs"],
+  ...["chain", "render.mjs", "compile-context.mjs", "story-slice.mjs", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "worktree.sh", "migration-drift-check.sh", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
   ...["backend-implementer", "explore", "frontend-implementer", "implementer", "micro-fixer", "reviewer"].map(name => [`5_executing/manifests/roles/${name}.md`, `templates/roles/${name}.md`]),
   ...["decisions", "morning-report", "stop-report"].map(name => [`5_executing/templates/${name}.md.tmpl`, `templates/${name}.md.tmpl`]),
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),
@@ -73,6 +77,17 @@ function main() {
     const manifestPath = safePath(target, ".skillchain-helpers.json");
     const previous = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : { version: 1, files: {} };
     if (previous.version !== 1 || !previous.files || typeof previous.files !== "object" || Array.isArray(previous.files)) throw new Error("invalid .skillchain-helpers.json");
+    const legacyPath = safePath(target, "scripts/plan.mjs");
+    const legacyHash = signature(legacyPath);
+    let backupPath = null;
+    const migrationHelp = "Rename scripts/plan.mjs to scripts/plan.mjs.pre-split; sync the new files; transfer relevant adaptations from the backup; run tests; then --adopt each new adapted file. Keep the backup for review and start no PROJ run until complete.";
+    if (legacyHash !== null) {
+      const old = previous.files["scripts/plan.mjs"];
+      if (!old || currentSource(old.source) !== "5_executing/scripts/plan.mjs" || !/^[a-f0-9]{64}$/.test(old.source_hash) || legacyHash !== old.source_hash)
+        throw new Error(`no files changed; old scripts/plan.mjs has modified or unknown provenance. ${migrationHelp}`);
+      backupPath = safePath(target, "scripts/plan.mjs.pre-split");
+      if (fs.existsSync(backupPath)) throw new Error(`no files changed; backup scripts/plan.mjs.pre-split already exists. Review and move the existing backup before sync. ${migrationHelp}`);
+    }
     const next = { version: 1, files: {} };
     const updates = [], conflicts = [];
     for (const [source, destination] of inventory) {
@@ -96,16 +111,22 @@ function main() {
       next.files[destination] = { source, source_hash: sourceHash, local_hash: keepLocal ? localHash : sourceHash };
     }
     if (conflicts.length) {
-      throw new Error(`no files changed; reconcile these helpers:\n${conflicts.join("\n")}\nCompare with the installed source. After merging and testing an adaptation, rerun with --adopt <path> for each reviewed file. Do not adopt an outdated copy merely to bypass this check.`);
+      throw new Error(`no files changed; reconcile these helpers:\n${conflicts.join("\n")}\nFor older validate-wave-plan.mjs or story-slice.mjs copies: back them up under other names, sync fresh files, transfer relevant adaptations, test and --adopt the new files. Compare with the installed source. After merging and testing an adaptation, rerun with --adopt <path> for each reviewed file. Do not adopt an outdated copy merely to bypass this check.`);
     }
     const serialized = JSON.stringify(next, null, 2) + "\n";
     const manifestChanged = !fs.existsSync(manifestPath) || fs.readFileSync(manifestPath, "utf8") !== serialized;
     if (check) {
-      if (updates.length || manifestChanged) throw new Error(`helper refresh required (${updates.length} files; manifest ${manifestChanged ? "needs update" : "current"}); run sync-framework.mjs without --check`);
+      if (backupPath || updates.length || manifestChanged) throw new Error(`helper refresh required (${updates.length} files; manifest ${manifestChanged ? "needs update" : "current"}); run sync-framework.mjs without --check`);
       console.log("Framework helpers current (reviewed adaptations preserved).");
       return;
     }
     // Plan first: missing sources or conflicts above must not cause a partial refresh.
+    if (backupPath) {
+      safePath(target, "scripts/plan.mjs");
+      safePath(target, "scripts/plan.mjs.pre-split");
+      if (signature(legacyPath) !== legacyHash || fs.existsSync(backupPath)) throw new Error("legacy file or backup changed during sync; no files changed");
+      fs.renameSync(legacyPath, backupPath);
+    }
     for (const { bytes, to, mode, expected } of updates) {
       if (signature(to) !== expected) throw new Error(`file changed during sync: ${to}`);
       fs.mkdirSync(path.dirname(to), { recursive: true });

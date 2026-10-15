@@ -33,7 +33,7 @@ This skill was imported from a Claude workflow. In Codex, follow these overrides
 
 The orchestrator stays lean so it survives the full PROJ → QA → docs chain.
 
-- Run the checkpoint and setup subskills (CP1, P0) in subagents; keep only the review point list and the verdicts here.
+- Run the checkpoint and setup subskills (CP1, P0) in subagents; keep only the review point list and the verdicts here. CP1 repeats PRD, architecture and plan structure checks before approval; already approved P5 runs keep their legacy context behavior.
 - Delegate every implementation and correction edit when Codex subagent policy permits it.
 - Keep decomposition, dispatch, integration, deterministic checks, gates, state/findings/progress updates, and commits with the lead.
 - Run disjoint work concurrently; serialize dependent or overlapping work.

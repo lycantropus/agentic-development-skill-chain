@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# compile-context-bundles.mjs: one file per worker (story files with the slice,
+# compile-context.mjs: one file per worker (story files with the slice,
 # role files per wave, contract/fan-out splits, cleanup, migration, show,
 # fail-before-write), the implementer view of the ONE PROJ architecture
 # document (wave filter, dropped diagrams, strict item parsing, scope reuse),
@@ -9,7 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL="$ROOT/codex/skills/5_executing"
-COMPILE="$SKILL/scripts/plan.mjs"
+COMPILE="$SKILL/scripts/compile-context.mjs"
 CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
 die() { echo "compile-context-bundles: $*" >&2; exit 1; }
@@ -109,7 +109,7 @@ printf '# PRD\nNEVER-INJECT-MARKER-PRD full requirement text.\n' >"$P/2_PRDs/PRO
 printf '# Progress\nNEVER-INJECT-MARKER-PROGRESS wave log.\n' >"$P/5_progress/PROJ-1-progress.md"
 cp "$P/3-4_plan/PROJ-1-architecture.md" "$CASE/arch.keep"
 cd "$CASE"
-run() { node "$COMPILE" context "$@" --roles-dir "$SKILL/manifests/roles"; }
+run() { node "$COMPILE" "$@" --roles-dir "$SKILL/manifests/roles"; }
 CTX="specs/PROJ-1-demo/context"
 snap() { find "$CTX" .claude -type f 2>/dev/null | sort | xargs -r sha256sum; }
 rc() { local r=0; "$@" >/dev/null 2>"$CASE/err" || r=$?; echo "$r"; } # exit code; stderr in $CASE/err
@@ -244,8 +244,8 @@ grep -rq 'NEVER-INJECT-MARKER' "$CTX" .claude && die "never-inject violated: PRD
 # budget breach and parser error: exit != 0, nothing written or deleted
 cp -r "$SKILL/manifests/roles" "$CASE/tight"
 sed -i 's/^budget_tokens: .*/budget_tokens: 50/' "$CASE/tight/reviewer.md"
-[ "$(rc node "$COMPILE" context compile 1 demo --roles-dir "$CASE/tight")" -eq 1 ] || die "budget breach must exit 1"
-node "$COMPILE" context compile 1 demo --roles-dir "$CASE/tight" >"$CASE/budget.out" 2>&1 || true
+[ "$(rc node "$COMPILE" compile 1 demo --roles-dir "$CASE/tight")" -eq 1 ] || die "budget breach must exit 1"
+node "$COMPILE" compile 1 demo --roles-dir "$CASE/tight" >"$CASE/budget.out" 2>&1 || true
 grep -qE 'reviewer [0-9]+/50 tokens' "$CASE/budget.out" || die "budget breach must name role, tokens and budget"
 snap | cmp - "$CASE/full.snap" || die "budget breach changed files"
 cp "$PLAN1" "$CASE/plan1.bak"
@@ -396,7 +396,7 @@ restore_plans; cp "$CASE/arch.keep" "$P/3-4_plan/PROJ-1-architecture.md"
 # a manifest name becomes a file name: anything but ^[a-z][a-z0-9-]*$ is refused
 cp -r "$SKILL/manifests/roles" "$CASE/badname"
 sed -i 's|^name: reviewer$|name: ../reviewer|' "$CASE/badname/reviewer.md"
-[ "$(rc node "$COMPILE" context compile 1 demo --roles-dir "$CASE/badname")" -eq 1 ] && grep -qF "manifest name '../reviewer'" "$CASE/err" \
+[ "$(rc node "$COMPILE" compile 1 demo --roles-dir "$CASE/badname")" -eq 1 ] && grep -qF "manifest name '../reviewer'" "$CASE/err" \
   || die "invalid manifest name must exit 1"
 
 # missing plan wave, plan without a story, missing plan folder: exit 2
@@ -425,15 +425,15 @@ mkdir -p specs/PROJ-3-noplan
 # project-local manifests win; the old preamble or an implementer without design system exits 2
 mkdir -p templates/roles
 cp "$SKILL"/manifests/roles/*.md templates/roles/
-node "$COMPILE" context compile 1 demo --wave 1 >/dev/null || die "unchanged local manifests rejected"
+node "$COMPILE" compile 1 demo --wave 1 >/dev/null || die "unchanged local manifests rejected"
 sed -i 's/^Your story and its ACs are in the `## Deine Story` section of this$/Your US, ACs, and tasks arrive in the spawn prompt from the orchestrator./' templates/roles/frontend-implementer.md
 snap >"$CASE/before.snap"
-[ "$(rc node "$COMPILE" context compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'templates/roles/frontend-implementer.md' "$CASE/err" || die "old local preamble: want 2 naming the file"
-[ "$(rc node "$COMPILE" context check 1 demo)" -eq 2 ] || die "check must report the old local preamble"
+[ "$(rc node "$COMPILE" compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'templates/roles/frontend-implementer.md' "$CASE/err" || die "old local preamble: want 2 naming the file"
+[ "$(rc node "$COMPILE" check 1 demo)" -eq 2 ] || die "check must report the old local preamble"
 snap | cmp - "$CASE/before.snap" || die "manifest error changed files"
 cp "$SKILL/manifests/roles/frontend-implementer.md" templates/roles/
 sed -i '/^  - design-system$/d' templates/roles/implementer.md
-[ "$(rc node "$COMPILE" context compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'design-system' "$CASE/err" || die "local implementer without design system: want 2"
+[ "$(rc node "$COMPILE" compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'design-system' "$CASE/err" || die "local implementer without design system: want 2"
 rm -rf templates
 
 # check: compiles every wave in memory, writes nothing, exits 1 on a breach
@@ -441,7 +441,7 @@ rm -rf specs/PROJ-1-demo/context
 run check 1 demo >"$CASE/check.out" || die "check failed on a fitting PROJ"
 grep -q '^wave 2:' "$CASE/check.out" || die "check must cover every wave"
 [ -e specs/PROJ-1-demo/context ] && die "check must not write"
-[ "$(rc node "$COMPILE" context check 1 demo --roles-dir "$CASE/tight")" -eq 1 ] && grep -qE 'reviewer [0-9]+/50 tokens' "$CASE/err" || die "check must exit 1 on a budget breach naming the role"
+[ "$(rc node "$COMPILE" check 1 demo --roles-dir "$CASE/tight")" -eq 1 ] && grep -qE 'reviewer [0-9]+/50 tokens' "$CASE/err" || die "check must exit 1 on a budget breach naming the role"
 
 # The header must cover real story sections before it can filter decisions.
 PLAN="$P/3-4_plan/PROJ-1-wave-1-plan.md"
@@ -492,6 +492,21 @@ rejects 's/^\*\*Affects:\*\* PRD-2$/**Affects:** PRD-9/' "Affects reaching no wa
 rejects '/^### Flow 1/d' "key flow content without a Flow item"
 cp "$CASE/arch.bak" "$A"
 
+# Explicit document validation rejects mixed Affects grammar; legacy context accepts it.
+node --input-type=module - "$ROOT" "$A" <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { validateArchitecture } = await import(pathToFileURL(`${process.argv[2]}/codex/skills/3_architecture/scripts/validate-architecture.mjs`));
+const text = readFileSync(process.argv[3], "utf8").replace("- PROJ-1-PRD-1: invoices", "- PROJ-1-PRD-1: invoices\n- PROJ-1-PRD-2: exports");
+const prds = ["PROJ-1-PRD-1", "PROJ-1-PRD-2"];
+validateArchitecture(text, process.argv[3], prds);
+assert.throws(() => validateArchitecture(text.replaceAll("**Affects:** PRD-2", "**Affects:** PRD-2, all"), process.argv[3], prds), /all alone/);
+JS
+sed -i 's/^\*\*Affects:\*\* PRD-2$/**Affects:** PRD-2, all/' "$A"
+run check 1 demo >/dev/null || die "legacy compiler must retain permissive Affects token matching"
+cp "$CASE/arch.bak" "$A"
+
 # legacy PROJ: no Summary lines anywhere -> architecture-delta.md
 sed -i '/^\*\*Summary:\*\*/d' "$P/3-4_plan/PROJ-1-architecture.md"
 echo "LEGACY_DELTA_TEXT" >"$P/architecture-delta.md"
@@ -513,7 +528,7 @@ cp "$CASE/arch.bak" "$P/3-4_plan/PROJ-1-architecture.md"
 # repo manifests synced before the rename still say architecture-delta
 cp -r "$SKILL/manifests/roles" "$CASE/roles"
 sed -i 's/^  - proj-architecture$/  - architecture-delta/' "$CASE/roles/backend-implementer.md"
-node "$COMPILE" context compile 1 demo --wave 1 --roles-dir "$CASE/roles" >/dev/null || die "legacy manifest id rejected"
+node "$COMPILE" compile 1 demo --wave 1 --roles-dir "$CASE/roles" >/dev/null || die "legacy manifest id rejected"
 grep -qF 'Decision 1: Server-side totals' "$B" || die "legacy manifest id did not map to the architecture view"
 
 echo "compile-context-bundles: ok"

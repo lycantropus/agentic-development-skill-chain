@@ -18,7 +18,7 @@ git init -q -b main; git config user.email t@local; git config user.name t
 for d in PRODUCT ARCHITECTURE GUIDELINES DESIGN-SYSTEM security-baseline test-conventions; do printf '# %s\n- one line\n' "$d" >"docs/$d.md"; done
 printf '# Components\n- Button\n' >docs/components.md
 printf '# Rules\n- rule 1\n' >AGENTS.md
-for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/plan.mjs \
+for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
          6_qa/scripts/findings.mjs 7_documentation/scripts/curation.sh; do
   cp "$SKILLS/$s" scripts/
 done

@@ -2,6 +2,8 @@
 
 **Last updated:** 2026-10-14
 
+CP1 repeats `chain check prds`, `chain check architecture` and `chain check plan` before approval, including after cascaded edits. Malformed inputs return to the owning skill. Existing approved P5 runs retain the context compiler's legacy fallbacks.
+
 The executing skill is Step 5 in the 0-to-8 chain. It turns the wave plans from Step 4 into working code, one PROJ at a time, with deterministic verification once per wave and hard gates between waves.
 
 Its main job is orchestration. When delegation is available, workers own every code, test, and fix edit. The lead owns decomposition, dispatch, integration, deterministic verification, gates, commits, and operational records. Disjoint work runs concurrently; dependencies and overlapping ownership run serially. Local editing is only a visible fallback when delegation is unavailable or prohibited.

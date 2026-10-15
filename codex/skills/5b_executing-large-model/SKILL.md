@@ -30,7 +30,7 @@ calls. `5_executing` must therefore be installed alongside it.
 These are the parts that do not depend on model quality. They are unchanged
 from `5_executing` and the same scripts enforce them.
 
-1. **CP1 + P0.** Read the phase with the installed helper (the repo copy
+1. **CP1 + P0.** CP1 repeats PRD, architecture and plan structure checks before approval; already approved P5 runs keep their legacy context behavior. Read the phase with the installed helper (the repo copy
    arrives with P0): `bash ~/.claude/skills/5_executing/scripts/chain state get <X> <theme> '.phase + ":" + .status'`
    (Codex: the `.codex/skills` copy). The subskills run in subagents; only
    verdicts and the review point list enter this context.

@@ -23,6 +23,7 @@ Orchestrate implementation by creating an agent team and spawning teammates per 
 The orchestrator (main agent) must stay lean so it survives the full PROJ → QA → docs chain. **Delegate every code, test, and fix edit when subagents are available and delegation is permitted; the main agent coordinates.**
 
 - **CP1 + P0:** the checkpoint and setup subskills run in spawned subagents; the orchestrator holds only the review point list and the verdicts.
+- **CP1 structure:** repeat PRD, architecture and plan structure checks before approval; already approved P5 runs keep their legacy context behavior.
 - **US implementation:** always spawned as `skillchain-implementer` / `skillchain-backend-implementer` / `skillchain-frontend-implementer` (`compile` writes them from `manifests/roles/`; no other implementer agent files exist), each reading its worker file by path. Never write code inline.
 - **Wave-scoped Outer Ralph:** the main agent owns deterministic commands and evidence; workers own every resulting fix.
 - **PROJ-end Ken review:** spawned in Skill 6, not read inline. Ken no longer runs per wave — only once against the assembled PROJ.

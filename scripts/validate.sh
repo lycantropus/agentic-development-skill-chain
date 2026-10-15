@@ -111,8 +111,8 @@ check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/co
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
   "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 # Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
-for dup in 0b_intake/scripts/curation-caps.sh 7_documentation/scripts/curation-caps.sh 0b_intake/scripts/intake-seal-check.sh 4_writing-plans/scripts/validate-wave-plan.mjs 8_delivery/scripts/worktree.sh \
-         5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/story-slice.mjs 5_executing/scripts/compile-context-bundles.mjs \
+for dup in 5_executing/scripts/plan.mjs 0b_intake/scripts/curation-caps.sh 7_documentation/scripts/curation-caps.sh 0b_intake/scripts/intake-seal-check.sh 8_delivery/scripts/worktree.sh \
+         5_executing/scripts/validate-wave-plan.mjs 5_executing/scripts/compile-context-bundles.mjs \
          8_delivery/scripts/render-pr-body.mjs 8_delivery/scripts/ci-poll.sh 8_delivery/scripts/conflict-probe.sh \
          6_qa/scripts/ledger.mjs 6_qa/scripts/harvest-debt.sh 5_executing/scripts/quality-evidence.mjs 5_executing/scripts/quality-gate-proof.sh; do
   for platform in claude codex; do
@@ -147,7 +147,9 @@ check_identical "$ROOT/claude/skills/vibecoder/SKILL.md" \
 check_identical "$ROOT/claude/skills/1a_clarification/SKILL.md" \
   "$ROOT/codex/skills/1a_clarification/SKILL.md"
 for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/scripts/sync-framework.mjs 5_executing/templates/decisions.md.tmpl \
-         5_executing/scripts/ponytail-check.sh 5_executing/scripts/plan.mjs \
+         5_executing/scripts/ponytail-check.sh 4_writing-plans/scripts/validate-wave-plan.mjs \
+         2_requirements-engineer/scripts/validate-prds.mjs 3_architecture/scripts/validate-architecture.mjs \
+         5_executing/scripts/compile-context.mjs 5_executing/scripts/story-slice.mjs \
          5_executing/scripts/migration-drift-check.sh \
          5_executing/manifests/roles/micro-fixer.md 5_executing/manifests/roles/implementer.md \
          5_executing/manifests/roles/frontend-implementer.md 5_executing/manifests/roles/backend-implementer.md \
@@ -163,6 +165,20 @@ for f in 5_executing/scripts/chain 5_executing/scripts/preflight.sh 5_executing/
          8_delivery/templates/pr-body.md.tmpl; do
   check_identical "$ROOT/claude/skills/$f" "$ROOT/codex/skills/$f"
 done
+
+# Shared pure readers must match every adjacent import copy.
+check_identical "$ROOT/codex/skills/4_writing-plans/scripts/document-parser.mjs" \
+  "$ROOT/claude/skills/4_writing-plans/scripts/document-parser.mjs" \
+  "$ROOT/codex/skills/2_requirements-engineer/scripts/document-parser.mjs" \
+  "$ROOT/claude/skills/2_requirements-engineer/scripts/document-parser.mjs" \
+  "$ROOT/codex/skills/3_architecture/scripts/document-parser.mjs" \
+  "$ROOT/claude/skills/3_architecture/scripts/document-parser.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/document-parser.mjs" \
+  "$ROOT/claude/skills/5_executing/scripts/document-parser.mjs"
+check_identical "$ROOT/codex/skills/3_architecture/scripts/architecture-parser.mjs" \
+  "$ROOT/claude/skills/3_architecture/scripts/architecture-parser.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/architecture-parser.mjs" \
+  "$ROOT/claude/skills/5_executing/scripts/architecture-parser.mjs"
 
 # Schemas must parse; every shell script must be syntactically valid;
 # every node script must compile.
@@ -187,6 +203,7 @@ fi
 HARNESS_LOGS=$(mktemp -d); trap 'rm -rf "$HARNESS_LOGS"' EXIT
 HARNESS_NAMES=(); HARNESS_PIDS=()
 harness() { local name="$1"; shift; "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
+harness document-validators node "$ROOT/scripts/test-document-validators.mjs"
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"
 harness chain-refs          node "$ROOT/scripts/check-chain-refs.mjs"
