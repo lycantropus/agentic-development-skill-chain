@@ -76,7 +76,7 @@ printf '# Wave 1\n\n**PRDs involved:** PROJ-1-PRD-1\n\n## User Stories in this W
 touch "$sonar/sonar-project.properties"
 printf 'SONAR_TOKEN=test-token\n' >"$sonar/.env.local"
 sonar_output="$(cd "$sonar" && \
-  PATH="$FAKE_BIN:/usr/bin:/bin" \
+  PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
   PREFLIGHT_SKIP_LIVE_PROBE=1 \
   PREFLIGHT_CODEX_INACTIVE=1 \
   PONYTAIL_ENFORCE=0 \
@@ -96,7 +96,7 @@ for command_name in sonar sonar-scanner; do
   chmod +x "$FAKE_BIN/$command_name"
 done
 run_sonar_policy() {
-  (unset SONAR_TOKEN; cd "$sonar"; PATH="$FAKE_BIN:/usr/bin:/bin" \
+  (unset SONAR_TOKEN; cd "$sonar"; PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
     PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
     PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
     bash "$PREFLIGHT" 1 sonar >"$TMP/sonar-policy-output" 2>&1)
@@ -148,7 +148,7 @@ let text = fs.readFileSync(process.argv[2], "utf8");
 text = text.replaceAll('$HOME/.claude/skills/5_executing', process.argv[4]).replaceAll('$HOME/.codex/skills/5_executing', process.argv[4]);
 fs.writeFileSync(process.argv[3], text);
 NODE
-fallback_output="$(cd "$sonar" && PATH="$FAKE_BIN:/usr/bin:/bin" \
+fallback_output="$(cd "$sonar" && PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
   PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
   PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
   bash scripts/preflight.sh 1 sonar)"
