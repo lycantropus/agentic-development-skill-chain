@@ -280,7 +280,7 @@ fi
 
 # --- ponytail install + parity gate (context system, §7) -----------------
 # Ponytail is the single source of the minimalism ladder on both providers.
-# Absence, version/mode mismatch, or missing helper is HARD (PONYTAIL_ENFORCE=0
+# Absence, wrong mode, or missing helper is HARD (PONYTAIL_ENFORCE=0
 # is the loud, recorded escape hatch — never silent). Degraded runs gate the
 # surviving provider alone.
 PONYTAIL_JSON=""
@@ -298,7 +298,7 @@ if PONYTAIL_SH="$(resolve_helper ponytail-check.sh)"; then
       say "⚠ ponytail gate failed but PONYTAIL_ENFORCE=0 — run continues WITHOUT the ladder (recorded enforced:false; flagged)"
     fi
   else
-    say "❌ ponytail MISSING, mode not '${PONYTAIL_REQUIRED_MODE:-full}', or parity mismatch (hard) — run 'bash $PONYTAIL_SH' for the install commands"
+    say "❌ ponytail MISSING, mode not '${PONYTAIL_REQUIRED_MODE:-full}', or subagent coverage restricted (hard) — run 'bash $PONYTAIL_SH' for the install commands"
     HARD_MISSING+=("ponytail")
   fi
 else

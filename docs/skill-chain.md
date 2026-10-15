@@ -157,7 +157,8 @@ Stage 2 adds the bootstrap and the full context system:
   role gets (`inject` lists and budgets) in the
   [role manifests](../claude/skills/5_executing/manifests/roles/).
 - **Ponytail parity:** the minimalism ladder comes from the Ponytail plugin on
-  both providers, with version and mode parity gated in the P0 preflight
+  all active providers, with installation and mode `full` gated in the P0 preflight;
+  plugin versions may differ
   ([setup.md §6d](../claude/skills/5_executing/subskills/setup.md)).
 - **P7 curation + gates:** `documentation` (7) curates `docs/` and
   `src/**/agent.md` in place, then must pass FORM (`chain check caps`; all

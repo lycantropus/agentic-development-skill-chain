@@ -29,7 +29,7 @@ validator, fix what it reports. This file covers only what it cannot check.
 }
 ```
 
-Optional top-level keys: `lint_cmd` (default `npm run lint`), `build_artifacts` (final-wave build reuse, deterministic builds only), `coverage_cmd` + `coverage_artifacts` (split coverage out of a Sonar wrapper; `sonar_cmd` then stays scanner-only). `sonar_cmd` is the repo's real entry point, run once at the PROJ-end Quality Gate. `complexity_cmd` and `arch_rules_cmd` (both optional strings) are static checks the wave gate runs last in the AC pass, once the ACs are green, with `WAVE_BASE_SHA` in the environment; absent → skipped. Each must exit 0 and print an analysed-file count above zero (`Analysed N files`, `N files checked`, `N modules cruised`), otherwise the gate fails it as a silent no-op. Optional `timeouts.complexity_seconds` / `arch_rules_seconds` default to `ac_seconds`. `mutation_cmd` (optional string) runs once at the PROJ-end Quality Gate, never per wave: it gets `BASE_SHA` (the P0 base tag) and `CHANGED_FILES` (newline-separated, deletions excluded) in its environment and must scope itself to them, must print the mutants tested (`Mutants: N`, positive control) and the survivors (`Survivors: N`), and exit 0 = threshold met, exactly 1 = survivors (with `Survivors: N` above zero; exit 1 without it is no evidence), any other non-zero = failed run (wrap tools whose exit codes differ; gitignore their temp and report directories); set `timeouts.mutation_seconds` explicitly. `timeouts` needs `ac_seconds`, `build_seconds`, `coderabbit_seconds`, `browser_seconds` — the gate (not the validator) fails without them; `ralph_stall_seconds` is optional (defaults to `ac_seconds`).
+Optional top-level keys: `lint_cmd` (default `npm run lint`), `build_artifacts` (final-wave build reuse, deterministic builds only), `coverage_cmd` + `coverage_artifacts` (split coverage out of a Sonar wrapper; `sonar_cmd` then stays scanner-only). `sonar_cmd` is the repo's real entry point, run once at the PROJ-end Quality Gate. `complexity_cmd` and `arch_rules_cmd` (both optional strings) are static checks the wave gate runs last in the AC pass, once the ACs are green, with `WAVE_BASE_SHA` in the environment; absent → skipped. Each must exit 0 and print an analysed-file count above zero (`Analysed N files`, `N files checked`, `N modules cruised`), otherwise the gate fails it as a silent no-op. Optional `timeouts.complexity_seconds` / `arch_rules_seconds` default to `ac_seconds`. `mutation_cmd` (optional string) runs once at the PROJ-end Quality Gate, never per wave: it gets `BASE_SHA` (the P0 base tag) and `CHANGED_FILES_FILE` (absolute path to a temporary NUL-separated file list from `git diff -z --name-only --diff-filter=d BASE_SHA..HEAD`, deletions excluded) in its environment and must scope itself to them, must print the mutants tested (`Mutants: N`, positive control) and the survivors (`Survivors: N`), and exit 0 = threshold met, exactly 1 = survivors (with `Survivors: N` above zero; exit 1 without it is no evidence), any other non-zero = failed run (wrap tools whose exit codes differ; gitignore their temp and report directories); set `timeouts.mutation_seconds` explicitly. `timeouts` needs `ac_seconds`, `build_seconds`, `coderabbit_seconds`, `browser_seconds` — the gate (not the validator) fails without them; `ralph_stall_seconds` is optional (defaults to `ac_seconds`).
 
 ## Judgment rules
 
@@ -45,3 +45,23 @@ Optional top-level keys: `lint_cmd` (default `npm run lint`), `build_artifacts` 
 - **Test file size:** the gate prints an advisory warning for any declared AC or regression test file above 800 lines. It never fails the gate and never splits the file; split only at a planned boundary and update task, config and route mappings together.
 - **Browser files:** one scenario file per wave or cohesive feature with a named owner (e.g. `tests/e2e/wave-<N>.test.mjs`); keep wave fixture cleanup with its scenarios; list shared helpers that affect the proof in both task `Test:` and `test_files`; use the project's runner (`node --test` only without inherited lock descriptors). Don't split existing suites automatically: a deliberate split updates task/config/route mappings together, reruns the affected suites, invalidates cached evidence, and keeps old certificates as historical proof only. Refresh helpers at a quiet setup/resume boundary before using new config fields — old gates ignore them and cannot enforce their contracts.
 - **Legacy string `ac_commands`:** convert by hand (regression and auth choices need judgment), re-validate, get approval again.
+
+## Mutation wrapper scope (breaking change)
+
+`CHANGED_FILES` is no longer exported, even if the parent shell sets it. Existing wrappers must migrate to `CHANGED_FILES_FILE`; there is no legacy or whole-repo fallback. The list exists only during the command and is removed after success, wrapper failure, timeout, or handled cancellation (SIGINT, SIGTERM, SIGHUP, SIGQUIT). Abrupt termination of the helper itself (for example SIGKILL or a runtime crash) may leave its private temporary directory behind. Read NUL records without line splitting, shell expansion, or `eval`; an empty list must never mean “mutate everything”. For example, adapt this Bash wrapper to the project's mutation tool:
+
+```bash
+set -euo pipefail
+: "${BASE_SHA:?missing mutation base}" "${CHANGED_FILES_FILE:?missing mutation file list}"
+[[ -f "$CHANGED_FILES_FILE" && -r "$CHANGED_FILES_FILE" ]] || exit 2
+mapfile -d '' -t changed_files < "$CHANGED_FILES_FILE"
+((${#changed_files[@]} > 0)) || { echo 'No changed files; no mutation scope' >&2; exit 2; }
+# Pass the array to the real tool's file-selection interface; retain its scope.
+# Example for a tool accepting literal paths after --:
+# project-mutation-tool -- "${changed_files[@]}"
+# Normalize its exit status and print actual Mutants: N and Survivors: N counts.
+```
+
+Filter unsupported file types explicitly inside the wrapper. If none remain, fail with an explanation; never silently widen the scope. Do not persist or reuse `CHANGED_FILES_FILE` after the command returns.
+
+The helper currently buffers Git’s path output up to Node’s default 1 MiB limit. A larger list fails the run without invoking the wrapper or widening its scope; stream the list if a real project reaches this limit.

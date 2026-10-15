@@ -89,7 +89,7 @@ try {
     assert.match(bad('run', 'mutation'), /missing command for mutation/);
     config.mutation_cmd = 'echo analysed everything'; saveConfig(); commit();
     bad('run', 'mutation'); bad('check'); // exit 0 without a mutant count is a silent no-op
-    config.mutation_cmd = 'echo "base=$BASE_SHA"; echo "files:$CHANGED_FILES"; echo "Mutants: 5"'; saveConfig(); commit();
+    config.mutation_cmd = `echo "base=$BASE_SHA"; while IFS= read -r -d '' file; do printf 'file:%s\\n' "$file"; done < "$CHANGED_FILES_FILE"; echo "Mutants: 5"`; saveConfig(); commit();
     ok('run', 'mutation');
     const mutationRecord = () => JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-mutation.json`), 'utf8'));
     assert.equal(mutationRecord().mutants, 5); assert.equal(mutationRecord().selected, undefined);

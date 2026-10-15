@@ -8,9 +8,9 @@ runner's P0 lane loads it directly. Setup happens ONCE per PROJ, before
 any implementation, so implementer lanes start with a clean branch,
 verified tools, and a machine-readable state file.
 
-P0 is script-driven — run the scripts, record the results — with exactly
-ONE bounded judgment step: the ground file (step 6a, context-curator
-judgment). There are no user questions in P0.
+P0 is script-driven: run the scripts and record their results. Bounded
+judgment validates the ground file (step 6a) and selects a safe fallback
+negative control when no auth budget is configured. There are no user questions in P0.
 
 ## Subagent Contract
 
@@ -281,7 +281,7 @@ taken (key left absent = silently skipped) under the defaulted decisions in
 
 ### 6. Worker context (compile worker files, ground file)
 
-**6a. Generate the ground file** — the one bounded judgment step in P0.
+**6a. Generate the ground file** — bounded assumption validation in P0.
 Write `specs/PROJ-<X>-<theme>/ground-file.md`: assumptions the plans rely
 on (stack versions, conventions, data-model facts), each VALIDATED
 against the codebase, and ONLY what `docs/` does not already state (§5
@@ -324,7 +324,7 @@ starts in between (lead discipline: a worker holding a path to an outdated file 
 not caught).
 
 **6d. Ponytail parity** is already gated inside step 4's preflight
-(`chain check ponytail`: absence or version/mode mismatch across active
+(`chain check ponytail`: absence or wrong mode on active
 providers blocks P0). Never work around a red gate; `PONYTAIL_ENFORCE=0`
 is the loud, recorded escape hatch — it lands in state.json and the
 reports, never silent.

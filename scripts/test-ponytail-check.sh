@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# chain check ponytail: parity ok / version mismatch / absent plugin (enforce on and off) / mode off /
+# chain check ponytail: parity ok / different versions accepted / absent plugin (enforce on and off) / mode off /
 # scoped subagent matcher / single-provider run, with stubbed plugin registries and a stubbed codex binary.
 set -euo pipefail
 
@@ -29,8 +29,8 @@ for provider in claude codex; do
   ptc --json | jq -e '.parity_ok == true and .enforced == true and .claude.version == "4.8.4" and .codex.version == "4.8.4" and .codex.active == true' >/dev/null || fail "$provider: --json shape wrong"
 
   fixture; mkdir -p "$PT/cache/4.9.0/.codex-plugin"; echo '{"version":"4.9.0"}' >"$PT/cache/4.9.0/.codex-plugin/plugin.json"
-  no; grep -q 'version mismatch: claude 4.8.4 vs codex 4.9.0' "$TMP/err" || fail "$provider: mismatch not reported"
-  grep -q 'ponytail gate FAILED (PONYTAIL_ENFORCE=1)' "$TMP/err" || fail "$provider: enforce failure not announced"
+  ok --json
+  jq -e '.parity_ok == true and .enforced == true and .claude.version == "4.8.4" and .codex.version == "4.9.0"' "$TMP/out" >/dev/null || fail "$provider: different versions must pass and remain visible"
 
   fixture; echo '{"version":2,"plugins":{}}' >"$PT/claude.json"
   no; grep -q 'claude: ponytail not installed' "$TMP/err" || fail "$provider: absent claude plugin not reported"
