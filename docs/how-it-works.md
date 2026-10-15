@@ -5,13 +5,13 @@ Start here if you have not used the chain before. This page explains the part th
 ## Two layers
 
 - **Skills** are written procedures an agent follows (concept, requirements, architecture, plans, executing, QA, docs, delivery). They decide things.
-- **Scripts** are small deterministic programs the skills call. They record state, check gates, render documents and manage the worktree. They never decide anything; they either succeed or refuse.
+- **Scripts** are small deterministic programs the skills call. They record state, check gates, render documents and manage the worktree. They apply fixed rules and either succeed or refuse; choosing scope, assessing findings and approving work stays with agents or humans.
 
 Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. Before the first sync, use the installed dispatcher instead of the repo copy. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
 
 ## The five script kinds
 
-Every script belongs to exactly one kind. Only Records write state; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files); Gates answer with an exit code and a report.
+Every dispatcher action belongs to exactly one kind. A script can implement actions of different kinds: `chain check plan` validates plans and `chain render context` renders context through the same helper; `chain quality` records evidence while `chain quality seal` checks it. Only Record actions directly write `state.json`, `findings.json` and `quality-*.json`; other helpers delegate changes to those writers. Other outputs, such as `ralph-wave-N.json`, belong to the gate producing them; Renderers write only their output documents (`chain render context` also refreshes the `skillchain-*` agent files); Gates answer with an exit code and a report.
 
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
@@ -29,7 +29,7 @@ Not behind `chain`: `env-local.sh` (a library the gates `source`), `merge-projec
 
 The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder; it stays `CP1:pending` through steps 1–4 until Checkpoint 1 approves the plan. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
 
-| Phase | Call | Reads | Writes (its one writer) |
+| Phase | Call | Reads | Writes |
 |---|---|---|---|
 | **CP1** — approve the plan | `chain check plan`, `chain render context check`, then `chain state transition … CP1 approved` | wave plans, `wave-gate-config.json`, PRDs | `state.json` via `chain state` (phase, and the path of the decision log); the log itself, `decisions.md`, is written by the checkpoint subskill |
 | **P0** — setup | see the P0 diagram below | the approved plans, `docs/` | worktree, `state.json`, `scripts/`, worker files |
@@ -37,9 +37,11 @@ The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P
 | **P5** worker | reads its one file; `chain worktree with-shared-lock -- <cmd>` for migrations and auth commands | its worker file | code and tests |
 | **P5** wave gate | `chain gate wave --ac-only N`, then `chain gate wave N`, then `chain state set … .waves` | code, `wave-gate-config.json` | `ralph-wave-N.json`, the `### Wave N Gate — PASSED` block in `progress.md` |
 | **P5** quality gate | `chain quality <X> <theme> run build\|coverage\|sonar\|lint`, `chain quality <X> <theme> review <report>`, `chain quality seal` | build, tests, Sonar, the integration review | `5_progress/quality-*.json`, the rendered `### Gate Status` block of the `## Quality Gate` section in `progress.md`, then `chain state transition … P5 done` |
-| **P6** — QA | `chain review qa`, `chain findings add` | the diff `BASE_SHA..HEAD`, PRDs, architecture | `findings.json`; the runner stores the finder's text report |
+| **P6** — QA | `chain review qa`, `chain findings add`, `chain findings stats` | the diff `BASE_SHA..HEAD`, PRDs, architecture | `findings.json`; the runner stores the finder's text report |
 | **P7** — documentation | `chain check caps`, `chain review docs`, `chain state set … .authorship` | `docs/*`, `AGENTS.md`, the QA report | `docs/*` |
 | **P8** — delivery | `chain check conflicts`, `chain findings harvest`, `chain findings auto-defer`, `chain findings stats`, `chain render pr`, `chain check ci`, `chain worktree cleanup` | `state.json`, `findings.json` | the PR body (rendered), `.pr` in `state.json`, the removed worktree |
+
+The lead orchestrates these calls, creates the wave-start tags and maintains the narrative in `progress.md`; gate scripts append their own result blocks. Record commands are the only writers of the three JSON records listed below, regardless of who invokes them. P8 creates the PR and checks its final head; CP2 lets the human review and merge; it is a human handoff, not another machine phase. P8 can finish its autonomous checks while the PR is open. Worktree cleanup follows the merge and repeated safety checks, as specified in [delivery](../claude/skills/8_delivery/SKILL.md).
 
 ## P0: one setup run
 
@@ -56,6 +58,10 @@ flowchart TD
   F --> G["7 · chain render context compile<br/>worker files for every wave, once"]
   G --> H["8 · chain state transition … P0 done<br/>seal commit"]
 ```
+
+The checkpoint commit in step 5 is an ordinary Git commit that gives the verifier a clean working tree; it is separate from the human approvals CP1 and CP2. “Verify the verifier” means exercising a safe, expected failure through the real gate: the auth-budget negative control where configured, otherwise a temporarily broken assertion, policy or build followed by restoration and a green rerun. The setup agent records commands and outcomes in `progress.md`; an unexplained failure does not count. It also writes the ground file after checking its assumptions against the code. See the [setup procedure](../claude/skills/5_executing/subskills/setup.md) for the exact commands.
+
+P0 compiles all worker files once after the ground file exists. At each P5 wave start, the lead refreshes that wave's files from the current sources before dispatching workers. This refresh is separate from the single P0 compile.
 
 The permission setup (`merge-project-settings.sh`, Claude only) is a separate manual one-time step.
 
@@ -86,7 +92,7 @@ Reports and the PR body are rendered from these files by `chain render report` a
 
 ## Which gate is a script, which a review
 
-A gate is either a **script** (deterministic, same answer every time), an **LLM review** (a reviewer from the opposite provider, whose findings go into the ledger), or a **human** approval. The runner re-checks the script gates itself, so a writer cannot seal a phase past a red one.
+A gate is either a **script** (deterministic, same answer every time), an **LLM review** (a reviewer from the opposite provider, whose findings go into the ledger), or a **human** approval. The unattended runner re-checks the script gates itself. In an interactive run, the lead follows the same gate order. First the AC-only pass checks the wave's acceptance criteria; only a green result permits the full wave gate, and only that gate passing permits the next wave.
 
 | Gate | Kind | Call |
 |---|---|---|
