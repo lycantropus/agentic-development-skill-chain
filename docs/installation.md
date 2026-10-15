@@ -28,6 +28,26 @@ This copies the bundled chain into:
 ~/.claude/skills/
 ```
 
+## Platforms
+
+The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq`, `node` and `perl` (perl ships with macOS).
+
+- **macOS**: `/bin/bash` is 3.2, which is too old. Install a current bash and put it before `/bin` on `PATH`
+  (`chain` and the gates stop with this hint otherwise):
+
+  ```bash
+  brew install bash jq coreutils flock
+  ```
+
+  `coreutils` (`timeout`) and `flock` are optional: without them the helpers use a built-in perl `timeout` and an
+  exclusive `mkdir` lock (a `--shared` request degrades to exclusive: safe, slower). The wave gate's `resources`
+  budget reads `vm_stat` on macOS; there is no memory-pressure (PSI) check there.
+- **Windows**: use WSL2 (it is Linux). Native Windows shells are not supported.
+- Case-insensitive filesystems (the macOS default) are not hardened: do not name two PROJ worktrees or `app_root`
+  paths that differ only by case.
+- All GNU-only calls live in `compat.sh`; `scripts/check-portability.sh` (part of `validate.sh`) enforces it and
+  `scripts/test-portability.sh` runs the fast suites on a Linux box with macOS-like tool shims.
+
 ## Ponytail (required for framework runs, Stage 2)
 
 The framework's minimalism ladder is the third-party

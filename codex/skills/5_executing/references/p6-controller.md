@@ -1,5 +1,7 @@
 # P6 phase controller — ledger triage, fix dispatch, re-verification
 
+Write findings, verification reports and other generated artifacts in English; preserve verbatim source evidence.
+
 You are the P6 PHASE CONTROLLER (CONCEPT.md §4 P6). The QA finder
 (skill 6) runs read-only in the peer lane and never fixes anything; YOU
 own the state machine, ledger processing, fix dispatch, and

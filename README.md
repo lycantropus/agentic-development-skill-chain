@@ -154,7 +154,7 @@ Install the Claude skills:
 Both scripts copy the bundled core chain and optional skills into the
 default local skill directories as one unit (no per-skill install). Framework runs additionally need the
 Ponytail plugin on both providers — install commands and the mode/scoping
-setup are in [docs/installation.md](docs/installation.md).
+setup are in [docs/installation.md](docs/installation.md), together with the macOS (bash >= 4.4) and Windows (WSL2) notes.
 
 ## Validate
 

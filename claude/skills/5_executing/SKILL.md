@@ -5,6 +5,19 @@ description: "Execute implementation plans user-story by user-story using agent 
 
 # Executing
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
 > The chain's default Step 5 is `5b_executing-large-model`: same gates, state and
 > handoff contracts, less procedure. Use this skill when the writer model is
 > below frontier level or for a comparison run. Both run the subskills in
@@ -286,7 +299,7 @@ Read lazily — the lead's context has to last the whole PROJ, and nothing below
 for p in specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md; do bash scripts/chain render slice "$p" "User Stories in this Wave"; bash scripts/chain render slice "$p" Execution; done
 ```
 
-**At each wave start** — only that wave's plan, `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md`. Its lead-facing header (`## User Stories in this Wave`, `## Execution`) drives dispatch. Each `## <US-ID>` section is that worker's slice — ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints, gotchas — and is compiled verbatim into the worker's file under `## Deine Story` (Step 2). Never re-read earlier waves' plans: what previous waves implemented comes from the wave shape plus `5_progress/PROJ-<X>-progress.md`.
+**At each wave start** — only that wave's plan, `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md`. Its lead-facing header (`## User Stories in this Wave`, `## Execution`) drives dispatch. Each `## <US-ID>` section is that worker's slice — ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints, gotchas — and is compiled verbatim into the worker's file under `## Your Story` (Step 2). Never re-read earlier waves' plans: what previous waves implemented comes from the wave shape plus `5_progress/PROJ-<X>-progress.md`.
 
 **PRDs** — `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` stay the authoritative requirements source. The plan's ACs were traced against them by the plan cross-review and CP1, and Skill 6 tests the PRD ACs again, so open the matching PRD story only when a plan/PRD AC conflict is suspected (an AC in the slice reads paraphrased or incomplete, or a worker or the Outer Ralph pass questions one). If plan and PRD disagree on AC text, the PRD wins: add the PRD wording to the spawn prompt, marked as superseding the file's slice, and log the drift in `progress.md`.
 
@@ -443,7 +456,7 @@ Prior waves: <Zusammenfassung aus progress.md>.
 A fix worker's prompt names the role file the same way (plus the other waves' role files by path for a cross-wave fix), carries the finding, and asks for a report starting with `Brief: <Finding-ID>`.
 
 Pass to each teammate (via `references/implementer.md` template):
-- **The path of its worker file** (above). It holds the role rules, project context, this wave's architecture and API contracts, and `## Deine Story` — the story slice with ACs, smoke test, UI Implementation Notes, tasks, UI handoff constraints and gotchas, verbatim from the plan. Never paste or re-type any of it. A `compile` failure (story ID missing or duplicated, unassignable role) is a plan defect: stop and fix the plan, never hand-copy.
+- **The path of its worker file** (above). It holds the role rules, project context, this wave's architecture and API contracts, and `## Your Story` — the story slice with ACs, smoke test, UI Implementation Notes, tasks, UI handoff constraints and gotchas, verbatim from the plan. Never paste or re-type any of it. A `compile` failure (story ID missing or duplicated, unassignable role) is a plan defect: stop and fix the plan, never hand-copy.
 - What only the lead knows: execution mode, runtime constraints, file ownership and the shared-lock and dev-server rules (above)
 - What previous waves implemented — a short summary from `progress.md` (the wave shape is lead-only, it is not in the worker file)
 - Relevant sections from `agent.md`

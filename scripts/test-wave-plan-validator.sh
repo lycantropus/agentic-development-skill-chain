@@ -31,11 +31,27 @@ expect_failure() {
   fi
 }
 
-for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7' '.mutation_cmd=[]'; do
+for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7' '.mutation_cmd=[]' '.sonar_required="false"' '.sonar_required=null' '.sonar_required=1' '.app_root="/abs"' '.app_root="../up"' '.app_root=3' '.worktree_links=[]' '.worktree_links=[{path:"a",target:"../b"}]' '.worktree_links=[{path:"a"}]' '.resources={test_workers:0}' '.resources={wait_seconds:-1}' '.resources={bogus:1}' '.resources=[]' '.resources={min_available_mb:"1g"}'; do
   prepare_case plan-valid.md config-valid.json
   jq "$expression" "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
   mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
   if run_validator >"$CASE/output" 2>&1; then echo "invalid quality config accepted: $expression" >&2; exit 1; fi
+done
+
+prepare_case plan-valid.md config-valid.json
+jq '.app_root="app" | .worktree_links=[{path:"p/node_modules",target:"app/node_modules"}]' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
+mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
+run_validator >"$CASE/output" 2>&1 || { cat "$CASE/output" >&2; echo "valid app_root/worktree_links rejected" >&2; exit 1; }
+
+jq '.resources={min_available_mb:2048,max_memory_psi_full_avg10:10,wait_seconds:0,test_workers:2}' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
+mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
+run_validator >"$CASE/output" 2>&1 || { cat "$CASE/output" >&2; echo "valid resources rejected" >&2; exit 1; }
+
+for required in true false; do
+  prepare_case plan-valid.md config-valid.json
+  jq --argjson required "$required" '.sonar_required=$required' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
+  mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
+  run_validator >/dev/null
 done
 
 prepare_case plan-valid.md config-valid.json

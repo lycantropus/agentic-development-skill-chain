@@ -3,6 +3,7 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 HELPER="$ROOT/claude/skills/5_executing/scripts/worktree.sh"
+source "$ROOT/claude/skills/5_executing/scripts/compat.sh"
 TEST_DIR=$(mktemp -d)
 children=()
 cleanup() {
@@ -27,19 +28,21 @@ expect_contention() {
 git init -q "$TEST_DIR/repo"
 git -C "$TEST_DIR/repo" -c user.name=test -c user.email=test@example.invalid commit --allow-empty -qm init
 git -C "$TEST_DIR/repo" worktree add -qb other "$TEST_DIR/other"
-for location in repo other; do
-  (cd "$TEST_DIR/$location" && timeout 10 bash "$HELPER" with-shared-lock --shared --timeout 0 -- bash -c 'touch "$1"; while [ ! -e "$2" ]; do sleep .02; done' _ "$TEST_DIR/$location-ready" "$TEST_DIR/release") >"$TEST_DIR/$location.log" 2>&1 &
+# Without flock the lock is exclusive-only (a shared request degrades to exclusive): one shared holder.
+locations=(repo other); command -v flock >/dev/null 2>&1 || locations=(repo)
+for location in "${locations[@]}"; do
+  (cd "$TEST_DIR/$location" && "${TIMEOUT_BIN[@]}" 10 bash "$HELPER" with-shared-lock --shared --timeout 0 -- bash -c 'touch "$1"; while [ ! -e "$2" ]; do sleep .02; done' _ "$TEST_DIR/$location-ready" "$TEST_DIR/release") >"$TEST_DIR/$location.log" 2>&1 &
   children+=("$!")
 done
 await_file "$TEST_DIR/repo-ready"
-await_file "$TEST_DIR/other-ready"
+[ ! -d "$TEST_DIR/other" ] || [ "${#locations[@]}" -lt 2 ] || await_file "$TEST_DIR/other-ready"
 expect_contention ""
 touch "$TEST_DIR/release"
 for pid in "${children[@]}"; do wait "$pid" || fail "shared holder failed"; done
 children=()
 (cd "$TEST_DIR/repo" && bash "$HELPER" with-shared-lock --timeout 0 -- true) || fail "exclusive lock not released"
 unlink "$TEST_DIR/release"
-(cd "$TEST_DIR/repo" && timeout 10 bash "$HELPER" with-shared-lock -- bash -c 'touch "$1"; while [ ! -e "$2" ]; do sleep .02; done' _ "$TEST_DIR/exclusive-ready" "$TEST_DIR/release") >"$TEST_DIR/exclusive.log" 2>&1 &
+(cd "$TEST_DIR/repo" && "${TIMEOUT_BIN[@]}" 10 bash "$HELPER" with-shared-lock -- bash -c 'touch "$1"; while [ ! -e "$2" ]; do sleep .02; done' _ "$TEST_DIR/exclusive-ready" "$TEST_DIR/release") >"$TEST_DIR/exclusive.log" 2>&1 &
 children+=("$!")
 await_file "$TEST_DIR/exclusive-ready"
 expect_contention "--shared"

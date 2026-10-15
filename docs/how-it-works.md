@@ -23,7 +23,7 @@ Every dispatcher action belongs to exactly one kind. A script can implement acti
 
 Stack-specific add-ons are separate scripts on purpose, so projects without that stack are unaffected: `chain check migrations` (Supabase projects), `chain render registry` (projects with a component library) and `chain check ponytail` (the Ponytail plugin). `chain check preflight` and `chain gate wave` call them when they apply.
 
-Not behind `chain`: `env-local.sh` (a library the gates `source`), `merge-project-settings.sh` (Claude only, run once per project by hand), and the phase runner `runner/run-phase.sh`, which drives unattended runs.
+Not behind `chain`: `env-local.sh` and `compat.sh` (libraries the gates `source`), `merge-project-settings.sh` (Claude only, run once per project by hand), and the phase runner `runner/run-phase.sh`, which drives unattended runs.
 
 Document structure is checked where it is produced: Step 2 runs `chain check prds <prd-directory>` before user/provider review and after edits. Step 3 validates its PRD inputs, then runs `chain check architecture <architecture-file> <prd-directory>` before architecture review. Step 4 checks both inputs before planning and checks its plan/config output. CP1 repeats all three gates before approval. These gates do not judge completeness or technical sense. New validators exit 0 for valid structure, 1 for invalid documents, 2 for unreadable input and 64 for wrong invocation; they write nothing.
 
@@ -80,7 +80,7 @@ A worker reads exactly one compiled file, named by path in its spawn prompt. Not
 | Project context for the role (its `inject` list) | `docs/PRODUCT.md`, `ARCHITECTURE.md`, `GUIDELINES.md`, `DESIGN-SYSTEM.md` or the security baseline, `ground-file.md` |
 | PROJ architecture, filtered to the PRDs of the wave | the PROJ architecture document |
 | API contracts of the wave | architecture and plan |
-| `## Deine Story` (story files only: story, ACs, gate commands) | the wave plan, cut out verbatim by `chain render slice` |
+| `## Your Story` (story files only: story, ACs, gate commands) | the wave plan, cut out verbatim by `chain render slice` |
 
 The role comes from the `Agent Type` column of the wave plan. Micro-fixer and explore spawns get no file. Whole PRDs, other stories' plans, `progress.md` and `agent.md` files are never injected. A role over its token budget makes `compile` fail before anything is written.
 

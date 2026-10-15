@@ -25,6 +25,7 @@
 #      PONYTAIL_ENFORCE, PONYTAIL_SUBAGENT_MATCHER
 # Exit: 0 parity ok (or enforce off) · 1 enforcement failure · 64 usage
 set -euo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
 
 JSON_OUT=0
 CODEX_ACTIVE="auto"
@@ -73,7 +74,7 @@ CODEX_INSTALLED=false CODEX_VERSION=""
 if [ "$CODEX_ACTIVE" = true ]; then
   if grep -A2 'plugins\."ponytail@ponytail"' "$CODEX_TOML" 2>/dev/null | grep -q 'enabled *= *true'; then
     if [ -d "$CODEX_CACHE" ]; then
-      latest="$(ls "$CODEX_CACHE" 2>/dev/null | sort -V | tail -n 1)"
+      latest="$(ls "$CODEX_CACHE" 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)"
       if [ -n "$latest" ] && [ -f "$CODEX_CACHE/$latest/.codex-plugin/plugin.json" ]; then
         CODEX_VERSION="$(jq -r '.version // empty' "$CODEX_CACHE/$latest/.codex-plugin/plugin.json" 2>/dev/null || true)"
       fi
@@ -114,7 +115,7 @@ RESULT="$(jq -n \
   --argjson xa "$([ "$CODEX_ACTIVE" = true ] && echo true || echo false)" \
   --arg mode "$MODE" \
   --argjson parity "$PARITY_OK" --argjson enforced "$ENFORCED" \
-  --arg at "$(date -Iseconds)" \
+  --arg at "$(now_iso)" \
   '{claude: {installed: $ci, version: $cv, mode: $mode},
     codex:  {installed: $xi, version: $xv, mode: $mode, active: $xa},
     parity_ok: $parity, enforced: $enforced, at: $at}')"

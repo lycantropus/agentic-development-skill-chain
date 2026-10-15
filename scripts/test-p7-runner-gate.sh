@@ -7,6 +7,7 @@ export SKILLCHAIN_POLL_SECONDS=0.1 # stubs return instantly; production default 
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS="$ROOT/claude/skills"
+source "$SKILLS/5_executing/scripts/compat.sh"
 CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
 die() { echo "p7-runner-gate: $*" >&2; exit 1; }
@@ -18,7 +19,7 @@ git init -q -b main; git config user.email t@local; git config user.name t
 for d in PRODUCT ARCHITECTURE GUIDELINES DESIGN-SYSTEM security-baseline test-conventions; do printf '# %s\n- one line\n' "$d" >"docs/$d.md"; done
 printf '# Components\n- Button\n' >docs/components.md
 printf '# Rules\n- rule 1\n' >AGENTS.md
-for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
+for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compat.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
          6_qa/scripts/findings.mjs 6_qa/scripts/findings-store.mjs 7_documentation/scripts/curation.sh; do
   cp "$SKILLS/$s" scripts/
 done
@@ -66,7 +67,7 @@ EOF
 chmod +x bin/codex
 run_p7() { # <out-file>; prints the runner's exit code
   local rc=0
-  PATH="$FIX/bin:$PATH" timeout --foreground 120 "$ROOT/runner/run-phase.sh" P7 96 stage2 --timeout 60 >"$1" 2>&1 || rc=$?
+  PATH="$FIX/bin:$PATH" "${TIMEOUT_BIN[@]}" --foreground 120 "$ROOT/runner/run-phase.sh" P7 96 stage2 --timeout 60 >"$1" 2>&1 || rc=$?
   echo "$rc"
 }
 mark_open_xr_fixed() {

@@ -13,6 +13,8 @@ codex:
   delivery: prompt-file
   sandbox: workspace-write
 ---
+Write generated reports, findings and other artifacts in English; preserve source evidence and intended product localization.
+
 Tier 0 — inject NOTHING (CONCEPT.md §5). The spawn prompt already carries
 the finding verbatim, the file paths, and optionally a pointer to the
 folder's agent.md. Everything else is noise for a one-finding fix: no

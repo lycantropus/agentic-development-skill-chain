@@ -73,9 +73,10 @@ printf '{"sonar_cmd":"pnpm sonar"}\n' >"$sonar/specs/PROJ-1-sonar/3-4_plan/wave-
 # A plan folder makes preflight run the hard worker-context check, so it needs a wave plan.
 printf '# Wave 1\n\n**PRDs involved:** PROJ-1-PRD-1\n\n## User Stories in this Wave\n\n| US ID | Scope | Agent Type | Complexity | Can start when |\n|---|---|---|---|---|\n| PROJ-1-PRD-1-US-1 | backend | backend-implementer | sonnet | immediately |\n\n## PROJ-1-PRD-1-US-1: Story\n' \
   >"$sonar/specs/PROJ-1-sonar/3-4_plan/PROJ-1-wave-1-plan.md"
+touch "$sonar/sonar-project.properties"
 printf 'SONAR_TOKEN=test-token\n' >"$sonar/.env.local"
 sonar_output="$(cd "$sonar" && \
-  PATH="$FAKE_BIN:/usr/bin:/bin" \
+  PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
   PREFLIGHT_SKIP_LIVE_PROBE=1 \
   PREFLIGHT_CODEX_INACTIVE=1 \
   PONYTAIL_ENFORCE=0 \
@@ -87,11 +88,56 @@ grep -q 'npm-wrapped scanner engine' <<<"$sonar_output" \
 grep -q '✓ worker context check' <<<"$sonar_output" \
   || fail "preflight did not run the worker context check on a plan folder"
 
+# A declared command alone is not an analysis requirement. Persist the P0 disposition.
+(cd "$sonar" && bash "$(dirname "$PREFLIGHT")/state.sh" init 1 sonar >/dev/null)
+rm "$sonar/.env.local" "$sonar/sonar-project.properties"
+for command_name in sonar sonar-scanner; do
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$FAKE_BIN/$command_name"
+  chmod +x "$FAKE_BIN/$command_name"
+done
+run_sonar_policy() {
+  (unset SONAR_TOKEN; cd "$sonar"; PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
+    PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
+    PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
+    bash "$PREFLIGHT" 1 sonar >"$TMP/sonar-policy-output" 2>&1)
+}
+run_sonar_policy || { cat "$TMP/sonar-policy-output" >&2; fail "unconfigured optional Sonar must not require scanner auth"; }
+jq -e '.preflight.ok and (.preflight.skipped | index("sonar: project not configured") != null)' \
+  "$sonar/specs/PROJ-1-sonar/state.json" >/dev/null || fail "P0 did not persist project-not-configured Sonar disposition"
+for policy in configured required false-configured malformed null numeric; do
+  rm -f "$sonar/sonar-project.properties"
+  printf '{"sonar_cmd":"pnpm sonar"}\n' >"$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json"
+  case "$policy" in
+    configured) touch "$sonar/sonar-project.properties" ;;
+    required) jq '.sonar_required=true' "$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json" >"$TMP/policy" ;;
+    false-configured) touch "$sonar/sonar-project.properties"; jq '.sonar_required=false' "$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json" >"$TMP/policy" ;;
+    null) jq '.sonar_required=null' "$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json" >"$TMP/policy" ;;
+    numeric) jq '.sonar_required=1' "$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json" >"$TMP/policy" ;;
+    malformed) jq '.sonar_required="false"' "$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json" >"$TMP/policy" ;;
+  esac
+  if [ -f "$TMP/policy" ]; then mv "$TMP/policy" "$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json"; fi
+  if run_sonar_policy; then fail "$policy Sonar policy must fail closed without scanner auth"; fi
+  case "$policy" in malformed|null|numeric) expected=sonar_required ;; *) expected=sonar-scanner-auth ;; esac
+  grep -q "$expected" "$TMP/sonar-policy-output" || { cat "$TMP/sonar-policy-output" >&2; fail "$policy failed for wrong reason"; }
+done
+# Missing scanner engine is also fatal when analysis is required.
+rm "$FAKE_BIN/sonar-scanner"
+printf '{"sonar_cmd":"true","sonar_required":true}\n' >"$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json"
+if run_sonar_policy; then fail "required Sonar without a scanner engine must fail"; fi
+grep -q 'no scanner engine' "$TMP/sonar-policy-output" || fail "missing engine failed for wrong reason"
+# Restore the configured wrapped-scanner positive control for the installed-helper check.
+printf '{"sonar_cmd":"pnpm sonar"}\n' >"$sonar/specs/PROJ-1-sonar/3-4_plan/wave-gate-config.json"
+touch "$sonar/sonar-project.properties"
+printf 'SONAR_TOKEN=test-token\n' >"$sonar/.env.local"
+rm "$FAKE_BIN/sonar"
+rm "$sonar/specs/PROJ-1-sonar/state.json"
+
 # A lone project preflight can resolve the new compiler from an installed tree.
 installed="$TMP/installed/5_executing"
 mkdir -p "$installed/scripts" "$sonar/scripts"
-cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$sonar/scripts/"
+cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$sonar/scripts/"
 cp "$ROOT/codex/skills/5_executing/scripts/ponytail-check.sh" \
+  "$ROOT/codex/skills/5_executing/scripts/compat.sh" \
   "$ROOT/codex/skills/5_executing/scripts/compile-context.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/document-parser.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/architecture-parser.mjs" "$installed/scripts/"
@@ -102,7 +148,7 @@ let text = fs.readFileSync(process.argv[2], "utf8");
 text = text.replaceAll('$HOME/.claude/skills/5_executing', process.argv[4]).replaceAll('$HOME/.codex/skills/5_executing', process.argv[4]);
 fs.writeFileSync(process.argv[3], text);
 NODE
-fallback_output="$(cd "$sonar" && PATH="$FAKE_BIN:/usr/bin:/bin" \
+fallback_output="$(cd "$sonar" && PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
   PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
   PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
   bash scripts/preflight.sh 1 sonar)"

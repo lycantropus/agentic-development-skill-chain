@@ -12,14 +12,15 @@ try {
     const write = (name, value) => fs.writeFileSync(path.join(cwd, name), value);
     const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
     const chain = path.join(root, platform, 'skills/5_executing/scripts/chain');
-    const call = (...args) => spawnSync('bash', [chain, 'quality', '1', 'test', ...args], { cwd, encoding: 'utf8' });
+    let qualityEnv = process.env;
+    const call = (...args) => spawnSync('bash', [chain, 'quality', '1', 'test', ...args], { cwd, encoding: 'utf8', env: qualityEnv });
     const ok = (...args) => { const r = call(...args); assert.equal(r.status, 0, r.stderr); return r.stdout; };
     const bad = (...args) => { const r = call(...args); assert.notEqual(r.status, 0, r.stdout); return r.stderr; };
     fs.mkdirSync(path.join(cwd, `${base}/3-4_plan`), { recursive: true });
     fs.mkdirSync(path.join(cwd, progress), { recursive: true });
     const progressPath = path.join(cwd, progress, 'PROJ-1-progress.md'), progressText = () => fs.readFileSync(progressPath, 'utf8');
     write(`${progress}/PROJ-1-progress.md`, '# PROJ-1 Progress\n\n## US-1: story\n');
-    const seal = () => spawnSync('bash', [chain, 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8' });
+    const seal = () => spawnSync('bash', [chain, 'quality', 'seal', '1', 'test'], { cwd, encoding: 'utf8', env: qualityEnv });
     // Real `sonar list issues` output (shortened): [0] MINOR/OPEN [1] MAJOR/OPEN [2] CRITICAL/OPEN [3] BLOCKER/OPEN (no line) [4] CRITICAL/CLOSED [5] MAJOR/RESOLVED.
     // issuesFile(moved) points the listed issues at the changed file source.txt; the rest stay in files this PROJ did not touch.
     const fixture = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fixtures/sonar/list-issues.json'), 'utf8'));
@@ -74,8 +75,9 @@ try {
     config.sonar_cmd = 'true'; saveConfig(); commit(); ok('run', 'coverage'); bad('run', 'sonar');
     fs.mkdirSync(path.join(cwd, 'scripts'));
     fs.copyFileSync(path.join(root, platform, 'skills/5_executing/scripts/worktree.sh'), path.join(cwd, 'scripts/worktree.sh'));
+    fs.copyFileSync(path.join(root, platform, 'skills/5_executing/scripts/compat.sh'), path.join(cwd, 'scripts/compat.sh'));
     config.auth_budget = { preflight_cmd: 'true' };
-    config.phase_commands = [{ label: 'auth', phase: 'quality', auth_consuming: true, command: `test -e /proc/$$/fd/8 && echo called >> ${progress}/auth-calls.log && echo "# tests 1"` }];
+    config.phase_commands = [{ label: 'auth', phase: 'quality', auth_consuming: true, command: `(test -e /proc/$$/fd/8 || test -d "$(git rev-parse --git-common-dir)/skillchain-shared-resources.lock.d") && echo called >> ${progress}/auth-calls.log && echo "# tests 1"` }];
     saveConfig(); commit(); ok('run', 'test:auth');
     config.auth_budget.preflight_cmd = 'exit 75'; saveConfig(); commit(); bad('run', 'test:auth');
     assert.equal(fs.readFileSync(path.join(cwd, `${progress}/auth-calls.log`), 'utf8'), 'called\n');
@@ -213,6 +215,52 @@ try {
     bad('check'); // a plain environment is a different environment ...
     assert.equal(seal().status, 0, seal().stderr); // ... which the seal reproduces from .env.local
     fs.rmSync(path.join(cwd, '.env.local'));
+    ok('run', 'build'); ok('run', 'lint'); scan(); ok('review', `${progress}/review.md`);
+
+    // Sonar policy is checked independently of plan validation, including by the seal.
+    qualityEnv = { ...process.env, PATH: `${execFileSync('bash', ['-c', 'dirname "$BASH"'], { encoding: 'utf8' }).trim()}:/usr/bin:/bin` }; // keep the running bash (macOS /bin/bash is 3.2)
+    assert.notEqual(spawnSync('bash', ['-c', 'command -v sonar && command -v sonar-scanner'], { env: qualityEnv }).status, 0, 'fixture PATH must omit a Sonar CLI');
+    ok('run', 'build'); ok('run', 'lint'); ok('review', `${progress}/review.md`);
+    ok('skip-sonar', 'sonar CLI unavailable'); ok('check');
+    assert.equal(seal().status, 0, seal().stderr);
+    ok('skip-sonar', 'project not configured'); ok('check');
+    assert.match(block(), /\| SonarCloud \| skipped \(project not configured\) \|/);
+    assert.equal(seal().status, 0, seal().stderr);
+    for (const policy of ['required', 'configured', 'false-configured', 'malformed']) {
+      delete config.sonar_required;
+      if (policy === 'required') config.sonar_required = true;
+      if (policy === 'false-configured') config.sonar_required = false;
+      if (policy === 'malformed') config.sonar_required = 'false';
+      if (policy.includes('configured')) write('sonar-project.properties', 'sonar.projectKey=fixture\n');
+      saveConfig(); commit();
+      const expected = policy === 'malformed' ? /sonar_required/ : /Sonar skip/;
+      assert.match(bad('skip-sonar', 'project not configured'), expected, `${policy} must reject a project-not-configured skip`);
+      assert.match(bad('skip-sonar', 'sonar CLI unavailable'), expected, `${policy} must reject a CLI-unavailable skip`);
+      // Bring the previously valid skip record to the current inputs, so seal must
+      // reject the policy itself rather than merely rejecting stale evidence.
+      if (policy === 'malformed') {
+        assert.match(seal().stderr, expected);
+        for (const invalid of [null, 1]) {
+          config.sonar_required = invalid; saveConfig();
+          assert.match(bad('skip-sonar', 'project not configured'), /sonar_required/);
+          assert.match(seal().stderr, /sonar_required/);
+        }
+        continue;
+      }
+      ok('run', 'build'); ok('run', 'lint'); ok('review', `${progress}/review.md`);
+      const recordPath = path.join(cwd, `${progress}/quality-sonar-skip.json`);
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+      record.head = git('rev-parse', 'HEAD').toString().trim();
+      record.inputs = ok('snapshot').trim();
+      for (const reason of ['project not configured', 'sonar CLI unavailable']) {
+        record.reason = reason;
+        fs.writeFileSync(recordPath, JSON.stringify(record));
+        assert.match(seal().stderr, expected, `${policy}: ${reason} skip must not seal`);
+      }
+      if (policy.includes('configured')) fs.rmSync(path.join(cwd, 'sonar-project.properties'));
+    }
+    qualityEnv = process.env;
+    delete config.sonar_required; saveConfig(); commit();
     ok('run', 'build'); ok('run', 'lint'); scan(); ok('review', `${progress}/review.md`);
 
     // Seal exits: 64 on usage, 1 without a progress file; check keeps existing progress prose and rewrites only its own block.

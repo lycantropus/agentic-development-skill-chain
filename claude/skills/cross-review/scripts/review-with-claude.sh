@@ -10,6 +10,8 @@
 # Usage: review-with-claude.sh --prompt <file> [--model M] [--timeout S] [--max-turns N]
 # Exit:  0 valid finding lines on stdout · 1 CLI failed/timeout/zero valid lines · 64 usage
 set -euo pipefail
+_compat_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_compat_dir/compat.sh" ]; then source "$_compat_dir/compat.sh"; else source "$_compat_dir/../../5_executing/scripts/compat.sh"; fi
 
 PROMPT="" MODEL="" TIMEOUT=600 MAX_TURNS=5
 while [ $# -gt 0 ]; do
@@ -61,7 +63,7 @@ SCHEMA='{"type":"object","properties":{"findings":{"type":"array","minItems":1,"
 # cut the run off as error_max_turns before a valid result ever formed. The
 # default here gives headroom above the observed floor; the wall-clock
 # --timeout below remains the real worst-case bound, not the turn count.
-setsid claude -p ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
+"${SETSID_BIN[@]}" claude -p ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} \
   --safe-mode --strict-mcp-config --tools "" --max-turns "$MAX_TURNS" --effort low \
   --no-session-persistence --output-format json --json-schema "$SCHEMA" \
   <"$PROMPT" >"$RAW" 2>&1 &

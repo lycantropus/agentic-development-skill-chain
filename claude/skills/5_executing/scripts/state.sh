@@ -43,9 +43,11 @@ EOF
 [ $# -ge 3 ] || usage
 CMD="$1"; PROJ="$2"; THEME="$3"; shift 3
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
+
 BASE="specs/PROJ-${PROJ}-${THEME}"
 STATE="${BASE}/state.json"
-NOW="$(date -Iseconds)"
+NOW="$(now_iso)"
 
 fail() { echo "state.sh: $*" >&2; exit 1; }
 
@@ -99,10 +101,12 @@ validate() {
 }
 
 # Mutations serialize on a lock file: a concurrent read-modify-write from
-# two lanes must not lose either write (flock is released on process exit).
+# two lanes must not lose either write (released on process exit).
 lock_state() {
-  exec 9>"${BASE}/.state.lock" || fail "cannot create ${BASE}/.state.lock"
-  flock -w 10 9 || fail "could not acquire state lock within 10s (stale run?)"
+  local rc=0
+  lock_acquire 9 exclusive 10 "${BASE}/.state.lock" || rc=$?
+  [ "$rc" -ne 2 ] || fail "cannot create ${BASE}/.state.lock"
+  [ "$rc" -eq 0 ] || fail "could not acquire state lock within 10s (stale run?)"
 }
 
 # Atomic, validated write: $1 = jq filter, remaining args passed to jq.

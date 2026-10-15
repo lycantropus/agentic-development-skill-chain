@@ -5,6 +5,33 @@ description: "Create detailed feature PRDs with user stories, acceptance criteri
 
 # Requirements Engineer
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Turn the approved concept into structured Product Requirements Documents. Focus on what the feature must do, not how it will be implemented.
 
 Never write code or technical architecture in this skill. Architecture and implementation happen later in the chain.

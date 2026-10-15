@@ -5,6 +5,20 @@ description: "Turn a feature idea or supplied problem brief into an approved bui
 
 # Concept: From Idea To Feature Concept
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 ## Purpose
 
 Turn a feature idea or stakeholder brief into one or more approved, buildable feature concepts at `specs/PROJ-<X>-<theme>/1_concept/PROJ-<X>-concept.md` (the chain-guide Step 1 output). This starts the PROJ chain: it fixes the PROJ number, theme slug, folder, scope boundary, assumptions, and first handoff. `visual-companion`, `frontend-design`, `prototyping`, `requirements-engineer`, `architecture`, `writing-plans`, `executing`, `qa`, and `documentation` all build on it, so each concept must be stable enough that nobody re-litigates the basic feature intent. Do not leave ambiguity unresolved because a later step exists.
@@ -106,6 +120,7 @@ Use a stakeholder brief from `clarification` (1a, `specs/_clarification/<slug>-s
 A stakeholder brief from `clarification` was confirmed by the stakeholder, usually without the PM who now runs concept being able to re-ask them:
 
 - Take confirmed facts as given; do not ask the PM to re-confirm them.
+- Reuse confirmed use cases and their concrete examples as the scenario source for intake. They describe the current workflow and desired business result; they do not select a future solution. If an older brief has none, ask only for the missing scenario context.
 - For each open question, first ask whether it has been answered since. A still-open question marked `Blocks concept? yes` is a stakeholder follow-up: report it with its owner and do not select a direction until it is resolved. Non-blocking ones carry into `Risks And Trade-Offs`.
 - If the PM's direction would contradict the stakeholder brief (for example, widen a non-goal), flag it as needing the problem owner instead of overriding it silently.
 - Never edit the stakeholder brief. If it no longer holds, ask for a new revision via `clarification`.
@@ -357,7 +372,7 @@ Apply requested changes, self-review and check the cap again, then automatically
 run cross-review on the revised concept in the same turn before presenting it
 again. Proceed only after user approval. Then:
 
-- UI feature → invoke `visual-companion`; with `Candidate Directions`, tell it to prototype each candidate. Pure backend/API → invoke `requirements-engineer`.
+- UI feature → hand off to `visual-companion` in a new session; with `Candidate Directions`, include the instruction to prototype each candidate. Pure backend/API → hand off to `requirements-engineer` in a new session.
 - If the PROJ depends on an uncreated or unapproved sibling, create or approve that prerequisite first.
-- For a multi-PROJ map, repeat for the next approved PROJ; later skills run per PROJ unless the user asks to continue several in sequence.
+- For a multi-PROJ map, give the next approved PROJ its own concept session; later skills also run per PROJ.
 - Never invoke writing-plans, architecture, executing, QA, documentation, or implementation directly from concept.

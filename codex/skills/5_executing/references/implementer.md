@@ -17,7 +17,7 @@ Task tool:
     before anything else; do not start without it, and report the missing or unreadable
     file instead of guessing. It holds the role rules, project context, the design
     system (frontend and full-stack roles), this wave's architecture and API contracts,
-    and `## Deine Story` (story, ACs, smoke test, tasks with TDD cycles and file paths,
+    and `## Your Story` (story, ACs, smoke test, tasks with TDD cycles and file paths,
     gotchas — verbatim from the plan; never re-type or trim it in this prompt).
     [Fix worker without a story: the path of `context/roles/wave-<N>/<role>.md`, any
      further waves' role files by path, and the finding itself; the report then

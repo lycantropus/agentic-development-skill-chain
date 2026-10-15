@@ -55,6 +55,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 # Preflight runs in the control checkout's shell, which may not be the same
 # session any secret (SONAR_TOKEN or otherwise) was exported into.
+source "$SCRIPT_DIR/compat.sh"
 source "$SCRIPT_DIR/env-local.sh"
 agent_browser_contract() {
   agent-browser open --help >/dev/null 2>&1 \
@@ -65,15 +66,22 @@ agent_browser_contract() {
 echo "→ P0 preflight (PROJ-${PROJ}-${THEME})"
 
 # --- hard tools ---------------------------------------------------------
-for tool in git gh claude node jq coderabbit realpath flock unlink; do
+for tool in git gh claude node jq coderabbit unlink; do
   if have "$tool"; then say "✓ $tool"; else say "❌ $tool MISSING (hard)"; HARD_MISSING+=("$tool"); fi
 done
 
+# Optional GNU tools: information only, the portable fallbacks in compat.sh cover their absence.
+have flock || say "– flock absent: exclusive mkdir-lock fallback in use (optional: brew install flock)"
+[ "${TIMEOUT_BIN[0]}" != perl ] || say "– timeout absent: built-in perl fallback in use (optional: brew install coreutils)"
+
 # npm or pnpm — hard when the project builds with node (package.json present)
-if [ -f package.json ]; then
+APP_ROOT="."
+[ -f "$GATE_CFG" ] && APP_ROOT=$(jq -r 'if (.app_root | type) == "string" then .app_root else "." end' "$GATE_CFG" 2>/dev/null || echo .)
+case "$APP_ROOT" in ''|/*|..|../*|*/..|*/../*) APP_ROOT="." ;; esac # an invalid app_root is the plan validator's and worktree.sh's job to refuse
+if [ -f "$APP_ROOT/package.json" ]; then
   if have pnpm || have npm; then say "✓ npm/pnpm"; else say "❌ npm/pnpm MISSING (hard — package.json present)"; HARD_MISSING+=("npm/pnpm"); fi
 else
-  say "– npm/pnpm: no package.json, not required"
+  say "– npm/pnpm: no $APP_ROOT/package.json, not required"
 fi
 
 # agent-browser — hard for legacy per-wave routes and structured top-level routes
@@ -109,7 +117,7 @@ fi
 if have claude; then
   if [ "${PREFLIGHT_SKIP_LIVE_PROBE:-0}" = "1" ]; then
     say "– claude live probe SKIPPED (PREFLIGHT_SKIP_LIVE_PROBE=1 — test use only)"
-  elif timeout --foreground "$PROBE_TIMEOUT" claude -p "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
+  elif "${TIMEOUT_BIN[@]}" --foreground "$PROBE_TIMEOUT" claude -p "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
     say "✓ claude live probe (bounded, ${PROBE_TIMEOUT}s)"
   else
     say "❌ claude live probe FAILED (hard — it hosts the chain)"
@@ -130,7 +138,7 @@ elif ! codex login status >/dev/null 2>&1; then
   DEGRADED_REASON="codex CLI unauthenticated"
 elif [ "${PREFLIGHT_SKIP_LIVE_PROBE:-0}" = "1" ]; then
   say "– codex live probe SKIPPED (PREFLIGHT_SKIP_LIVE_PROBE=1 — test use only)"
-elif ! timeout --foreground "$PROBE_TIMEOUT" codex exec --sandbox read-only --skip-git-repo-check "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
+elif ! "${TIMEOUT_BIN[@]}" --foreground "$PROBE_TIMEOUT" codex exec --sandbox read-only --skip-git-repo-check "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
   CODEX_STATE="unauthenticated"
   DEGRADED_REASON="codex live probe failed"
 fi
@@ -175,58 +183,57 @@ if have sonar; then
   if [ -n "${SONAR_TOKEN:-}" ] || sonar auth status >/dev/null 2>&1; then
     say "✓ sonar auth (SONAR_TOKEN or auth status)"
   else
-    say "– optional PROJ-end sonar auth unverified (no SONAR_TOKEN); mandatory wave sonar_cmd must still provide working auth and fail closed"
+    say "– optional PROJ-end sonar auth unverified (no SONAR_TOKEN); required Sonar analysis must still provide scanner auth and fail closed"
     SKIPPED+=("sonar-auth")
   fi
 fi
 
-# --- mandatory wave sonar_cmd: hard preflight, never silently green (§7) ----
-# `sonar` (the operator CLI) can exit 0 while running a no-op local scan with
-# no language analyzer installed — it "checks off" every file without ever
-# analyzing it. sonar-scanner is the actual analysis engine; wave-gate.sh's
-# sonar_cmd is mandatory (chain check plan requires it non-empty), so a
-# broken scanner/auth setup must stop P0 here instead of surfacing later as a
-# false-green wave gate. sonar_cmd is commonly wrapped (`npm run sonar`), so
-# this checks the real prerequisites (binary + token in the environment) —
-# not the command string, which can't be statically resolved through a wrapper.
-# A standalone sonar-scanner binary is one way to have the engine, not the only
-# one: an npm-wrapped scanner (@sonar/scan, sonarqube-scanner) downloads and runs
-# the same engine, and such a wrapper commonly sources its own token file. So
-# resolve one level of npm/pnpm script wrapper and accept either shape — proven
-# for this repo by the recorded P0 negative control (green analysis, exit 1 on a
-# bad token). Anything unresolvable is still a hard stop.
-if [ -f "$GATE_CFG" ] && jq -e '.sonar_cmd | select(type=="string" and test("\\S"))' "$GATE_CFG" >/dev/null 2>&1; then
-  sonar_cmd=$(jq -r '.sonar_cmd' "$GATE_CFG")
-  sonar_def="$sonar_cmd"
-  sonar_script=$(printf '%s' "$sonar_cmd" | sed -nE 's/^(npm run|pnpm run|pnpm|yarn) ([A-Za-z0-9:._-]+)$/\2/p')
-  if [ -n "$sonar_script" ] && [ -f package.json ]; then
-    sonar_def=$(jq -r --arg s "$sonar_script" '.scripts[$s] // ""' package.json)
-  fi
-
-  sonar_engine=""
-  if have sonar-scanner; then
-    sonar_engine="sonar-scanner on PATH"
-  elif printf '%s' "$sonar_def" | grep -qE '@sonar/scan|sonarqube-scanner|sonar-scanner'; then
-    sonar_engine="npm-wrapped scanner engine"
-  fi
-
-  sonar_auth=""
-  if [ -n "${SONAR_TOKEN:-}" ]; then
-    sonar_auth="SONAR_TOKEN in env"
-  elif printf '%s' "$sonar_def" | grep -q '\.env\.local' \
-    && [ -f .env.local ] && grep -q '^SONAR_TOKEN=' .env.local; then
-    sonar_auth="SONAR_TOKEN sourced from .env.local by sonar_cmd"
-  fi
-
-  if [ -z "$sonar_engine" ]; then
-    say "❌ no scanner engine for sonar_cmd '$sonar_cmd' (hard — no sonar-scanner on PATH and no npm-wrapped scanner in its definition)"
-    HARD_MISSING+=("sonar-scanner")
-  elif [ -z "$sonar_auth" ]; then
-    say "❌ SONAR_TOKEN not reachable by sonar_cmd (hard — not in env and not in an .env.local the command sources; \`sonar auth status\` alone does not authenticate the scanner, see sonar-cli skill)"
-    HARD_MISSING+=("sonar-scanner-auth")
+# --- Sonar policy: only configured or explicitly required analysis is mandatory ---
+# sonar_cmd remains required plan metadata; it alone does not require analysis.
+# A wrapped scanner still needs an engine and scanner auth when analysis is required.
+if [ -f "$GATE_CFG" ] && ! jq -e 'type == "object" and (if has("sonar_required") then (.sonar_required | type == "boolean") else true end)' "$GATE_CFG" >/dev/null 2>&1; then
+  say "❌ sonar_required must be boolean when present (hard — invalid Sonar policy)"
+  HARD_MISSING+=("sonar_required")
+elif [ -e sonar-project.properties ] || { [ -f "$GATE_CFG" ] && jq -e '.sonar_required == true' "$GATE_CFG" >/dev/null 2>&1; }; then
+  if [ ! -f "$GATE_CFG" ] || ! jq -e '.sonar_cmd | select(type=="string" and test("\\S"))' "$GATE_CFG" >/dev/null 2>&1; then
+    say "❌ required Sonar analysis needs a non-empty sonar_cmd"
+    HARD_MISSING+=("sonar_cmd")
   else
-    say "✓ scanner engine ($sonar_engine), auth ($sonar_auth) for mandatory wave sonar_cmd"
+    sonar_cmd=$(jq -r '.sonar_cmd' "$GATE_CFG")
+    sonar_def="$sonar_cmd"
+    sonar_script=$(printf '%s' "$sonar_cmd" | sed -nE 's/^(npm run|pnpm run|pnpm|yarn) ([A-Za-z0-9:._-]+)$/\2/p')
+    if [ -n "$sonar_script" ] && [ -f package.json ]; then
+      sonar_def=$(jq -r --arg s "$sonar_script" '.scripts[$s] // ""' package.json)
+    fi
+
+    sonar_engine=""
+    if have sonar-scanner; then
+      sonar_engine="sonar-scanner on PATH"
+    elif printf '%s' "$sonar_def" | grep -qE '@sonar/scan|sonarqube-scanner|sonar-scanner'; then
+      sonar_engine="npm-wrapped scanner engine"
+    fi
+
+    sonar_auth=""
+    if [ -n "${SONAR_TOKEN:-}" ]; then
+      sonar_auth="SONAR_TOKEN in env"
+    elif printf '%s' "$sonar_def" | grep -q '\.env\.local' \
+      && [ -f .env.local ] && grep -q '^SONAR_TOKEN=' .env.local; then
+      sonar_auth="SONAR_TOKEN sourced from .env.local by sonar_cmd"
+    fi
+
+    if [ -z "$sonar_engine" ]; then
+      say "❌ no scanner engine for sonar_cmd '$sonar_cmd' (hard — no sonar-scanner on PATH and no npm-wrapped scanner in its definition)"
+      HARD_MISSING+=("sonar-scanner")
+    elif [ -z "$sonar_auth" ]; then
+      say "❌ SONAR_TOKEN not reachable by sonar_cmd (hard — not in env and not in an .env.local the command sources; \`sonar auth status\` alone does not authenticate the scanner, see sonar-cli skill)"
+      HARD_MISSING+=("sonar-scanner-auth")
+    else
+      say "✓ scanner engine ($sonar_engine), auth ($sonar_auth) for required Sonar analysis"
+    fi
   fi
+elif [ -f "$GATE_CFG" ]; then
+  say "– Sonar skipped (project not configured)"
+  SKIPPED+=("sonar: project not configured")
 fi
 
 # Framework-owned files are versioned for the run but must not inherit the
@@ -368,7 +375,7 @@ OK=true
 
 if [ -f "$BASE/state.json" ]; then
   PREFLIGHT_JSON="$(jq -n \
-    --arg at "$(date -Iseconds)" \
+    --arg at "$(now_iso)" \
     --argjson ok "$OK" \
     --argjson hard "$(printf '%s\n' "${HARD_MISSING[@]:-}" | jq -R . | jq -s 'map(select(length > 0))')" \
     --argjson skipped "$(printf '%s\n' "${SKIPPED[@]:-}" | jq -R . | jq -s 'map(select(length > 0))')" \

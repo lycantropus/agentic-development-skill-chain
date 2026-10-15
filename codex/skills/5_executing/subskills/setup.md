@@ -1,5 +1,7 @@
 # Setup — P0 Subskill of Executing (runs as a subagent)
 
+Write generated artifacts, decision logs, reports and handoff prompts in English; converse with the user in their language.
+
 Owns the P0 phase of the agent workflow (CONCEPT.md §4). This is a
 subskill of `5_executing`, not a standalone skill: the Step 5 lead
 (`5b_executing-large-model` by default, or `5_executing`) spawns ONE subagent with this file as its instructions once
@@ -88,7 +90,44 @@ validation before it creates anything.
 
 ### 1. Persistent PROJ worktree + BASE_SHA
 
-From the control checkout root, run:
+**Protected changes in the supplied control checkout:** keep them untouched.
+Do not stash, discard, or commit unrelated edits to satisfy the clean gate.
+Instead, use a separate clean detached control worktree at the explicitly
+identified, committed CP1-approved SHA. Approval in the working copy alone is
+insufficient: confirm that this commit contains the approved plans and sealed
+`CP1:approved` state. If those exist only as uncommitted changes, stop and return
+to the checkpoint lead to seal and commit only the authorized CP1 artifacts.
+
+From the supplied checkout root, substitute the approved commit and a new,
+unoccupied absolute sibling path, then run:
+
+```bash
+ORIGINAL_CONTROL=$(git rev-parse --show-toplevel)
+CP1_SHA=$(git rev-parse --verify '<approved-commit>^{commit}') || exit 1
+git show "$CP1_SHA:specs/PROJ-<X>-<theme>/state.json" |
+  jq -e '.phase == "CP1" and .status == "approved"' >/dev/null || exit 1
+CLEAN_CONTROL=/absolute/path/to/repo-cp1-control
+git worktree add --detach "$CLEAN_CONTROL" "$CP1_SHA" || exit 1
+cd "$CLEAN_CONTROL" || exit 1
+[ -z "$(git status --porcelain)" ] || exit 1
+```
+
+Repeat step 0's plan consistency gate in this clean checkout, then run the
+ordinary `prepare` below; its clean-checkout gate remains mandatory. Ignored
+local environment files are not copied by Git: satisfy the existing environment
+requirements without printing secrets or copying unrelated changes. Record the
+original checkout, detached control path, and approved SHA in `progress.md` in
+the resulting PROJ worktree. The helper records the clean control path as
+`.worktree.control_path`. Keep both new worktrees through the normal delivery
+cleanup; the PROJ worktree can depend on its control checkout's environment.
+
+The default target uses the **control directory's basename**, so a control named
+`repo-cp1-control` produces `repo-cp1-control-proj<X>`, not `repo-proj<X>`.
+Do not guess the PROJ path: the returned path and recorded `.worktree.path` are
+authoritative, including on resume. Reuse the same clean control checkout for
+P0 retries; do not create another control checkout or retarget the base tag.
+
+From the clean control checkout root (the supplied checkout if already clean), run:
 
 ```bash
 WORKTREE=$(~/.codex/skills/5_executing/scripts/chain worktree prepare <X> <theme>)
@@ -118,7 +157,11 @@ occupied target path is a hard stop.
 and Git ignores it. If only `.env.local.example` exists, stop and require the
 local secret file. Secret values are never printed or stored. Dependencies are
 installed reproducibly from the one supported lockfile inside the worktree;
-`node_modules` is never linked. The helper records `.worktree` metadata,
+`node_modules` is never linked. With `app_root` in `wave-gate-config.json` (a nested
+app, e.g. `app`), the lockfile, install, preflight package-manager check and
+wave-gate registry check all use that directory. `worktree_links` (`[{path, target}]`,
+git-ignored `path`) recreates ignored dev-asset symlinks, e.g. a prototype's
+`node_modules` -> `app/node_modules`, after the install. The helper records `.worktree` metadata,
 `.base_sha`, and `.branch` through `chain state`, including shared database mode,
 dev port (`SKILLCHAIN_DEV_PORT` or `frontend.dev_url`), and cleanup status.
 
@@ -260,7 +303,7 @@ versioned framework helpers available for the run.
 Before committing the copied files, run the target's existing lint command
 when it has one (`npm run lint --if-present`, or its configured equivalent)
 and `bash scripts/chain render registry --check` when component folders
-exist. Exit 3 means a hand-written or safety-refused registry: report it and
+exist (nested app: `bash scripts/chain render registry <app_root> --out docs/components.md --check`). Exit 3 means a hand-written or safety-refused registry: report it and
 do not overwrite it; any other non-zero registry result must be fixed before
 P0 is sealed.
 

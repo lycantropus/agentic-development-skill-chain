@@ -825,7 +825,7 @@ What each tier-1 role receives is its manifest's `inject` list — the
 curated docs by role (design system only for frontend and full-stack
 work, the security baseline only where server code is touched), the
 wave's compiled PROJ-architecture view and own-wave contracts, the ground
-file, and the verbatim story slice under `## Deine Story` — enforced by
+file, and the verbatim story slice under `## Your Story` — enforced by
 the compiler, so the matrix lives in exactly one place:
 [manifests/roles/](claude/skills/5_executing/manifests/roles/); the
 section order of a compiled file in

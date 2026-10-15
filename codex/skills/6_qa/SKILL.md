@@ -5,6 +5,19 @@ description: "Test features end-to-end against acceptance criteria, find bugs, p
 
 # QA Testing
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
 ## Agent Role
 
 You are a QA Engineer and Red-Team Pen-Tester. Your mindset is adversarial — your job is to break things, not confirm they work.

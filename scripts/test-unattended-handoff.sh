@@ -28,7 +28,7 @@ mkdir -p bin runner
 for t in codex; do printf '#!/bin/sh\nexit 0\n' >"bin/$t"; done
 cat >runner/run-phase.sh <<'STUB'
 #!/usr/bin/env bash
-echo "args: $*"; echo "pgid: $(ps -o pgid= $$ | tr -d ' ')"; echo "stdin: $(readlink /proc/$$/fd/0)"
+echo "args: $*"; echo "pgid: $(ps -o pgid= $$ | tr -d ' ')"; if [ -e /proc/$$/fd/0 ]; then echo "stdin: $(readlink /proc/$$/fd/0)"; elif [ -z "$(head -c 1)" ]; then echo "stdin: /dev/null"; else echo "stdin: not-null"; fi  # no /proc on macOS: EOF at once = /dev/null
 sleep 3; echo finished
 STUB
 chmod +x bin/* runner/run-phase.sh
@@ -68,7 +68,7 @@ rm -f .claude/settings.json
 # 5. Launch: returns before the runner finishes, detached (own session), stdin /dev/null, output in the log.
 cat >runner/run-phase.sh <<'STUB'
 #!/usr/bin/env bash
-echo "args: $*"; echo "pgid: $(ps -o pgid= $$ | tr -d ' ')"; echo "stdin: $(readlink /proc/$$/fd/0)"
+echo "args: $*"; echo "pgid: $(ps -o pgid= $$ | tr -d ' ')"; if [ -e /proc/$$/fd/0 ]; then echo "stdin: $(readlink /proc/$$/fd/0)"; elif [ -z "$(head -c 1)" ]; then echo "stdin: /dev/null"; else echo "stdin: not-null"; fi  # no /proc on macOS: EOF at once = /dev/null
 sleep 3; echo finished
 STUB
 chmod +x runner/run-phase.sh
@@ -77,7 +77,7 @@ start=$SECONDS
 launched="$(bash launch.sh)"
 [ $((SECONDS - start)) -lt 2 ] || die 'launch blocked until the runner finished (not detached)'
 LOG="$(printf '%s\n' "$launched" | sed -n 's/^log: \(.*\)  pid: [0-9]*$/\1/p')"
-case "$LOG" in "$CASE"/skillchain-auto-PROJ-1.*.log) ;; *) die "launch must print a private log path and pid, got: $launched" ;; esac
+case "$LOG" in "$CASE"/skillchain-auto-PROJ-1.*) ;; *) die "launch must print a private log path and pid, got: $launched" ;; esac
 pid="$(printf '%s\n' "$launched" | sed -n 's/.*pid: \([0-9]*\).*/\1/p')"
 for _ in $(seq 1 20); do grep -q '^stdin:' "$LOG" 2>/dev/null && break; sleep 0.2; done
 grep -qx 'args: auto 1 demo' "$LOG" || die "runner not started as 'auto 1 demo': $(cat "$LOG")"

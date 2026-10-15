@@ -22,6 +22,8 @@
 #     the poll to the exact local seal commit.
 #     Exit:   0 all checks green · 1 at least one check red · 2 timeout · 64 usage
 set -euo pipefail
+_compat_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_compat_dir/compat.sh" ]; then source "$_compat_dir/compat.sh"; else source "$_compat_dir/../../5_executing/scripts/compat.sh"; fi
 
 # Each gate is a subshell function: its own variables, its own EXIT trap, its own exit code.
 probe() (
@@ -96,7 +98,7 @@ poll() (
     echo "delivery.sh poll: PR head $HEAD_SHA does not match expected sealed head $EXPECTED_HEAD" >&2
     exit 1
   fi
-  echo "→ [$(date -Iseconds)] polling PR #${PR} at ${HEAD_SHA:0:7} (timeout ${TIMEOUT}s)"
+  echo "→ [$(now_iso)] polling PR #${PR} at ${HEAD_SHA:0:7} (timeout ${TIMEOUT}s)"
 
   # Push and pull_request can produce two runs. The newest per workflow is the
   # verdict; a newest cancelled/failed run never inherits an older success.

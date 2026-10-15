@@ -5,6 +5,33 @@ description: "Assemble a standalone, distributable handoff package from discover
 
 # Handoff Package — Standalone External Deliverable
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Assemble everything decided during discovery — concept, mockups, iterations, PRDs — into one **standalone, self-contained package** that external readers can consume without access to the rest of the repository. The package serves two downstream audiences: an external **UI/UX expert** (e.g. a Figma design assignment) and **developers** (e.g. work imported into Linear).
 
 This is the terminal step of the product discovery track. It can also produce a requested external review package during the full chain without changing that delivery track or skipping subsequent steps. It does not invent product decisions; it curates, deduplicates, and reframes existing artifacts so an outside reader can act on them.

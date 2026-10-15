@@ -138,7 +138,7 @@ persona_prompts() { # config-json -> captured persona prompts in $CASE/personas
   printf '%s\n' "$1" >specs/PROJ-1-test/3-4_plan/wave-gate-config.json
   PATH="$CASE/noclaude:$CASE/cap:$PATH" PERSONA_CAPTURE="$CASE/personas" bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider codex --personas >"$CASE/out" 2>&1 || { cat "$CASE/out" >&2; exit 1; }
 }
-persona_has() { grep -l "You are $1" "$CASE"/personas/*.txt | xargs grep -c "$2" | paste -sd+ | grep -qv '^0$'; }
+persona_has() { grep -l "You are $1" "$CASE"/personas/*.txt | xargs grep -c "$2" | paste -sd+ - | grep -qv '^0$'; }
 persona_prompts '{}'
 persona_has 'Marcus Weber' 'coupling' || { echo "default Weber focus lost" >&2; exit 1; }
 ! grep -rq 'machine-checked' "$CASE/personas" || { echo "unconfigured project got machine-checked text" >&2; exit 1; }

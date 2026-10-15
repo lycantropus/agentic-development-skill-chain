@@ -3,6 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/compat.sh"
 
 STATUS_ONLY=false
 AUTH_BUDGET_NEGATIVE_CONTROL=false
@@ -39,7 +40,7 @@ infra_fail() {
   local message="$1" code="${2:-70}" tmp
   if [[ -f "$RALPH_STATE" ]]; then
     tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX")
-    jq --arg message "$message" --argjson code "$code" --arg updated "$(date -Iseconds)" '
+    jq --arg message "$message" --argjson code "$code" --arg updated "$(now_iso)" '
       .ralph_status="infrastructure_failed"
       | .infrastructure_failure={message:$message,exit_code:$code,at:$updated}
       | .updated_at=$updated
@@ -59,7 +60,7 @@ source "$SCRIPT_DIR/env-local.sh"
 cleanup() {
   local pid
   if [[ -n "$BROWSER_SESSION" ]]; then
-    timeout --foreground "$BROWSER_TIMEOUT" agent-browser --session "$BROWSER_SESSION" close >/dev/null 2>&1 || true
+    "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" agent-browser --session "$BROWSER_SESSION" close >/dev/null 2>&1 || true
   fi
   for pid in "$BUILD_PID" "$CR_PID"; do
     [[ -n "$pid" ]] || continue
@@ -87,7 +88,7 @@ run_with_timeout() {
   local started rc elapsed
   started=$(date +%s)
   set +e
-  timeout --foreground "$secs" "$@"
+  "${TIMEOUT_BIN[@]}" --foreground "$secs" "$@"
   rc=$?
   set -e
   elapsed=$(( $(date +%s) - started ))
@@ -119,6 +120,16 @@ for value in "$AC_TIMEOUT" "$BUILD_TIMEOUT" "$CODERABBIT_TIMEOUT" "$BROWSER_TIME
   [[ "$value" -gt 0 ]] || fail "required timeouts must be greater than zero"
 done
 
+# Host-resource budget (all optional): test commands wait for memory headroom, then fail as infrastructure (77).
+MIN_AVAILABLE_MB=$(jq -r '.resources.min_available_mb // 1024' "$CFG")
+MAX_PSI_FULL=$(jq -r '.resources.max_memory_psi_full_avg10 // 20' "$CFG")
+MEM_WAIT_SECONDS=$(jq -r '.resources.wait_seconds // 300' "$CFG")
+TEST_WORKERS=$(jq -r '.resources.test_workers // empty' "$CFG")
+for pair in "min_available_mb:$MIN_AVAILABLE_MB" "max_memory_psi_full_avg10:$MAX_PSI_FULL" "wait_seconds:$MEM_WAIT_SECONDS" "test_workers:${TEST_WORKERS:-1}"; do
+  [[ "${pair#*:}" =~ ^[0-9]+$ ]] || fail "invalid resources.${pair%%:*}"
+done
+[[ -z "$TEST_WORKERS" ]] || export VITEST_MAX_WORKERS="${VITEST_MAX_WORKERS:-$TEST_WORKERS}"
+
 AUTH_PREFLIGHT_CMD=$(jq -r '.auth_budget.preflight_cmd // empty' "$CFG")
 AUTH_RATE_LIMIT_EVIDENCE_CMD=$(jq -r '.auth_budget.rate_limit_evidence_cmd // empty' "$CFG")
 AUTH_EXHAUSTED_RC=$(jq -r '.auth_budget.exhausted_exit_code // 75' "$CFG")
@@ -135,7 +146,7 @@ sleep_with_heartbeat() {
 init_ralph_state() {
   [[ -f "$RALPH_STATE" ]] && return
   local tmp started
-  started=$(date -Iseconds); tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX")
+  started=$(now_iso); tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX")
   jq -n --arg wave "$WAVE" --arg started "$started" \
     '{version:2,wave:$wave,started_at:$started,updated_at:$started,ralph_status:"running",commands:[],regressions:[]}' >"$tmp"
   mv "$tmp" "$RALPH_STATE"
@@ -146,7 +157,7 @@ record_ac() {
   tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX")
   jq --argjson index "$index" --arg id "$id" --arg task "$task" --arg command "$command" --argjson tests "$tests" \
     --argjson attempts "$attempts" --argjson rc "$rc" --argjson selected "$selected" --arg status "$status" \
-    --arg pass "${PASS_ID:-}" --arg log "$log" --arg head "$verified_head" --arg config "$CONFIG_HASH" --argjson auth "$auth" --arg updated "$(date -Iseconds)" '
+    --arg pass "${PASS_ID:-}" --arg log "$log" --arg head "$verified_head" --arg config "$CONFIG_HASH" --argjson auth "$auth" --arg updated "$(now_iso)" '
       .updated_at=$updated |
       .commands=((.commands // []) | map(select(.index != $index)) + [{pass_id:$pass,index:$index,id:$id,task:($task | if .=="" then null else . end),command:$command,test_files:$tests,config_hash:$config,auth_consuming:$auth,attempts:$attempts,rc:$rc,selected:$selected,failed_empty_selection:($status=="failed_empty_selection"),status:$status,log:$log,verified_head:$head,updated_at:$updated}])
     ' "$RALPH_STATE" >"$tmp" && mv "$tmp" "$RALPH_STATE"
@@ -156,7 +167,7 @@ record_regression() {
   local label="$1" command="$2" tests="$3" auth="$4" rc="$5" selected="$6" status="$7" log="$8" head="$9" tmp
   tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX")
   jq --arg label "$label" --arg command "$command" --argjson tests "$tests" --argjson rc "$rc" --argjson selected "$selected" \
-    --arg status "$status" --arg log "$log" --arg head "$head" --arg config "$CONFIG_HASH" --argjson auth "$auth" --arg updated "$(date -Iseconds)" '
+    --arg status "$status" --arg log "$log" --arg head "$head" --arg config "$CONFIG_HASH" --argjson auth "$auth" --arg updated "$(now_iso)" '
       .updated_at=$updated |
       .regressions=((.regressions // []) | map(select(.label != $label)) + [{label:$label,command:$command,test_files:$tests,config_hash:$config,auth_consuming:$auth,rc:$rc,selected:$selected,failed_empty_selection:($status=="failed_empty_selection"),status:$status,log:$log,verified_head:$head,updated_at:$updated}])
     ' "$RALPH_STATE" >"$tmp" && mv "$tmp" "$RALPH_STATE"
@@ -200,7 +211,7 @@ run_static_check() {
   log="${BASE}/5_progress/ralph-wave-${WAVE}-${kind}-attempt-${attempt}.log"
   resolve_wave_base
   heartbeat; set +e
-  WAVE_BASE_SHA="$WAVE_BASE" timeout --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
+  WAVE_BASE_SHA="$WAVE_BASE" "${TIMEOUT_BIN[@]}" --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
   set -e; heartbeat
   assert_verified_head; assert_clean_worktree
   STATIC_COUNT=$(analysed_count "$log")
@@ -257,26 +268,68 @@ ralph_status() {
 
 if [[ "$STATUS_ONLY" == true ]]; then ralph_status; exit 0; fi
 
+# macOS headroom in MiB: (free + inactive + speculative) pages x page size from vm_stat. No PSI counterpart on macOS.
+vm_stat_available_mb() {
+  local out
+  if [[ -n "${SKILLCHAIN_VMSTAT_FILE:-}" ]]; then out=$(cat "$SKILLCHAIN_VMSTAT_FILE") || return 1; else out=$(vm_stat 2>/dev/null) || return 1; fi
+  awk '/page size of/ {for(i=1;i<=NF;i++) if($i=="of") ps=$(i+1)} /^Pages (free|inactive|speculative):/ {gsub(/\./,"",$NF); n+=$NF} END {if (ps>0 && n>0) print int(n*ps/1048576); else exit 1}' <<<"$out"
+}
+
+# Memory headroom in MiB: MemAvailable, capped by a cgroup v2 limit (Linux), or vm_stat (macOS). The *_FILE/_DIR overrides let tests mock telemetry.
+available_mem_mb() {
+  local kb max cur dir="${SKILLCHAIN_CGROUP_DIR:-/sys/fs/cgroup}" avail
+  if [[ -n "${SKILLCHAIN_VMSTAT_FILE:-}" || ! -r "${SKILLCHAIN_MEMINFO_FILE:-/proc/meminfo}" ]]; then vm_stat_available_mb; return; fi
+  kb=$(awk '/^MemAvailable:/{print $2}' "${SKILLCHAIN_MEMINFO_FILE:-/proc/meminfo}" 2>/dev/null) || return 1
+  [[ "$kb" =~ ^[0-9]+$ ]] || return 1
+  avail=$((kb / 1024))
+  max=$(cat "$dir/memory.max" 2>/dev/null || true); cur=$(cat "$dir/memory.current" 2>/dev/null || true)
+  if [[ "$max" =~ ^[0-9]+$ && "$cur" =~ ^[0-9]+$ && $(( (max - cur) / 1048576 )) -lt "$avail" ]]; then avail=$(( (max - cur) / 1048576 )); fi
+  echo "$avail"
+}
+
+# Pressure-stall "full avg10" of the memory resource (whole percent); empty without PSI.
+memory_psi_full() {
+  awk '/^full/{for(i=1;i<=NF;i++) if($i ~ /^avg10=/){v=substr($i,7); print int(v)}}' "${SKILLCHAIN_PSI_FILE:-/proc/pressure/memory}" 2>/dev/null || true
+}
+
+# Delays a heavy command while the host is short of memory, then reports an infrastructure prerequisite failure.
+# It never infers OOM from an exit code and never kills anything. No telemetry (neither /proc/meminfo nor vm_stat) = nothing to judge.
+check_memory_headroom() {
+  local what="$1" waited=0 avail psi problem
+  while :; do
+    avail=$(available_mem_mb) || return 0
+    psi=$(memory_psi_full); psi="${psi:-0}"; problem=""
+    [[ "$avail" -ge "$MIN_AVAILABLE_MB" ]] || problem="MemAvailable ${avail} MiB < ${MIN_AVAILABLE_MB} MiB"
+    [[ "$psi" -le "$MAX_PSI_FULL" ]] || problem="memory PSI full avg10=${psi} > ${MAX_PSI_FULL}"
+    [[ -n "$problem" ]] || return 0
+    [[ "$waited" -lt "$MEM_WAIT_SECONDS" ]] || infra_fail "host memory pressure before ${what}: ${problem} (waited ${waited}s); command not started" 77
+    echo "   ⏳ ${problem}; waiting before ${what}" >&2
+    sleep_with_heartbeat 15; waited=$((waited + 15))
+  done
+}
+
 # Runs an auth-budget preflight and the test under the shared-project lock.
 # Return codes 73/74 and the configured exhausted code are infrastructure, not test failures.
 run_test_command() {
   local auth="$1" command="$2" timeout_secs="$3" log="$4" hook_log="$5" rc
+  check_memory_headroom "$(basename "$log")"
   if [[ "$auth" != true ]]; then
-    timeout --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
+    "${TIMEOUT_BIN[@]}" --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
     return "$rc"
   fi
   [[ -n "$AUTH_PREFLIGHT_CMD" ]] || infra_fail "auth-consuming command has no auth_budget.preflight_cmd"
   [[ -x scripts/worktree.sh ]] || infra_fail "auth-consuming command requires executable scripts/worktree.sh"
   env WAVE="$WAVE" WAVE_GATE_CONFIG="$CFG" RALPH_STATE="$RALPH_STATE" \
     scripts/worktree.sh with-shared-lock -- bash -c '
+      source "$7"
       set +e
       bash -c "$1" >"$2" 2>&1
       hook_rc=$?
       set -e
       if grep -q "AUTH_BUDGET_EXHAUSTED" "$2" || [[ "$hook_rc" -eq "$3" ]]; then exit "$3"; fi
       [[ "$hook_rc" -eq 0 ]] || exit 74
-      timeout --foreground "$4" bash -c "$5" >"$6" 2>&1
-    ' _ "$AUTH_PREFLIGHT_CMD" "$hook_log" "$AUTH_EXHAUSTED_RC" "$timeout_secs" "$command" "$log"
+      "${TIMEOUT_BIN[@]}" --foreground "$4" bash -c "$5" >"$6" 2>&1
+    ' _ "$AUTH_PREFLIGHT_CMD" "$hook_log" "$AUTH_EXHAUSTED_RC" "$timeout_secs" "$command" "$log" "$SCRIPT_DIR/compat.sh"
   rc=$?
   return "$rc"
 }
@@ -330,7 +383,7 @@ while IFS= read -r entry; do
   [[ -n "$check" && "$check" != null ]] || fail "regression ${label}: selection_check_cmd must be non-empty"
   log="${BASE}/5_progress/ralph-wave-${WAVE}-selection-$(jq -r '.index' <<<"$entry").log"
   selection_rc=0
-  timeout --foreground "$BROWSER_TIMEOUT" bash -c "$check" >"$log" 2>&1 || selection_rc=$?
+  "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" bash -c "$check" >"$log" 2>&1 || selection_rc=$?
   [[ "$selection_rc" -eq 0 ]] || fail "scenario selection preflight failed for ${label} rc=${selection_rc} (log: $log)"
   [[ $(selected_count "$log") -gt 0 ]] || fail "scenario selection preflight: ${label} selected no tests (log: $log)"
 done < <(jq -c "${WAVE_KEY}.regression_commands | to_entries[] | select(.value | has(\"selection_check_cmd\")) | .value + {index:.key}" "$CFG")
@@ -369,7 +422,7 @@ fi
 printf '%s\n' "$$" >"$RALPH_PID"; OWNS_RALPH=true; heartbeat
 LAST_AUTH="${BASE}/5_progress/ralph-wave-${WAVE}.auth-last"
 # Failed results live only for this invocation; never suppress a recovery retry.
-PASS_ID="$(date +%s%N)-$$"
+PASS_ID="$(now_ms)-$$"
 
 for ((index=0; index<AC_COUNT; index++)); do
   entry=$(jq -c "${WAVE_KEY}.ac_commands[$index]" "$CFG")
@@ -392,7 +445,7 @@ for ((index=0; index<AC_COUNT; index++)); do
     log="${BASE}/5_progress/ralph-wave-${WAVE}-ac-$((index+1))-dependency.log"
     check=$(jq -r '.external_dependency.check_command' <<<"$entry")
     set +e
-    timeout --foreground "$AC_TIMEOUT" bash -c "$check" >"$log" 2>&1
+    "${TIMEOUT_BIN[@]}" --foreground "$AC_TIMEOUT" bash -c "$check" >"$log" 2>&1
     dependency_rc=$?
     set -e
     assert_verified_head; assert_clean_worktree
@@ -427,13 +480,16 @@ for ((index=0; index<AC_COUNT; index++)); do
   fi
   if [[ "$auth" == true && "$AUTH_PACING_SECONDS" -gt 0 && -f "$LAST_AUTH" ]]; then
     last=$(tr -cd '0-9' <"$LAST_AUTH"); [[ ${#last} -ge 13 ]] || last=$((last * 1000))
-    wait_for=$(( (AUTH_PACING_SECONDS * 1000 - ($(date +%s%3N) - last) + 999) / 1000 ))
+    wait_for=$(( (AUTH_PACING_SECONDS * 1000 - ($(now_ms) - last) + 999) / 1000 ))
     [[ "$wait_for" -le 0 ]] || sleep_with_heartbeat "$wait_for"
   fi
   attempts=$(jq -r --arg id "$id" '[.commands[]? | select(.id==$id)][0].attempts // 0' "$RALPH_STATE")
   for retry in 1 2; do
-    attempts=$((attempts+1)); log="${BASE}/5_progress/ralph-wave-${WAVE}-ac-$((index+1))-attempt-${attempts}.log"; hook_log="${log%.log}-auth-preflight.log"; rate_limit_log="${log%.log}-rate-limit-evidence.log"
-    [[ "$auth" == true ]] && date +%s%3N >"$LAST_AUTH"
+    attempts=$((attempts+1))
+    # Skip retained logs (e.g. after the state JSON was archived): old evidence stays untouched.
+    while [[ -e "${BASE}/5_progress/ralph-wave-${WAVE}-ac-$((index+1))-attempt-${attempts}.log" ]]; do attempts=$((attempts+1)); done
+    log="${BASE}/5_progress/ralph-wave-${WAVE}-ac-$((index+1))-attempt-${attempts}.log"; hook_log="${log%.log}-auth-preflight.log"; rate_limit_log="${log%.log}-rate-limit-evidence.log"
+    [[ "$auth" == true ]] && now_ms >"$LAST_AUTH"
     heartbeat; set +e; run_test_command "$auth" "$command" "$AC_TIMEOUT" "$log" "$hook_log"; rc=$?; set -e; selected=$(selected_count "$log"); heartbeat
     if [[ "$rc" -eq 73 ]] || { [[ "$rc" -ne 0 ]] && grep -q '^SKILLCHAIN_LOCK_TIMEOUT ' "$log" "$hook_log" 2>/dev/null; }; then
       infra_fail "shared-resource lock unavailable for AC ${id} (log: $log; preflight: $hook_log)" 73
@@ -454,7 +510,7 @@ for ((index=0; index<AC_COUNT; index++)); do
     if [[ "$rate_limited" == false && "$auth" == true && -n "$AUTH_RATE_LIMIT_EVIDENCE_CMD" ]]; then
       set +e
       env WAVE="$WAVE" WAVE_GATE_CONFIG="$CFG" RALPH_STATE="$RALPH_STATE" AC_ID="$id" AC_LOG="$log" \
-        timeout --foreground "$AC_TIMEOUT" bash -c "$AUTH_RATE_LIMIT_EVIDENCE_CMD" >"$rate_limit_log" 2>&1
+        "${TIMEOUT_BIN[@]}" --foreground "$AC_TIMEOUT" bash -c "$AUTH_RATE_LIMIT_EVIDENCE_CMD" >"$rate_limit_log" 2>&1
       evidence_rc=$?
       if [[ "$evidence_rc" -eq 0 ]] && ! grep -q '[^[:space:]]' "$rate_limit_log"; then
         evidence_rc=74
@@ -499,7 +555,7 @@ if [[ "$AC_ONLY" == true || "$EXTERNAL_BLOCKED" == true ]]; then
     echo "⏸ Wave ${WAVE} BLOCKED EXTERNAL — retained ACs await prerequisites; no completion certificate"
   fi
   if [[ "$AC_ONLY_FAILED" == true ]]; then status=failed; rc=1; fi
-  tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX"); jq --arg status "$status" --arg updated "$(date -Iseconds)" '.ralph_status=$status|.updated_at=$updated' "$RALPH_STATE" >"$tmp" && mv "$tmp" "$RALPH_STATE"
+  tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX"); jq --arg status "$status" --arg updated "$(now_iso)" '.ralph_status=$status|.updated_at=$updated' "$RALPH_STATE" >"$tmp" && mv "$tmp" "$RALPH_STATE"
   exit "$rc"
 fi
 
@@ -523,7 +579,9 @@ for ((index=0; index<REG_COUNT; index++)); do
       continue
     fi
   fi
-  log="${BASE}/5_progress/ralph-wave-${WAVE}-regression-$((index+1)).log"; hook_log="${log%.log}-auth-preflight.log"
+  log="${BASE}/5_progress/ralph-wave-${WAVE}-regression-$((index+1)).log"
+  for reg_attempt in $(seq 2 1000); do [[ -e "$log" ]] || break; log="${BASE}/5_progress/ralph-wave-${WAVE}-regression-$((index+1))-attempt-${reg_attempt}.log"; done
+  hook_log="${log%.log}-auth-preflight.log"
   set +e; run_test_command "$auth" "$command" "$AC_TIMEOUT" "$log" "$hook_log"; rc=$?; set -e; selected=$(selected_count "$log")
   if [[ "$rc" -eq 73 ]] || { [[ "$rc" -ne 0 ]] && grep -q '^SKILLCHAIN_LOCK_TIMEOUT ' "$log" "$hook_log" 2>/dev/null; }; then
     infra_fail "shared-resource lock unavailable for regression ${label} (log: $log; preflight: $hook_log)" 73
@@ -542,7 +600,7 @@ for ((index=0; index<REG_COUNT; index++)); do
   assert_clean_worktree
 done
 rm -f "$RALPH_PID"; OWNS_RALPH=false
-tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX"); jq --arg updated "$(date -Iseconds)" '.ralph_status="complete"|.updated_at=$updated' "$RALPH_STATE" >"$tmp" && mv "$tmp" "$RALPH_STATE"
+tmp=$(mktemp "${RALPH_STATE}.tmp.XXXXXX"); jq --arg updated "$(now_iso)" '.ralph_status="complete"|.updated_at=$updated' "$RALPH_STATE" >"$tmp" && mv "$tmp" "$RALPH_STATE"
 
 step "3/6 Browser smoke test"
 ROUTES_JSON=$(jq -c --arg wave "$WAVE" '[.frontend.routes[]? | select((.wave|tostring)==$wave)]' "$CFG")
@@ -576,9 +634,7 @@ if [[ "$ROUTE_COUNT" -eq 0 ]]; then echo "   (backend-only wave — skipped)"; e
     if ! curl -fsS --max-time 2 "$READY_URL" >/dev/null 2>&1; then
       [[ -n "$DEV_CMD" ]] || fail "dev server not ready at ${READY_URL} and frontend.dev_cmd is missing"
       DEV_LOG="${BASE}/5_progress/dev-server-wave-${WAVE}.log"
-      if command -v setsid >/dev/null; then setsid bash -c "$DEV_CMD" >"$DEV_LOG" 2>&1 & DEV_PID=$!; DEV_PROCESS_GROUP=true
-      else bash -c "$DEV_CMD" >"$DEV_LOG" 2>&1 & DEV_PID=$!
-      fi
+      "${SETSID_BIN[@]}" bash -c "$DEV_CMD" >"$DEV_LOG" 2>&1 & DEV_PID=$!; DEV_PROCESS_GROUP=$SETSID_GROUP
       deadline=$(( $(date +%s) + READY_TIMEOUT ))
       until curl -fsS --max-time 2 "$READY_URL" >/dev/null 2>&1; do kill -0 "$DEV_PID" 2>/dev/null || fail "dev server exited before readiness (log: $DEV_LOG)"; [[ $(date +%s) -lt "$deadline" ]] || fail "dev server readiness timed out (log: $DEV_LOG)"; sleep "$READY_INTERVAL"; done
     fi
@@ -590,10 +646,10 @@ if [[ "$ROUTE_COUNT" -eq 0 ]]; then echo "   (backend-only wave — skipped)"; e
       browser=(agent-browser --session "$session"); [[ -z "$auth_state" ]] || browser+=(--state "$auth_state")
       BROWSER_SESSION="$session"
       run_with_timeout "$BROWSER_TIMEOUT" "smoke ${path}" "${browser[@]}" open "$target"
-      actual=$(timeout --foreground "$BROWSER_TIMEOUT" "${browser[@]}" get url) || fail "smoke ${path}: get url failed or timed out"; [[ "$actual" == "$expected" ]] || fail "smoke ${path} redirected/resolved to '${actual}', expected '${expected}'"
-      text_out=$(timeout --foreground "$BROWSER_TIMEOUT" "${browser[@]}" snapshot) || fail "smoke ${path}: snapshot failed or timed out"; [[ -z "$expected_text" ]] || grep -Fq "$expected_text" <<<"$text_out" || fail "smoke ${path} missing expected_text '${expected_text}'"
-      timeout --foreground "$BROWSER_TIMEOUT" "${browser[@]}" errors >/dev/null || fail "browser errors or timeout on ${path}"
-      timeout --foreground "$BROWSER_TIMEOUT" "${browser[@]}" close >/dev/null 2>&1 || true
+      actual=$("${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" get url) || fail "smoke ${path}: get url failed or timed out"; [[ "$actual" == "$expected" ]] || fail "smoke ${path} redirected/resolved to '${actual}', expected '${expected}'"
+      text_out=$("${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" snapshot) || fail "smoke ${path}: snapshot failed or timed out"; [[ -z "$expected_text" ]] || grep -Fq "$expected_text" <<<"$text_out" || fail "smoke ${path} missing expected_text '${expected_text}'"
+      "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" errors >/dev/null || fail "browser errors or timeout on ${path}"
+      "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" close >/dev/null 2>&1 || true
       BROWSER_SESSION=""
     done
   fi
@@ -602,8 +658,11 @@ stop_dev_server
 assert_verified_head; assert_clean_worktree
 
 step "4/6 Component registry"
-if [[ -f scripts/gen-component-registry.mjs && ( -d src/components || -d src/features ) ]]; then
-  set +e; node scripts/gen-component-registry.mjs --check; REG_RC=$?; set -e
+APP_ROOT="$(jq -r 'if (.app_root | type) == "string" then .app_root else "." end' "$CFG" 2>/dev/null || echo .)"
+case "$APP_ROOT" in ''|/*|..|../*|*/..|*/../*) fail "invalid app_root '$APP_ROOT' in wave-gate-config.json" ;; esac
+if [[ -f scripts/gen-component-registry.mjs && ( -d "$APP_ROOT/src/components" || -d "$APP_ROOT/src/features" ) ]]; then
+  REG_ARGS=(); [[ "$APP_ROOT" == . ]] || REG_ARGS=("$APP_ROOT" --out docs/components.md)
+  set +e; node scripts/gen-component-registry.mjs "${REG_ARGS[@]}" --check; REG_RC=$?; set -e
   [[ "$REG_RC" -eq 0 || "$REG_RC" -eq 3 ]] || fail "component registry out of date"
 else echo "   (component registry unavailable/not applicable — skipped)"; fi
 
@@ -622,8 +681,8 @@ CR_STDERR="${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}.stderr.
 # Without --foreground, timeout contains each command's children in its own group.
 BUILD_INPUTS=$(node "$SCRIPT_DIR/quality.mjs" "$PROJ" "$THEME" snapshot)
 started=$(date +%s)
-timeout --kill-after=5s "$BUILD_TIMEOUT" bash -c "$BUILD_CMD" >"$BUILD_LOG" 2>&1 & BUILD_PID=$!
-timeout --kill-after=5s "$CODERABBIT_TIMEOUT" coderabbit review --agent --base-commit "$WAVE_BASE" >"$CR_RAW" 2>"$CR_STDERR" & CR_PID=$!
+"${TIMEOUT_BIN[@]}" --kill-after=5s "$BUILD_TIMEOUT" bash -c "$BUILD_CMD" >"$BUILD_LOG" 2>&1 & BUILD_PID=$!
+"${TIMEOUT_BIN[@]}" --kill-after=5s "$CODERABBIT_TIMEOUT" coderabbit review --agent --base-commit "$WAVE_BASE" >"$CR_RAW" 2>"$CR_STDERR" & CR_PID=$!
 BUILD_RC=0; wait "$BUILD_PID" || BUILD_RC=$?; BUILD_PID=""
 CR_RC=0; wait "$CR_PID" || CR_RC=$?; CR_PID=""
 echo "   Build exit ${BUILD_RC}; CodeRabbit exit ${CR_RC}; parallel phase $(( $(date +%s) - started ))s"
@@ -664,9 +723,9 @@ elif [[ "$LEDGER_AVAILABLE" == false ]]; then
 fi
 [[ "$CUMULATIVE_BLOCKING" -eq 0 ]] || fail "${CUMULATIVE_BLOCKING} cumulative/current open blocking finding(s) remain after review ingestion"
 assert_verified_head; assert_clean_worktree
-TS=$(date -Iseconds)
+TS=$(now_iso)
 WAVE_PLAN="${BASE}/3-4_plan/PROJ-${PROJ}-wave-${WAVE}-plan.md"
-STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[0-9]+-PRD-[0-9]+-US-[0-9]+' | sort -uV | paste -sd, - | sed 's/,/, /g'; } || true)
+STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[0-9]+-PRD-[0-9]+-US-[0-9]+' | sort -u -t- -k2,2n -k4,4n -k6,6n | paste -sd, - | sed 's/,/, /g'; } || true)
 cat >>"$PROGRESS" <<EOF
 
 ### Wave ${WAVE} Gate — PASSED ($TS)

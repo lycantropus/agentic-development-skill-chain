@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 
@@ -92,10 +93,11 @@ function valid(key, config, fingerprint) {
   if (key === 'sonar-issues' && record.ce_task !== valid('sonar', config, fingerprint).ce_task) throw new Error('sonar-issues: recorded for a different scan');
   return record;
 }
-function canSkip(reason) {
+function canSkip(reason, config) {
+  if (config.sonar_required === true || fs.existsSync('sonar-project.properties')) return false;
   const available = name => spawnSync('bash', ['-c', 'command -v "$1" >/dev/null', '_', name]).status === 0;
   if (reason === 'sonar CLI unavailable') return !available('sonar') || !available('sonar-scanner');
-  return reason === 'project not configured' && !fs.existsSync('sonar-project.properties');
+  return reason === 'project not configured';
 }
 const STATUS_BEGIN = '<!-- quality-status: rendered by chain quality from 5_progress/quality-*.json, never edit -->', STATUS_END = '<!-- /quality-status -->';
 // The status block is derived from the records alone; a record that is missing, stale or failed reads "pending".
@@ -106,7 +108,7 @@ function statusBlock(config, fingerprint) {
   const mutation = !config.mutation_cmd ? 'skipped (not configured)' : current('mutation') ? (current('mutation').rc === 0 ? 'ran' : `ran (${current('mutation').survivors} survivors carried forward)`) : 'pending';
   const skip = fs.existsSync(evidencePath('sonar-skip')) ? current('sonar-skip') : null;
   const issues = current('sonar-issues');
-  const sonar = skip ? (canSkip(skip.reason) ? `skipped (${skip.reason})` : 'pending') : current('sonar') && issues ? (issues.open.length ? `ran (${issues.open.length} carried forward)` : 'ran') : 'pending';
+  const sonar = skip ? (canSkip(skip.reason, config) ? `skipped (${skip.reason})` : 'pending') : current('sonar') && issues ? (issues.open.length ? `ran (${issues.open.length} carried forward)` : 'ran') : 'pending';
   const rows = [['Code Review', passed(['review'])], ['Mutation', mutation], ['Build', passed(['build'])], ['Tests', tests.length ? passed(tests) : 'skipped (none declared)'], ['Lint', passed(['lint'])], ['SonarCloud', sonar]];
   return [STATUS_BEGIN, '### Gate Status', '', '| Check | Status |', '|---|---|', ...rows.map(([name, status]) => `| ${name} | ${status} |`), STATUS_END].join('\n');
 }
@@ -146,7 +148,7 @@ function verifyAll(config, fingerprint) {
   for (const key of ['build', 'lint', 'review', ...(config.mutation_cmd ? ['mutation'] : []), ...(config.coverage_cmd ? ['coverage'] : []), ...(config.phase_commands ?? []).filter(e => e.phase === 'quality').map(e => `test:${e.label}`)]) valid(key, config, fingerprint);
   if (fs.existsSync(evidencePath('sonar-skip'))) {
     const skip = valid('sonar-skip', config, fingerprint);
-    if (!canSkip(skip.reason)) throw new Error('Sonar skip no longer valid');
+    if (!canSkip(skip.reason, config)) throw new Error('Sonar skip no longer valid');
   } else { valid('sonar', config, fingerprint); valid('sonar-issues', config, fingerprint); }
 }
 async function main() {
@@ -154,6 +156,7 @@ async function main() {
   if (!proj || !theme || !/^[\w-]+$/.test(proj) || !/^[\w-]+$/.test(theme)) throw new Error('Usage: quality.mjs PROJ THEME [check|snapshot|run KIND|record-build LOG HEAD INPUTS|review REPORT|skip-sonar REASON|sonar-issues FILE] | seal PROJ THEME');
   if (fs.realpathSync('.') !== fs.realpathSync(git('rev-parse', '--show-toplevel'))) throw new Error('run from the worktree root');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  if (Object.hasOwn(config, 'sonar_required') && typeof config.sonar_required !== 'boolean') throw new Error('sonar_required must be boolean when present');
   if (action === 'seal') loadEnvLocal(); // the fingerprint hashes the environment the commands ran in
   const fingerprint = inputs();
   if (!['snapshot', 'record-build', 'seal'].includes(action)) {
@@ -205,7 +208,7 @@ async function act(config, fingerprint) {
   }
   if (action === 'review' || action === 'skip-sonar') {
     const key = action === 'review' ? 'review' : 'sonar-skip';
-    if (action === 'skip-sonar' && !canSkip(kind)) throw new Error('invalid Sonar skip');
+    if (action === 'skip-sonar' && !canSkip(kind, config)) throw new Error('invalid Sonar skip');
     const log = action === 'review' ? kind : `${progress}/quality-sonar-skip.log`;
     if (action === 'skip-sonar') fs.writeFileSync(log, kind + '\n');
     if (!fs.readFileSync(log, 'utf8').trim()) throw new Error('review report is empty');
@@ -263,18 +266,19 @@ async function act(config, fingerprint) {
         env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES_FILE: changedFile };
         delete env.CHANGED_FILES;
       }
-      const timeoutArgs = ['--kill-after=5s', String(seconds), ...invocation];
+      // GNU timeout, gtimeout or the perl shim from compat.sh (stock macOS has none); exec keeps the pid for signals.
+      const timeoutArgs = ['-c', 'source "$1"; shift; exec "${TIMEOUT_BIN[@]}" "$@"', '_', fileURLToPath(new URL('compat.sh', import.meta.url)), '--kill-after=5s', String(seconds), ...invocation];
       if (isMut) {
         // Await the child so cancellation reaches timeout and still runs our cleanup.
         rc = await new Promise((resolve, reject) => {
-          mutationChild = spawn('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env });
+          mutationChild = spawn('bash', timeoutArgs, { stdio: ['ignore', fd, fd], env });
           mutationChild.once('error', reject);
           mutationChild.once('close', (status, signal) => {
             resolve(interrupted || (status ?? (signal ? 128 + os.constants.signals[signal] : 2)));
           });
         });
       } else {
-        rc = spawnSync('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env }).status ?? 1;
+        rc = spawnSync('bash', timeoutArgs, { stdio: ['ignore', fd, fd], env }).status ?? 1;
       }
     } finally {
       fs.closeSync(fd);

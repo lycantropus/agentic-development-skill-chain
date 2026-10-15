@@ -1,9 +1,23 @@
 ---
 name: clarification
-description: "Facilitate a live clarification session between a PM and a stakeholder and write a standalone stakeholder brief: job to be done, problem owner and deputy, outcome/adoption/guardrail success factors with baselines and targets, non-goals, constraints, and open questions. Use when: (1) a stakeholder brings a new feature request or problem and the PM wants it clarified before concept work, (2) the problem owner will not be present when the concept is written. Produces specs/_clarification/<slug>-stakeholder_brief.md, which 1_concept consumes later. Not for: choosing scope, solution direction, PROJ split, UI, or technology (use concept); product-level vision (use product-vision); defining measurement instrumentation."
+description: "Facilitate a live clarification session between a PM and a stakeholder and write a standalone stakeholder brief: job to be done, stakeholder-confirmed use cases grounded in concrete examples, problem owner and deputy, outcome/adoption/guardrail success factors with baselines and targets, non-goals, constraints, and open questions. Use when: (1) a stakeholder brings a new feature request or problem and the PM wants it clarified before concept work, (2) the problem owner will not be present when the concept is written. Produces a stakeholder brief in specs/_clarification/, which 1_concept consumes later. Not for: choosing scope, solution direction, PROJ split, UI, or technology (use concept); product-level vision (use product-vision); defining measurement instrumentation."
 ---
 
 # Clarification: Clarify The Problem With The Stakeholder
+
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
 
 ## Purpose
 
@@ -30,17 +44,25 @@ Do NOT propose solutions, scope, UI, or technology, and do NOT define how succes
 
 1. **Seed** - one or two sentences: what prompted this request?
 2. **Problem owner and deputy** - who owns the problem and decides on trade-offs; who stands in when they are absent.
-3. **Job to be done** - when <situation>, <who> wants <goal>, so that <benefit>. One or more jobs.
-4. **Current pain** - what happens today, where it breaks down, how often, what it costs.
-5. **Success factors** - in business terms, each with a known baseline and target or `unknown`:
+3. **Concrete example** - ask the stakeholder to describe at least one actual situation: what triggered it, who was involved, what happened, where it became difficult, and how it ended. Follow up on missing facts.
+4. **Job to be done** - derive the recurring goal and benefit from the example and other answers: when <situation>, <who> wants <goal>, so that <benefit>. One or more jobs.
+5. **Current pain** - what happens today, where it breaks down, how often, what it costs.
+6. **Success factors** - in business terms, each with a known baseline and target or `unknown`:
    - *Outcome:* the business or user result that should change.
    - *Adoption:* who must use it, how much, by when.
    - *Guardrail:* what must not get worse.
-6. **Non-goals** - what this explicitly should not achieve or include.
-7. **Constraints** - deadlines, budget, regulation, policies, dependencies on other teams or systems.
-8. **Open questions** - each with owner, due date, and whether it blocks concept work.
-9. **Read-back** - read the stakeholder brief back section by section; the stakeholder confirms or corrects each section.
-10. **Write and hand off** - write the file, set the status, and tell the PM the next step.
+7. **Non-goals** - what this explicitly should not achieve or include.
+8. **Constraints** - deadlines, budget, regulation, policies, dependencies on other teams or systems.
+9. **Open questions** - each with owner, due date, and whether it blocks concept work.
+10. **Use case proposal** - synthesize the examples and all information gathered into a coherent business use case; see [Use Cases](#use-cases). Ask the stakeholder to confirm or correct it.
+11. **Read-back** - read the stakeholder brief back section by section; the stakeholder confirms or corrects each section.
+12. **Write and hand off** - write the file, set the status, and tell the PM the next step.
+
+## Use Cases
+
+The job to be done states the recurring goal and benefit. A use case makes the work situation understandable: trigger, participants, current workflow and handoffs, difficulty and consequences, and desired business result. Describe the current workflow and desired result without designing a future solution.
+
+Propose at least one use case in plain language from the concrete examples and the rest of the session. Preserve the factual example as its grounding. Combine examples only when they describe the same workflow; keep distinct use cases separate. Do not invent facts or steps: ask for missing information or record it as an open question. Ask "Does this describe your use case correctly?" and incorporate corrections before treating it as confirmed. Reconcile the proposal with later answers during the final read-back.
 
 ## Stakeholder Brief
 
@@ -62,6 +84,15 @@ draft | confirmed with <owner>, <YYYY-MM-DD>
 - When <situation>, <who> wants <goal>, so that <benefit>.
 
 ## Current Pain
+
+## Use Cases
+
+### <use case title>
+- Concrete example: <actual situation described by the stakeholder, including how it ended>
+- Trigger and participants:
+- Current workflow and handoffs:
+- Difficulty and consequences:
+- Desired business result:
 
 ## Success Factors
 | Type | Factor (business terms) | Baseline | Target |

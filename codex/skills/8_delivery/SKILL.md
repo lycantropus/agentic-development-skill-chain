@@ -5,6 +5,19 @@ description: "Run P8 delivery for a finished PROJ: probe merge conflicts against
 
 # Delivery — P8: Conflict Probe, PR, CI, Checkpoint 2
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
 Owns the P8 phase (CONCEPT.md §4): the last autonomous phase before the
 second human checkpoint. Everything human-facing here is rendered from
 data — the PR body comes from `state.json` + `findings.json` via a

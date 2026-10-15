@@ -19,7 +19,7 @@ block stop   >"$CASE/stop.sh";   [ -s "$CASE/stop.sh" ]   || die 'stop block mis
 
 # --- fixture: a PROJ sitting at P5:running (quality gate passed) -----------
 mkdir -p "$CASE/repo/scripts" "$CASE/repo/specs/PROJ-1-demo/5_progress" "$CASE/bin"
-cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$ROOT/claude/skills/6_qa/scripts/findings-store.mjs" "$CASE/repo/scripts/"
+cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/5_executing/scripts/compat.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$ROOT/claude/skills/6_qa/scripts/findings-store.mjs" "$CASE/repo/scripts/"
 cd "$CASE/repo"
 S="bash scripts/chain state"
 $S init 1 demo >/dev/null
@@ -105,8 +105,8 @@ PATH="$CASE/bin:$PATH" PERSONA_LOG="$CASE/personas.log" \
   --author-provider claude --personas --round 1 >"$CASE/cr.out" 2>&1 || { cat "$CASE/cr.out" >&2; die 'persona review failed'; }
 starts="$(grep -c '|start ' "$CASE/personas.log")"
 [ "$starts" = 6 ] || die "expected 6 persona workers, got $starts"
-[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f1 | sort -u | wc -l)" = 6 ] || die 'persona workers must be six distinct processes'
-[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f2 | sort -u | wc -l)" = 6 ] || die "six distinct personas expected: $(cut -d'|' -f2 "$CASE/personas.log" | sort -u | tr '\n' ',')"
+[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f1 | sort -u | wc -l | tr -d " ")" = 6 ] || die 'persona workers must be six distinct processes'
+[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f2 | sort -u | wc -l | tr -d " ")" = 6 ] || die "six distinct personas expected: $(cut -d'|' -f2 "$CASE/personas.log" | sort -u | tr '\n' ',')"
 last_start="$(grep '|start ' "$CASE/personas.log" | sed 's/.*start //' | sort -n | tail -1)"
 first_end="$(grep '|end ' "$CASE/personas.log" | sed 's/.*end //' | sort -n | head -1)"
 awk -v s="$last_start" -v e="$first_end" 'BEGIN { exit !(s < e) }' || die 'persona workers must run concurrently'
