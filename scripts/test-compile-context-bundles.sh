@@ -342,7 +342,7 @@ printf '\n## PROJ-1-PRD-2-US-2: Print invoices\n**Scope:** frontend\n' >>"$PLAN2
 run compile 1 demo >/dev/null
 [ -e "$CTX/workers/wave-2/PROJ-1-PRD-2-US-2.md" ] || die "second wave-2 story not compiled"
 echo stale >"$CTX/roles/wave-2/retired-role.md"
-wave2() { find "$CTX/workers/wave-2" "$CTX/roles/wave-2" -type f ! -name 'PROJ-1-PRD-2-US-2.md' ! -name 'retired-role.md' -printf '%p %T@ ' -exec sha256sum {} \; | sort; }
+wave2() { find "$CTX/workers/wave-2" "$CTX/roles/wave-2" -type f ! -name 'PROJ-1-PRD-2-US-2.md' ! -name 'retired-role.md' -exec sh -c 'for f; do printf "%s %s " "$f" "$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")"; sha256sum "$f" 2>/dev/null || shasum -a 256 "$f"; done' _ {} + | sort; }
 wave2 >"$CASE/wave2.before"
 restore_plans
 run compile 1 demo --wave 1 >/dev/null
@@ -353,7 +353,7 @@ wave2 | cmp - "$CASE/wave2.before" || die "valid wave-2 files changed during com
 sed -i 's/^| PROJ-1-PRD-2-US-1 .*/&\n| PROJ-1-PRD-2-US-3 | backend | backend-implementer | sonnet | immediately |/' "$PLAN2"
 printf '\n## PROJ-1-PRD-2-US-3: Archive invoices\n**Scope:** backend\n' >>"$PLAN2"
 run compile 1 demo >/dev/null
-wave2() { find "$CTX/workers/wave-2" "$CTX/roles/wave-2" -type f ! -name 'PROJ-1-PRD-2-US-3.md' -printf '%p %T@ ' -exec sha256sum {} \; | sort; }
+wave2() { find "$CTX/workers/wave-2" "$CTX/roles/wave-2" -type f ! -name 'PROJ-1-PRD-2-US-3.md' -exec sh -c 'for f; do printf "%s %s " "$f" "$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")"; sha256sum "$f" 2>/dev/null || shasum -a 256 "$f"; done' _ {} + | sort; }
 wave2 >"$CASE/wave2.before"
 printf '\n## Post-Wave Notes\nWave 2 shipped.\n' >>"$PLAN2"
 run compile 1 demo --wave 1 >/dev/null
