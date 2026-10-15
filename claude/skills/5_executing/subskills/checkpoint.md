@@ -181,7 +181,7 @@ bash ~/.claude/skills/5_executing/scripts/chain check architecture \
   specs/PROJ-<X>-<theme>/2_PRDs
 bash ~/.claude/skills/5_executing/scripts/chain check plan \
   specs/PROJ-<X>-<theme>/3-4_plan
-bash ~/.claude/skills/5_executing/scripts/chain render context check <X> <theme>
+bash ~/.claude/skills/5_executing/scripts/chain render context check <X> <theme> --roles-dir ~/.claude/skills/5_executing/manifests/roles
 ```
 
 Malformed PRDs or architecture return to their owning skill; repeat its review
@@ -191,10 +191,13 @@ The context `check` compiles every wave's worker and role files in memory (it wr
 nothing) and fails when a role would exceed its budget at P0, a decision or key
 flow is malformed, or one reaches no wave. It also fails (exit 2) when a story
 cannot be assigned to a role from the plan table's `Agent Type` column
-(duplicate, missing, unsupported, or contradicting `Scope`/`Split`), and when a
-project-local role manifest (`templates/roles/`) still has the old preamble or
-lacks the design system in `implementer`: take the current manifest via
-`sync-framework` or align it by hand.
+(duplicate, missing, unsupported, or contradicting `Scope`/`Split`), and when an
+installed role manifest still has the old preamble or lacks the design system
+in `implementer`: refresh the installed skill. Before P0, explicitly use installed
+roles because project roles (`templates/roles/`) may still await synchronization.
+A green installed-role check does not authorize implementation: P0 must reconcile
+sync conflicts and pass the default project-role check without `--roles-dir`
+before execution.
 
 This is a hard pre-approval gate. It checks unique AC IDs, their task/command
 mapping, bidirectional task/test-file agreement, broad regressions, auth-budget

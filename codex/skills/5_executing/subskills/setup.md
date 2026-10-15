@@ -158,6 +158,18 @@ bash ~/.codex/skills/5_executing/scripts/chain sync
 
 A non-zero exit blocks setup until the reported helper differences are reconciled. The command plans the whole inventory before copying anything; unrecognized or modified project copies are never overwritten. Compare each conflict with its installed source, merge the needed upstream changes while preserving project adaptations, test the result, then rerun with `--adopt scripts/<reviewed-file>` (repeat the option for multiple files). Do not adopt stale code to bypass an update. No separate user confirmation is required for an already-authorized helper refresh.
 
+After synchronization succeeds and all conflicts are reconciled, validate every
+wave against the synchronized project roles (`templates/roles/`) without an override:
+
+```bash
+bash scripts/chain render context check <X> <theme>
+```
+
+This mandatory check blocks setup on failure. Step 4 and CP1 checked installed
+roles before P0; their green result does not validate project role adaptations.
+Resolve role compatibility or budget failures and rerun this default check before
+continuing. Never use `--roles-dir` to bypass this gate.
+
 ### 2. CodeRabbit config preflight
 
 If `.coderabbit.yaml`/`.coderabbit.yml` is missing at repo root, copy
@@ -318,9 +330,10 @@ cross-wave view): `context/workers/wave-N/<US-ID>.md` per story (the role comes
 from the plan table's `Agent Type`; `Split: contract` gives `.backend.md` and
 `.frontend.md`) and `context/roles/wave-N/<role>.md` per role without a story
 (reviewer, Quality-Gate fix workers). Step 5 recompiles `--wave N` at each wave
-start. CP1 already ran `chain render context check`, so a failure here
-means the sources changed since CP1 (or the ground file pushed a role
-over its budget).
+start. CP1 checked installed roles; P0 checks the synchronized project roles.
+A failure here can also come from project role adaptations, changed sources, or
+the ground file pushing a role over its budget. Resolve the reported cause before
+sealing P0.
 
 - A role over its manifest budget aborts `compile` with exit 1 (role, tokens,
   budget) before anything is written. Condense that role's sources, or raise

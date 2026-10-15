@@ -14,6 +14,25 @@ CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
 die() { echo "compile-context-bundles: $*" >&2; exit 1; }
 
+# SC-01: before P0 use installed roles; after sync validate project roles.
+node --input-type=module - "$ROOT" <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const root = process.argv[2];
+for (const provider of ["codex", "claude"]) {
+  const base = `${root}/${provider}/skills`;
+  const installed = `bash ~/.${provider}/skills/5_executing/scripts/chain render context check <X> <theme> --roles-dir ~/.${provider}/skills/5_executing/manifests/roles`;
+  for (const file of ["4_writing-plans/SKILL.md", "5_executing/subskills/checkpoint.md"]) {
+    assert.ok(readFileSync(`${base}/${file}`, "utf8").includes(installed), `${provider}/${file}: pre-P0 check must explicitly use installed roles`);
+  }
+  const setup = readFileSync(`${base}/5_executing/subskills/setup.md`, "utf8");
+  const sync = setup.indexOf(`bash ~/.${provider}/skills/5_executing/scripts/chain sync`);
+  const localCheck = setup.indexOf("bash scripts/chain render context check <X> <theme>\n");
+  const compile = setup.indexOf("bash scripts/chain render context compile <X> <theme>");
+  assert.ok(sync >= 0 && localCheck > sync && compile > localCheck, `${provider}/setup: check synchronized project roles without an override before compile`);
+}
+JS
+
 P="$CASE/specs/PROJ-1-demo"
 mkdir -p "$P/3-4_plan" "$CASE/docs"
 echo "# Product" >"$CASE/docs/PRODUCT.md"
@@ -430,6 +449,12 @@ sed -i 's/^Your story and its ACs are in the `## Deine Story` section of this$/Y
 snap >"$CASE/before.snap"
 [ "$(rc node "$COMPILE" compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'templates/roles/frontend-implementer.md' "$CASE/err" || die "old local preamble: want 2 naming the file"
 [ "$(rc node "$COMPILE" check 1 demo)" -eq 2 ] || die "check must report the old local preamble"
+sha256sum templates/roles/*.md >"$CASE/stale-roles.sha"
+run check 1 demo >"$CASE/installed-check.out" || die "pre-P0 installed-role check must bypass stale local roles"
+grep -q '^wave 2:' "$CASE/installed-check.out" || die "installed-role check must cover every wave"
+sha256sum -c "$CASE/stale-roles.sha" >/dev/null || die "pre-P0 check changed local roles"
+cp "$SKILL"/manifests/roles/*.md templates/roles/
+node "$COMPILE" check 1 demo >/dev/null || die "post-sync default check must accept the six current project roles"
 snap | cmp - "$CASE/before.snap" || die "manifest error changed files"
 cp "$SKILL/manifests/roles/frontend-implementer.md" templates/roles/
 sed -i '/^  - design-system$/d' templates/roles/implementer.md

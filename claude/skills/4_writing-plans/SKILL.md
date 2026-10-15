@@ -164,10 +164,14 @@ Run the validator first — it checks plan/config structure, AC↔task↔command
 ```bash
 bash ~/.claude/skills/5_executing/scripts/chain check plan \
   specs/PROJ-<X>-<theme>/3-4_plan
-bash ~/.claude/skills/5_executing/scripts/chain render context check <X> <theme>
+bash ~/.claude/skills/5_executing/scripts/chain render context check <X> <theme> --roles-dir ~/.claude/skills/5_executing/manifests/roles
 ```
 
 The `check` compiles every wave's worker and role files in memory (writes nothing).
+Before P0, use the installed role manifests explicitly: project roles may still
+await synchronization. A green installed-role check does not authorize implementation;
+P0 must reconcile sync conflicts and pass the default project-role check without
+`--roles-dir` before execution.
 It exits 1 when a role would exceed its budget at P0, and 2 when a story cannot be
 assigned a role — fix it now while the architecture is
 open: tighten the Summary lines or the verbatim sections, or move a PRD to
