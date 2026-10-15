@@ -252,6 +252,7 @@ async function act(config, fingerprint) {
       if (isMut) {
         changedDir = fs.mkdtempSync(path.join(path.resolve(os.tmpdir()), 'skillchain-mutation-'));
         const changedFile = path.join(changedDir, 'changed-files');
+        // shortcut: Git path output uses Node's 1 MiB buffer; stream it if a project exceeds that size.
         fs.writeFileSync(changedFile, execFileSync('git', ['diff', '-z', '--name-only', '--diff-filter=d', `${baseSha}..HEAD`]));
         // Child-only handoff preserves the input fingerprint; never inherit a legacy scope.
         env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES_FILE: changedFile };
@@ -265,7 +266,7 @@ async function act(config, fingerprint) {
           let interrupted = 0;
           const interrupt = () => { interrupted = 130; child.kill('SIGTERM'); };
           const terminate = () => { interrupted = 143; child.kill('SIGTERM'); };
-          process.once('SIGINT', interrupt); process.once('SIGTERM', terminate);
+          process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
           child.once('error', reject);
           child.once('close', (status, signal) => {
             process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', terminate);

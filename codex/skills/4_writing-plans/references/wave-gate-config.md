@@ -63,3 +63,5 @@ mapfile -d '' -t changed_files < "$CHANGED_FILES_FILE"
 ```
 
 Filter unsupported file types explicitly inside the wrapper. If none remain, fail with an explanation; never silently widen the scope. Do not persist or reuse `CHANGED_FILES_FILE` after the command returns.
+
+The helper currently buffers Git’s path output up to Node’s default 1 MiB limit. A larger list fails the run without invoking the wrapper or widening its scope; stream the list if a real project reaches this limit.

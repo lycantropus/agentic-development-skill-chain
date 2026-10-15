@@ -57,7 +57,7 @@ console.log('Mutants: 5'); console.log('Survivors: 0');
     assert.match(check(1).stderr, /failed \(124\)/);
     for (const signal of ['SIGTERM', 'SIGINT']) {
       config.timeouts.mutation_seconds = 30;
-      config.mutation_cmd = 'node wrapper.mjs; echo "Survivors: 2"; sleep 30'; save(); commit();
+      config.mutation_cmd = `trap '' TERM; node wrapper.mjs; echo "Survivors: 2"; sleep 30`; save(); commit();
       fs.unlinkSync(path.join(cwd, capture));
       const child = spawn(process.execPath, [script, '1', 'test', 'run', 'mutation'], { cwd, stdio: 'ignore' });
       const closed = new Promise(resolve => child.once('close', resolve));
@@ -65,6 +65,8 @@ console.log('Mutants: 5'); console.log('Survivors: 0');
       while (!fs.existsSync(path.join(cwd, capture)) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
       if (!fs.existsSync(path.join(cwd, capture))) { child.kill('SIGKILL'); assert.fail('wrapper did not start'); }
       const scope = JSON.parse(fs.readFileSync(path.join(cwd, capture), 'utf8'));
+      child.kill(signal);
+      await new Promise(resolve => setTimeout(resolve, 80));
       child.kill(signal);
       assert.equal(await closed, 1, 'interrupted run must fail');
       const record = JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-mutation.json`), 'utf8'));
@@ -76,10 +78,12 @@ console.log('Mutants: 5'); console.log('Survivors: 0');
     assert.notEqual(call().status, 0); assert.ok(!fs.existsSync(path.join(cwd, capture)));
     git('tag', 'proj-PROJ-1-base', baseSha);
     // Empty scope remains empty, never a whole-repo fallback.
-    config.mutation_cmd = `node -e 'const fs=require("fs"); const p=process.env.CHANGED_FILES_FILE; fs.writeFileSync("${capture}",JSON.stringify({file:p})); if(fs.readFileSync(p).length) process.exit(2); console.error("empty scope"); process.exit(2)'`;
+    config.mutation_cmd = `node -e 'const fs=require("fs"); const p=process.env.CHANGED_FILES_FILE; fs.writeFileSync("${capture}",JSON.stringify({file:p,size:fs.statSync(p).size})); if(fs.readFileSync(p).length) process.exit(2); console.error("empty scope"); process.exit(2)'`;
     save(); commit(); git('tag', '-f', 'proj-PROJ-1-base', 'HEAD');
     assert.notEqual(call().status, 0);
-    assert.ok(!fs.existsSync(JSON.parse(fs.readFileSync(path.join(cwd, capture), 'utf8')).file));
+    const emptyScope = JSON.parse(fs.readFileSync(path.join(cwd, capture), 'utf8'));
+    assert.equal(emptyScope.size, 0, 'empty diff must produce an empty file list');
+    assert.ok(!fs.existsSync(emptyScope.file));
     // Failure to spawn timeout also removes the list (only Git remains on PATH).
     const bin = path.join(temp, `${provider}-bin`); fs.mkdirSync(bin);
     fs.symlinkSync(execFileSync('which', ['git'], { encoding: 'utf8' }).trim(), path.join(bin, 'git'));

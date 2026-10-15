@@ -7,7 +7,7 @@ Start here if you have not used the chain before. This page explains the part th
 - **Skills** are written procedures an agent follows (concept, requirements, architecture, plans, executing, QA, docs, delivery). They decide things.
 - **Scripts** are small deterministic programs the skills call. They record state, check gates, render documents and manage the worktree. They apply fixed rules and either succeed or refuse; choosing scope, assessing findings and approving work stays with agents or humans.
 
-Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. Before the first sync, use the installed dispatcher instead of the repo copy. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
+Every script is reached through one entry point, **`chain <verb> [<sub>] [args…]`**. A synchronized repo has it at `scripts/chain` (`bash scripts/chain state get …`); before the first sync, call the installed copy `~/.claude/skills/5_executing/scripts/chain` (Codex: `~/.codex/skills/…`), which finds all helpers in the installed skills. `chain` only looks up the script and runs it unchanged: same arguments, same exit code, same output. `chain --list` prints the table below, `chain --where <verb> [<sub>]` prints the script it would run.
 
 ## The five script kinds
 
@@ -45,7 +45,7 @@ The lead orchestrates these calls, creates the wave-start tags and maintains the
 
 ## P0: one setup run
 
-P0 runs once per PROJ, right after CP1. It is script-driven; the ground file is its single judgment step. There are no questions to the user.
+P0 runs once per PROJ, right after CP1. Scripts check fixed rules; the setup agent validates the ground-file assumptions and chooses a safe fallback negative control when needed. There are no questions to the user.
 
 ```mermaid
 flowchart TD
@@ -54,7 +54,7 @@ flowchart TD
   B --> C["3 · chain sync<br/>scripts/*, templates/*, .skillchain-helpers.json"]
   C --> D["4 · chain check preflight<br/>tools, auth, ponytail, migrations<br/>state: .preflight .degraded .context.ponytail"]
   D --> E["5 · checkpoint commit, then verify the verifier<br/>chain gate wave --auth-budget-negative-control,<br/>or one safe controlled failure"]
-  E --> F["6 · ground-file.md<br/>the one judgment step"]
+  E --> F["6 · ground-file.md<br/>assumptions checked against the code"]
   F --> G["7 · chain render context compile<br/>worker files for every wave, once"]
   G --> H["8 · chain state transition … P0 done<br/>seal commit"]
 ```
@@ -100,7 +100,7 @@ A gate is either a **script** (deterministic, same answer every time), an **LLM 
 | Plan, concept, requirements, architecture review | LLM review | `chain review plan` (and the other modes) |
 | Checkpoint 1 approval | Human | the checkpoint subskill; nothing is approved on the user's behalf |
 | Tool and auth preflight, Ponytail parity, migration drift | Script | `chain check preflight` |
-| Acceptance criteria per wave (Outer Ralph) | Script | `chain gate wave --ac-only N` |
+| Acceptance-criteria checks inside Outer Ralph | Script | `chain gate wave --ac-only N` |
 | Wave gate: ACs, regressions, build, browser smoke | Script (CodeRabbit runs inside it as one input) | `chain gate wave N` |
 | Integration review at the end of P5 | LLM review | a reviewer worker; its report is bound with `chain quality … review` |
 | Quality gate evidence | Script | `chain quality seal` |
