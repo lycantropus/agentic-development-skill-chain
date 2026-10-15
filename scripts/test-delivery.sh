@@ -34,7 +34,7 @@ for provider in claude codex; do
   out="$(probe)"; [ "$(jq -r .verdict <<<"$out")" = semantic ] || fail "$provider: source conflict should be semantic: $out"
   [ "$(git_in rev-parse main proj/PROJ-1)" = "$head_before" ] || fail "$provider: probe moved a real branch"
   [ -z "$(git_in status --porcelain)" ] || fail "$provider: probe dirtied the checkout"
-  [ "$(git_in worktree list | wc -l)" = 1 ] || fail "$provider: probe left its worktree behind"
+  [ "$(git_in worktree list | wc -l | tr -d " ")" = 1 ] || fail "$provider: probe left its worktree behind"
 
   rc=0; probe nobranch >/dev/null 2>&1 || rc=$?; [ "$rc" = 1 ] || fail "$provider: missing target should exit 1, got $rc"
   git_in branch -q -D proj/PROJ-1; rc=0; probe >/dev/null 2>&1 || rc=$?; [ "$rc" = 1 ] || fail "$provider: missing PROJ branch should exit 1, got $rc"

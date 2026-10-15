@@ -105,8 +105,8 @@ PATH="$CASE/bin:$PATH" PERSONA_LOG="$CASE/personas.log" \
   --author-provider claude --personas --round 1 >"$CASE/cr.out" 2>&1 || { cat "$CASE/cr.out" >&2; die 'persona review failed'; }
 starts="$(grep -c '|start ' "$CASE/personas.log")"
 [ "$starts" = 6 ] || die "expected 6 persona workers, got $starts"
-[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f1 | sort -u | wc -l)" = 6 ] || die 'persona workers must be six distinct processes'
-[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f2 | sort -u | wc -l)" = 6 ] || die "six distinct personas expected: $(cut -d'|' -f2 "$CASE/personas.log" | sort -u | tr '\n' ',')"
+[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f1 | sort -u | wc -l | tr -d " ")" = 6 ] || die 'persona workers must be six distinct processes'
+[ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f2 | sort -u | wc -l | tr -d " ")" = 6 ] || die "six distinct personas expected: $(cut -d'|' -f2 "$CASE/personas.log" | sort -u | tr '\n' ',')"
 last_start="$(grep '|start ' "$CASE/personas.log" | sed 's/.*start //' | sort -n | tail -1)"
 first_end="$(grep '|end ' "$CASE/personas.log" | sed 's/.*end //' | sort -n | head -1)"
 awk -v s="$last_start" -v e="$first_end" 'BEGIN { exit !(s < e) }' || die 'persona workers must run concurrently'
