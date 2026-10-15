@@ -55,6 +55,13 @@ the ladder, recorded in state.json and flagged in the reports.
 
 ## Notes
 
+The core chain (steps 0 to 8) is one installation unit. Both installers copy every
+skill folder and the runner; there is no per-skill selection and no dependency
+resolution. The early skills lean on the shared helpers in `5_executing`
+(`scripts/chain` and friends), and `5b_executing-large-model` requires
+`5_executing` alongside it. Copying single folders by hand is unsupported unless
+you also copy the folders they document as dependencies.
+
 Framework helpers in a project are versioned snapshots of the installed skills.
 P0 and every implementation start/resume run the installed synchronizer before
 workers start:

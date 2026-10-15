@@ -51,10 +51,10 @@ flowchart TD
   A --> B["2 · chain worktree prepare<br/>worktree, branch proj/PROJ-X, tag proj-PROJ-X-base<br/>state: .worktree .base_sha .branch"]
   B --> C["3 · chain sync<br/>scripts/*, templates/*, .skillchain-helpers.json"]
   C --> D["4 · chain check preflight<br/>tools, auth, ponytail, migrations<br/>state: .preflight .degraded .context.ponytail"]
-  D --> E["5 · verify the verifier<br/>chain gate wave --auth-budget-negative-control,<br/>or one safe controlled failure"]
+  D --> E["5 · checkpoint commit, then verify the verifier<br/>chain gate wave --auth-budget-negative-control,<br/>or one safe controlled failure"]
   E --> F["6 · ground-file.md<br/>the one judgment step"]
   F --> G["7 · chain render context compile<br/>worker files for every wave, once"]
-  G --> H["8 · chain state transition … P0 done<br/>one setup commit"]
+  G --> H["8 · chain state transition … P0 done<br/>seal commit"]
 ```
 
 The permission setup (`merge-project-settings.sh`, Claude only) is a separate manual one-time step.

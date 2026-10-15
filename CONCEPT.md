@@ -593,8 +593,9 @@ missing sets `degraded`, never silently); verify the verifier with one
 controlled red gate; suggest static-check commands; write the ground file
 (the judgment step: validated assumptions `docs/` does not already state);
 compile the worker files for every wave once — delivered by path in each
-spawn prompt, no hook, canonical for both providers; seal `P0:done` with one
-setup commit. Procedure: [setup.md](claude/skills/5_executing/subskills/setup.md);
+spawn prompt, no hook, canonical for both providers; commit a checkpoint before the
+negative control (its clean-tree gate stays strict) and seal `P0:done` with a
+second setup commit. Procedure: [setup.md](claude/skills/5_executing/subskills/setup.md);
 the sequence diagram and the worker-file layout in
 [how-it-works.md](docs/how-it-works.md#p0-one-setup-run); lock diagnosis
 and worker handover in
@@ -981,7 +982,7 @@ not the source of workflow semantics.
 | Agent role | `.claude/agents/*.md` | Codex skill/agent metadata | role, tools, write scope, budget |
 | Minimalism | Ponytail Claude plugin | Ponytail Codex plugin | same Ponytail mode and rule version |
 | Cross-review | OpenAI `codex-plugin-cc` pattern | Codex-facing `claude` skill pattern | provider opposite to `author_provider` |
-| Wave-gate enforcement | PreToolUse hook (`wave-gate-enforcer.js`) as defense-in-depth | prompt contract (no verified hook equivalent) | RUNNER-owned: the next wave/lane is not started until `chain gate wave` exits 0; hooks only harden this, they don't carry it |
+| Wave-gate enforcement | optional external PreToolUse hook (`~/.claude/hooks/wave-gate-enforcer.js`, not shipped or installed by this repo) as defense-in-depth | prompt contract (no verified hook equivalent) | RUNNER-owned: the next wave/lane is not started until `chain gate wave` exits 0; hooks only harden this, they don't carry it |
 | Gotcha broadcast | agent-team messaging within one process | agent-team messaging within one process | across processes: runner-owned shared JSONL file (§6) |
 | Worktrees / rescue / conflict probe | plain git | plain git | runner owns all git lifecycle |
 | PR + CI polling | `gh` | `gh` | deterministic P8 scripts |
@@ -1013,7 +1014,7 @@ port allocation. Mode 3 stays disabled until this passes.
 | `git` | branching, worktrees, merge gate, rescue, conflict probe | ✅ hard |
 | `gh` | create PR, `gh pr checks` polling (P8) | ✅ hard |
 | `claude` | Claude phase lane + provider-opposite review via `claude -p` | ✅ hard |
-| `node` | hooks (ponytail, wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
+| `node` | hooks (ponytail; the optional external wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
 | `jq` | `chain gate wave`, `chain findings`, `chain state` | ✅ hard |
 | `coderabbit` | wave review (`--agent --base-commit`) | ✅ hard (gate component) |
 | `codex` | Codex phase lane + provider-opposite review via `codex exec` | 🟡 preferred, degradable — missing/unauthenticated → single-provider run with model-opposite review, flagged in report + PR body, never silent |
@@ -1166,9 +1167,9 @@ machine files and their single writers in
 ## 8. Autonomy Policy (Overnight Runs)
 
 After Checkpoint 1 the process runs without user interaction up to the
-finished PR — including across several PROJs in sequence (Checkpoint 1
-can approve several PROJ plans at once; they then run through
-sequentially).
+finished PR for one PROJ per `run-phase.sh auto` call. Running several
+approved PROJs in sequence (one Checkpoint 1 approving several plans, then a
+queue) is the intended direction but **not implemented**; see Stop Behavior.
 
 ### Escalation Rules (replace all "ask the user" spots)
 
@@ -1192,9 +1193,11 @@ report is rendered (what happened verbatim, state when parked, cleanup
 list, recommended next action). Open worktrees and dev servers are
 documented, not deleted — they are evidence; the persistent PROJ worktree
 is retained with its path and the safe P8 resume command, and only a
-successful P8 may remove it after exact-head green CI. If more PROJs are
-queued and the failure is PROJ-local, the next PROJ starts; an environment
-failure (env/tools) ends the whole run. The stop policy is in
+successful P8 may remove it after exact-head green CI. A multi-PROJ queue
+is **not implemented**: `run-phase.sh auto <X> <theme>` drives exactly one
+PROJ and stops with it. The intended design, for a future queue, is that a
+PROJ-local failure lets the next PROJ start while an environment failure
+(env/tools) ends the whole run. The stop policy is in
 [runner/README.md](runner/README.md#invariants-the-runner-owns), the report
 frame in
 [stop-report.md.tmpl](claude/skills/5_executing/templates/stop-report.md.tmpl),

@@ -245,7 +245,11 @@ P0 is sealed.
 Before trusting an unattended run, prove one applicable gate can reject a
 controlled bad change. When `auth_budget` is configured, its project hooks must
 honor `SKILLCHAIN_AUTH_BUDGET_NEGATIVE_CONTROL=1` without consuming a hosted
-identity. After step 4 verifies the synchronized gate, run:
+identity. After step 4 verifies the synchronized gate, first commit what the setup has
+written so far (synced helpers, templates, manifest, state) as a checkpoint:
+`chore(PROJ-<X>): P0 checkpoint — framework scripts`. The ordinary fallback
+control below runs `chain gate wave --ac-only`, which refuses a dirty working
+tree; the clean-tree check is not relaxed for it. Then run:
 
 ```bash
 CONTROL_WAVE=$(jq -r '.waves | keys | map(tonumber) | min' "$PLAN_DIR/wave-gate-config.json")
@@ -320,8 +324,9 @@ over its budget).
 **5c. Delivery — there is nothing to activate.** No hook: the lead (or the
 runner's lane prompt) names the worker file by path in each spawn prompt, and the
 worker reads it first. `chain check preflight` installs nothing into
-`.claude/settings.json`. `bash scripts/merge-project-settings.sh` additionally
-merges the execution permission allowlist. Never paste file contents into spawn
+`.claude/settings.json`. (`merge-project-settings.sh`, which merges the
+execution permission allowlist into `.claude/settings.json`, exists only in the
+Claude tree and is not a Codex step.) Never paste file contents into spawn
 prompts. After `sync` the lead runs `compile --wave N` in the same step; no worker
 starts in between (lead discipline: a worker holding a path to an outdated file is
 not caught).
@@ -335,7 +340,7 @@ reports, never silent.
 ### 6. Seal P0
 
 1. `bash scripts/chain state transition <X> <theme> P0 done`
-2. Commit everything from steps 1–5 on the PROJ branch:
+2. Commit everything not yet in the checkpoint commit on the PROJ branch:
    `chore(PROJ-<X>): P0 setup — branch, preflight, framework scripts, worker context files`
 
 → RETURN to the orchestrator with the summary from the Subagent Contract.
@@ -361,7 +366,7 @@ re-executes itself there once, and starts every later phase from that path. The
 - [ ] `scripts/` + `templates/` contain the framework copies, executable
 - [ ] `.coderabbit.yaml` present at repo root
 - [ ] One safe negative control was observed red, restored, and recorded
-- [ ] One setup commit on the PROJ branch
+- [ ] Setup committed on the PROJ branch: the checkpoint commit before the negative control, then the seal commit
 
 ## Failure Behavior
 
