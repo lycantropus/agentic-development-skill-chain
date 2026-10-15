@@ -725,7 +725,7 @@ fi
 assert_verified_head; assert_clean_worktree
 TS=$(now_iso)
 WAVE_PLAN="${BASE}/3-4_plan/PROJ-${PROJ}-wave-${WAVE}-plan.md"
-STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[0-9]+-PRD-[0-9]+-US-[0-9]+' | sort -uV | paste -sd, - | sed 's/,/, /g'; } || true)
+STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[0-9]+-PRD-[0-9]+-US-[0-9]+' | sort -u -t- -k2,2n -k4,4n -k6,6n | paste -sd, - | sed 's/,/, /g'; } || true)
 cat >>"$PROGRESS" <<EOF
 
 ### Wave ${WAVE} Gate — PASSED ($TS)

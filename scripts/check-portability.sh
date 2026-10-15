@@ -7,7 +7,7 @@ cd "$ROOT"
 
 # command position: line start, after ; & | $( or if/then/else/do/!
 CMD='(^|[;&|]|\$\(|\b(if|then|else|do|!)[[:space:]])[[:space:]]*'
-PATTERN="${CMD}(timeout|gtimeout|flock|setsid)[[:space:]]|realpath -m|realpath --relative|date \+%s%|date -I|date -d|etimes|sha1sum|sha256sum|md5sum|sort -V|readlink -f|sed -i|spawn(Sync)?\('timeout'"
+PATTERN="${CMD}(timeout|gtimeout|flock|setsid)[[:space:]]|realpath -m|realpath --relative|date \+%s%|date -I|date -d|etimes|sha1sum|sha256sum|md5sum|sort -[a-zA-Z]*V|readlink -f|sed -i|spawn(Sync)?\('timeout'"
 
 files=$(ls claude/skills/*/scripts/* runner/run-phase.sh 2>/dev/null | grep -vE '/compat\.sh$|/merge-project-settings\.sh$|/(sonar-issues|supabase-local-dev)/' || true)
 hits=$(grep -nE "$PATTERN" $files /dev/null | grep -vE '^[^:]+:[0-9]+:[[:space:]]*(#|//)' || true)
