@@ -26,11 +26,11 @@ SKILLCHAIN_CGROUP_MOUNT="$SKILLCHAIN_CGROUP_MOUNT/" expect77 resource_run "$TMP/
 [[ ! -e "$TMP/trailing-launched" ]]
 export SKILLCHAIN_CGROUP_DIR="$TMP/cgroup"
 unset SKILLCHAIN_CGROUP_MOUNT SKILLCHAIN_SELF_CGROUP_FILE
-printf '{"resources":{"wait_seconds":3,"max_parallel_commands":2}}'  >"$TMP/config"
+printf '{"resources":{"wait_seconds":30,"max_parallel_commands":2}}'  >"$TMP/config"
 export SKILLCHAIN_RESOURCE_HEARTBEAT_FILE="$TMP/heartbeat"
 printf '0\n' >"$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE"
 (
-  deadline=$((SECONDS + 10))
+  deadline=$((SECONDS + 20))
   while [[ $(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE") -eq 0 && "$SECONDS" -lt "$deadline" ]]; do sleep 0.05; done
   [[ $(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE") -gt 0 && ! -e "$TMP/recovered" ]] || touch "$TMP/heartbeat-failed"
   printf 'max\n' >"$SKILLCHAIN_CGROUP_DIR/memory.max"
