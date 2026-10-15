@@ -69,7 +69,7 @@
         "total": { "type": "integer" },
         "stories": {
           "type": "object",
-          "description": "US id -> status (pending|in_progress|done|gap)",
+          "description": "US id -> status or metadata object. There is no \"gap\" status: a story with red ACs stays blocked; an approved external prerequisite is declared as external_dependency in wave-gate-config.json",
           "additionalProperties": { "type": "string" }
         }
       }

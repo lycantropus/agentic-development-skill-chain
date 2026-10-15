@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a PROJ fixture for the renderers in an empty directory: make-fixture.sh <dir>
-# Blocked at P5, degraded, retained worktree, one gap story, one deferred finding, one external prerequisite.
+# Blocked at P5, degraded, retained worktree, one legacy "gap" story (shown as a plain status, never as a known gap), one deferred finding, one external prerequisite.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 CHAIN="bash $ROOT/claude/skills/5_executing/scripts/chain"
