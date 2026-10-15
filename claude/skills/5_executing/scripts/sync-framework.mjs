@@ -107,7 +107,7 @@ function main() {
       }
       const keepLocal = adopted.has(destination) || !replaceable;
       const mode = fs.statSync(from).mode & 0o777;
-      const needsCopy = !keepLocal && (localHash !== sourceHash || (fs.statSync(to).mode & 0o777) !== mode);
+      const needsCopy = !keepLocal && (localHash !== sourceHash || (fs.statSync(to).mode & 0o100) !== (mode & 0o100));
       if (needsCopy) updates.push({ bytes, to, mode, expected: localHash });
       next.files[destination] = { source, source_hash: sourceHash, local_hash: keepLocal ? localHash : sourceHash };
     }

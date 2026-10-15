@@ -169,3 +169,57 @@ cmp -s "$PREFLIGHT" "$ROOT/claude/skills/5_executing/scripts/preflight.sh" \
   || fail "preflight provider copies are not byte-identical"
 
 echo "preflight compatibility tests: PASS"
+
+# SC-10: pressure refuses preflight before live provider or package probes.
+pressure="$TMP/pressure"
+mkdir -p "$pressure/specs/PROJ-1-biome/3-4_plan"
+printf '{"resources":{"min_available_mb":1024,"wait_seconds":0}}\n' >"$pressure/specs/PROJ-1-biome/3-4_plan/wave-gate-config.json"
+printf 'MemAvailable: 100 kB\n' >"$TMP/meminfo"
+(cd "$pressure" && bash "$ROOT/codex/skills/5_executing/scripts/chain" state init 1 biome >/dev/null)
+(cd "$pressure" && bash "$ROOT/codex/skills/5_executing/scripts/chain" state set 1 biome .preflight '{"ok":true}' >/dev/null)
+printf '#!/usr/bin/env bash\necho called >"$RESOURCE_PROBE_MARKER"\nexit 0\n' >"$FAKE_BIN/claude"
+export RESOURCE_PROBE_MARKER="$TMP/provider-probe"
+rc=0
+(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" PONYTAIL_ENFORCE=0 bash "$PREFLIGHT" 1 biome >"$TMP/pressure.log" 2>&1) || rc=$?
+[ "$rc" -eq 77 ] || fail "pressure must refuse preflight with 77, got $rc: $(cat "$TMP/pressure.log")"
+[ ! -e "$RESOURCE_PROBE_MARKER" ] || fail "pressure launched preflight provider probe"
+
+jq -e '.preflight.ok == false and .preflight.resource_exit == 77' "$pressure/specs/PROJ-1-biome/state.json" >/dev/null || fail "refused preflight retained green evidence"
+
+# An ambient marker without the inherited lease cannot bypass admission.
+rc=0
+(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_RESOURCE_ACTIVE=1 SKILLCHAIN_RESOURCE_LOCK_FILE= SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" bash "$PREFLIGHT" 1 biome >"$TMP/marker.log" 2>&1) || rc=$?
+[ "$rc" -eq 77 ] || fail "ambient marker bypassed admission, got $rc"
+[ ! -e "$RESOURCE_PROBE_MARKER" ] || fail "ambient marker launched provider"
+
+# A valid outer lease from another policy must not skip this project's policy.
+printf '{"resources":{"test_workers":0,"wait_seconds":0}}\n' >"$pressure/specs/PROJ-1-biome/3-4_plan/wave-gate-config.json"
+printf '{"resources":{"min_available_mb":0,"max_memory_psi_full_avg10":100,"wait_seconds":0}}\n' >"$TMP/outer-resources.json"
+rc=0
+(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" PREFLIGHT_PROBE_TIMEOUT=1 PONYTAIL_ENFORCE=0 bash -c 'source "$1"; resource_run "$2" outer-preflight bash "$3" 1 biome' _ "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$TMP/outer-resources.json" "$PREFLIGHT" >"$TMP/outer.log" 2>&1) || rc=$?
+[ "$rc" -eq 64 ] || fail "outer lease bypassed project policy, got $rc: $(cat "$TMP/outer.log")"
+[ ! -e "$RESOURCE_PROBE_MARKER" ] || fail "outer lease launched provider despite invalid project policy"
+jq -e '.preflight.ok == false and .preflight.resource_exit == 64' "$pressure/specs/PROJ-1-biome/state.json" >/dev/null || fail "invalid nested policy retained green evidence"
+
+# Stock macOS mkdir leases must reenter once, without recursive preflight launches.
+portable="$TMP/portable-lease"
+mkdir -p "$portable"
+printf 'MemAvailable: 16777216 kB\n' >"$TMP/portable-meminfo"
+printf '{"resources":{"min_available_mb":0,"max_memory_psi_full_avg10":100,"wait_seconds":0}}\n' >"$TMP/portable-config.json"
+rc=0
+(cd "$portable" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/portable-meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/portable-resources" PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" REAL_BASH="$BASH" PREFLIGHT_SCRIPT="$PREFLIGHT" REENTRY_COUNT="$TMP/reentry-count" "$BASH" -c '
+  command() { if [[ "${1:-}" == -v && "${2:-}" == flock ]]; then return 1; else builtin command "$@"; fi; }
+  bash() {
+    if [[ "${1:-}" == "$PREFLIGHT_SCRIPT" ]]; then
+      local n=0; [[ ! -f "$REENTRY_COUNT" ]] || n=$(cat "$REENTRY_COUNT")
+      n=$((n + 1)); echo "$n" >"$REENTRY_COUNT"
+      [[ "$n" -le 1 ]] || { echo "unexpected recursive preflight launch" >&2; return 99; }
+    fi
+    "$REAL_BASH" "$@"
+  }
+  export -f command bash
+  source "$1"
+  "${TIMEOUT_BIN[@]}" --foreground 10 "$REAL_BASH" -c '\''source "$1"; resource_run "$2" portable-preflight "$REAL_BASH" "$PREFLIGHT_SCRIPT" 1 portable'\'' _ "$1" "$2"
+' _ "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$TMP/portable-config.json" >"$TMP/portable.log" 2>&1) || rc=$?
+[ "$rc" -eq 0 ] || fail "portable lease preflight recursed or failed, got $rc: $(cat "$TMP/portable.log")"
+[ "$(grep -c '→ P0 preflight' "$TMP/portable.log")" -eq 1 ] || fail "portable preflight body did not run exactly once"

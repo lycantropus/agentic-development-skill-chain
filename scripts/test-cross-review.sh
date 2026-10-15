@@ -3,6 +3,17 @@ set -euo pipefail
 export SKILLCHAIN_POLL_SECONDS=0.1 # stubs return instantly; production default stays
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Instruction contracts: supported UI baseline and sealed-language migration.
+for provider in codex claude; do
+  qa="$ROOT/$provider/skills/6_qa/SKILL.md"
+  grep -q 'Discover the documented component-review surface and supported themes' "$qa"
+  ! grep -q '/dev/components' "$qa"
+  for skill in 2_requirements-engineer 2b_handoff-package 2c_review-reconcile 3_architecture 4_writing-plans 5_executing 5b_executing-large-model 6_qa 7_documentation 8_delivery; do
+    file="$ROOT/$provider/skills/$skill/SKILL.md"
+    grep -q 'Before CP1 approval' "$file"
+    grep -q 'verbatim; a newer language policy alone must not reopen approval' "$file"
+  done
+done
 SCRIPT="$ROOT/codex/skills/cross-review/scripts/cross-review.sh"
 CASE="$(mktemp -d)"
 trap 'rm -rf "$CASE"' EXIT
@@ -149,5 +160,66 @@ persona_has 'Ken Takahashi' 'complexity_cmd' || { echo "Takahashi not told about
 persona_has 'Elena Rodriguez' 'retrospective' || { echo "retrospective instruction lost" >&2; exit 1; }
 rm -f specs/PROJ-1-test/3-4_plan/wave-gate-config.json
 
-echo 'cross-review diff-scope, manual-round and degraded-model tests passed'
+# SC-13: an empty change stream can still cover tracked product files.
+PATH="$CASE/bin:$PATH" PROMPT_CAPTURE="$CASE/prompt" bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider claude --diff-base HEAD --diff-paths src >"$CASE/out" 2>&1
+ grep -q 'Matched tracked paths: 1' "$CASE/prompt"
+ grep -q 'clean change stream' "$CASE/prompt"
+PATH="$CASE/bin:$PATH" PROMPT_CAPTURE="$CASE/prompt" bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider claude --diff-base HEAD --diff-paths absent >"$CASE/out" 2>&1
+ grep -q 'Matched tracked paths: 0' "$CASE/prompt"
+ grep -q 'does not establish coverage' "$CASE/prompt"
 
+# SC-14: authentication succeeds while inference is quota-exhausted.
+mkdir -p "$CASE/quota"
+cat >"$CASE/quota/claude" <<'EOF4'
+#!/usr/bin/env bash
+if [[ "${1:-} ${2:-}" == "auth status" ]]; then exit 0; fi
+printf 'claude\n' >>"$CALLS"
+cat >/dev/null
+printf '%s\n' '{"is_error":true,"error":"usage_limit_reached","status":429}'
+exit 1
+EOF4
+cat >"$CASE/quota/codex" <<'EOF5'
+#!/usr/bin/env bash
+if [[ "${1:-} ${2:-}" == "login status" ]]; then exit 0; fi
+printf 'codex\n' >>"$CALLS"
+cat >"$PROMPT_CAPTURE"
+printf '%s\n' '{"severity":"low","category":"review-clean","summary":"clean"}'
+EOF5
+chmod +x "$CASE/quota/claude" "$CASE/quota/codex"
+quota_review() { PATH="$CASE/quota:$PATH" CALLS="$CASE/calls" PROMPT_CAPTURE="$CASE/prompt" bash "$SCRIPT" "$@"; }
+: >"$CASE/calls"
+quota_review qa 1 test --artifacts artifact.md --author-provider codex --personas --persist >"$CASE/out" 2>&1 || { cat "$CASE/out" >&2; exit 1; }
+[ "$(grep -c '^claude$' "$CASE/calls")" -eq 1 ]
+[ "$(grep -c '^codex$' "$CASE/calls")" -eq 6 ]
+jq -e '.cross_review[-1] | .reviewer_provider == "codex" and .degraded_fallback == true' specs/PROJ-1-test/state.json >/dev/null
+grep -q '"classification":"provider-unavailable"' "$CASE/out"
+# Required providers and non-QA truth gates never silently fall back.
+for mode in qa docs; do
+  : >"$CASE/calls"; before="$(jq '.cross_review|length' specs/PROJ-1-test/state.json)"; rc=0
+  extra=(); [ "$mode" != qa ] || extra=(--personas --require-provider claude)
+  quota_review "$mode" 1 test --artifacts artifact.md --author-provider codex --persist "${extra[@]}" >"$CASE/out" 2>&1 || rc=$?
+  [ "$rc" -eq 1 ] && [ "$(wc -l <"$CASE/calls")" -eq 1 ]
+  [ "$(jq '.cross_review|length' specs/PROJ-1-test/state.json)" -eq "$before" ]
+done
+# Unknown output failures stay closed rather than being mislabeled quota.
+sed -i 's/usage_limit_reached/invalid_response/' "$CASE/quota/claude"
+sed -i 's/429/400/' "$CASE/quota/claude"
+: >"$CASE/calls"; rc=0
+quota_review qa 1 test --artifacts artifact.md --author-provider codex --personas >"$CASE/out" 2>&1 || rc=$?
+[ "$rc" -eq 1 ] && [ "$(wc -l <"$CASE/calls")" -eq 1 ]
+echo 'cross-review diff-scope, manual-round, snapshot and quota tests passed'
+
+
+# SC-10: the gate passes its actual policy to each adapter; pressure is infrastructure, not a review.
+mkdir -p specs/PROJ-1-test/3-4_plan
+printf '{"resources":{"min_available_mb":1024,"wait_seconds":0}}\n' >specs/PROJ-1-test/3-4_plan/wave-gate-config.json
+printf 'MemAvailable: 100 kB\n' >"$CASE/meminfo"
+export SKILLCHAIN_MEMINFO_FILE="$CASE/meminfo" SKILLCHAIN_CGROUP_DIR="$CASE/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$CASE/resources"
+: >"$CASE/calls"
+before="$(jq '.cross_review|length' specs/PROJ-1-test/state.json)"
+rc=0
+quota_review docs 1 test --artifacts artifact.md --author-provider claude --persist >"$CASE/out" 2>&1 || rc=$?
+[ "$rc" -eq 77 ] || { cat "$CASE/out" >&2; echo "expected infrastructure exit77, got $rc" >&2; exit 1; }
+[ ! -s "$CASE/calls" ]
+[ "$(jq '.cross_review|length' specs/PROJ-1-test/state.json)" -eq "$before" ]
+grep -q '"classification":"infrastructure"' "$CASE/out"

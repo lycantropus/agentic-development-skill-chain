@@ -209,7 +209,7 @@ fi
 # slowest one (wave-gate) is the wall clock. Output is replayed in order.
 HARNESS_LOGS=$(mktemp -d); trap 'rm -rf "$HARNESS_LOGS"' EXIT
 HARNESS_NAMES=(); HARNESS_PIDS=()
-harness() { local name="$1"; shift; "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
+harness() { local name="$1"; shift; env SKILLCHAIN_RESOURCE_LOCK_DIR="$HARNESS_LOGS/$name.resources" "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
 harness document-validators node "$ROOT/scripts/test-document-validators.mjs"
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"
@@ -222,6 +222,7 @@ harness render              bash "$ROOT/scripts/test-render.sh"
 harness story-slice         bash "$ROOT/scripts/test-story-slice.sh"
 harness context-bundles     bash "$ROOT/scripts/test-compile-context-bundles.sh"
 harness runner-context      bash "$ROOT/scripts/test-runner-context-recovery.sh"
+harness runner-interruption bash "$ROOT/scripts/test-runner-interruption.sh"
 harness unattended-handoff  bash "$ROOT/scripts/test-unattended-handoff.sh"
 harness p7-runner-gate      bash "$ROOT/scripts/test-p7-runner-gate.sh"
 harness in-session-driver   bash "$ROOT/scripts/test-in-session-driver.sh"
@@ -232,6 +233,7 @@ harness preflight-biome     bash "$ROOT/scripts/test-preflight-biome.sh"
 harness migration-drift     bash "$ROOT/scripts/test-migration-drift-check.sh"
 harness worktree            bash "$ROOT/scripts/test-worktree.sh"
 harness shared-lock         bash "$ROOT/scripts/test-shared-lock.sh"
+harness resource-run        bash "$ROOT/scripts/test-resource-run.sh"
 harness wave-gate           bash "$ROOT/scripts/test-wave-gate.sh"
 harness portability         bash "$ROOT/scripts/test-portability.sh"
 harness quality             node "$ROOT/scripts/test-quality.mjs"

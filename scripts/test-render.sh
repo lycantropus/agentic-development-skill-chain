@@ -29,5 +29,17 @@ for provider in claude codex; do
   rc=0; bash "$CHAIN" render pr 9 none >/dev/null 2>&1 || rc=$?; [ "$rc" = 2 ] || fail "$provider missing state should exit 2, got $rc"
   rc=0; bash "$CHAIN" render report bogus >/dev/null 2>&1 || rc=$?; [ "$rc" = 64 ] || fail "$provider unknown report mode should exit 64, got $rc"
   bash "$CHAIN" render pr --selftest >/dev/null || fail "$provider selftest failed"
+  # Preserve recorded degradation reasons without inventing provider/model attribution.
+  bash "$CHAIN" state set 1 demo .degraded_reason '"same-provider/same-model override after earlier Claude reviews"' >/dev/null
+  bash "$CHAIN" render pr 1 demo >"$W/degraded-pr.txt"
+  grep -qF 'Provider degradation: same-provider/same-model override after earlier Claude reviews' "$W/degraded-pr.txt" || fail "$provider degradation reason changed"
+  ! grep -qE 'single-provider run|model-opposite fallback' "$W/degraded-pr.txt" || fail "$provider invented fallback attribution"
+  bash "$CHAIN" state set 1 demo .degraded_reason null >/dev/null
+  bash "$CHAIN" render report morning specs >/dev/null
+  grep -qF 'Provider degradation: reason not recorded' specs/morning-report-*.md || fail "$provider missing-reason attribution is not neutral"
+  # Multiline ledger summaries must stay inside one Markdown table row.
+  printf '%s\n' '{"source":"debt","severity":"low","status":"deferred","summary":"first | pipe\r\nsecond\rthird\nfourth","file":"src/debt.ts"}' | bash "$CHAIN" findings add 1 demo >/dev/null
+  bash "$CHAIN" render pr 1 demo >"$W/multiline-pr.txt"
+  grep -qF 'first \| pipe<br>second<br>third<br>fourth |' "$W/multiline-pr.txt" || fail "$provider multiline debt broke its table row"
 done
 echo "test-render: ok"

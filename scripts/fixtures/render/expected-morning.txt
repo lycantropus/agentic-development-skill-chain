@@ -11,7 +11,7 @@
 - External prerequisite (declaration, not a pass): AC-1 / wave 1 — needs sso; decided by me at 2026. Readiness: `curl x`; evidence: 5_progress/ralph-wave-1.json.
 - **Worktree:** `/nonexistent/wt` (retained — ci red)
 - **Isolation:** dependencies installed; .env.local linked; database/auth infrastructure shared; dev port 3001
-- **Degradation:** ⚠ single-provider run (codex unavailable) — cross-review: model-opposite fallback
+- **Degradation:** ⚠ Provider degradation: codex unavailable
 - **Safe cleanup resume (reseals, pushes, and re-polls exact HEAD):** `(cd '/nonexistent/wt' && '@RUNNER@/run-phase.sh' P8 '1' 'demo')`
 
   Deferred debt (decide at CP2):

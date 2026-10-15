@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+source "$ROOT/codex/skills/5_executing/scripts/compat.sh"
+export SKILLCHAIN_MEMINFO_FILE="$TMP/mem" SKILLCHAIN_PSI_FILE="$TMP/psi" SKILLCHAIN_CGROUP_DIR="$TMP/cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/locks"
+mkdir "$SKILLCHAIN_CGROUP_DIR"
+printf 'MemAvailable: 4194304 kB\n' >"$SKILLCHAIN_MEMINFO_FILE"
+printf 'full avg10=0.00\n' >"$SKILLCHAIN_PSI_FILE"
+printf '{"resources":{"wait_seconds":0,"max_parallel_commands":2,"test_workers":2}}' >"$TMP/config"
+expect77() { local rc=0; "$@" || rc=$?; [[ "$rc" == 77 ]] || { echo "expected77 got $rc" >&2; exit 1; }; }
+resource_run "$TMP/config" positive bash -c '[[ "$VITEST_MAX_WORKERS" == 2 ]]'
+printf 'MemAvailable: 100 kB\n' >"$SKILLCHAIN_MEMINFO_FILE"
+for label in build review; do expect77 resource_run "$TMP/config" "$label" touch "$TMP/$label"; [[ ! -e "$TMP/$label" ]]; done
+printf 'MemAvailable: 4194304 kB\n' >"$SKILLCHAIN_MEMINFO_FILE"
+printf '104857600\n' >"$SKILLCHAIN_CGROUP_DIR/memory.max"; printf '0\n' >"$SKILLCHAIN_CGROUP_DIR/memory.current"
+expect77 resource_run "$TMP/config" cgroup touch "$TMP/cgroup-launched"; [[ ! -e "$TMP/cgroup-launched" ]]
+# Self cgroup and limiting ancestors must cap host headroom too.
+export SKILLCHAIN_CGROUP_MOUNT="$TMP/nested-cgroups" SKILLCHAIN_SELF_CGROUP_FILE="$TMP/self-cgroup"
+mkdir -p "$SKILLCHAIN_CGROUP_MOUNT/slice/child"
+printf '0::/slice/child\n' >"$SKILLCHAIN_SELF_CGROUP_FILE"
+printf '104857600\n' >"$SKILLCHAIN_CGROUP_MOUNT/slice/memory.max"; printf '0\n' >"$SKILLCHAIN_CGROUP_MOUNT/slice/memory.current"
+unset SKILLCHAIN_CGROUP_DIR
+expect77 resource_run "$TMP/config" ancestor touch "$TMP/ancestor-launched"; [[ ! -e "$TMP/ancestor-launched" ]]
+SKILLCHAIN_CGROUP_MOUNT="$SKILLCHAIN_CGROUP_MOUNT/" expect77 resource_run "$TMP/config" trailing-ancestor touch "$TMP/trailing-launched"
+[[ ! -e "$TMP/trailing-launched" ]]
+export SKILLCHAIN_CGROUP_DIR="$TMP/cgroup"
+unset SKILLCHAIN_CGROUP_MOUNT SKILLCHAIN_SELF_CGROUP_FILE
+printf '{"resources":{"wait_seconds":3,"max_parallel_commands":2}}'  >"$TMP/config"
+export SKILLCHAIN_RESOURCE_HEARTBEAT_FILE="$TMP/heartbeat"
+printf '0\n' >"$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE"
+(sleep 0.5; [[ $(cat "$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE") -gt 0 && ! -e "$TMP/recovered" ]] || touch "$TMP/heartbeat-failed"; printf 'max\n' >"$SKILLCHAIN_CGROUP_DIR/memory.max") & recovery=$!
+resource_run "$TMP/config" recovery touch "$TMP/recovered"; wait "$recovery"; [[ -e "$TMP/recovered" && ! -e "$TMP/heartbeat-failed" ]]
+unset SKILLCHAIN_RESOURCE_HEARTBEAT_FILE
+# Two commands overlap, a third cannot launch until a slot is released.
+for n in 1 2; do resource_run "$TMP/config" "slot$n" bash -c 'touch "$1"; while [[ ! -e "$2" ]]; do sleep 0.05; done' _ "$TMP/started$n" "$TMP/release" & done
+pids=$(jobs -p)
+for ((i=0;i<100;i++)); do [[ ! -e "$TMP/started1" || ! -e "$TMP/started2" ]] || break; sleep 0.05; done
+[[ -e "$TMP/started1" && -e "$TMP/started2" ]]
+printf '{"resources":{"wait_seconds":0}}' >"$TMP/nowait"
+expect77 resource_run "$TMP/nowait" overflow touch "$TMP/overflow"; [[ ! -e "$TMP/overflow" ]]
+touch "$TMP/release"; for pid in $pids; do wait "$pid"; done
+resource_run "$TMP/config" released true
+ln -s "$SKILLCHAIN_RESOURCE_LOCK_DIR" "$TMP/unsafe-locks"
+expect77 env SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/unsafe-locks" bash -c 'source "$1"; resource_run "$2" unsafe touch "$3"' _ "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$TMP/config" "$TMP/unsafe-launched"
+[[ ! -e "$TMP/unsafe-launched" ]]
+resource_run "$TMP/config" nested resource_run "$TMP/config" nested-child true
+# Stock macOS has no flock: nested commands share the live mkdir owner lease.
+(
+  command() { if [[ "${1:-}" == -v && "${2:-}" == flock ]]; then return 1; else builtin command "$@"; fi; }
+  resource_run "$TMP/config" portable resource_run "$TMP/config" portable-child true
+)
+printf prompt | resource_run "$TMP/config" stdin bash -c '[[ $(cat) == prompt ]]'
+for bad in '{"resources":false}' '{"resources":null}' '{"resources":{"wait_seconds":null}}' '{"resources":{"unknown":1}}'; do
+  printf '%s' "$bad" >"$TMP/bad-policy"
+  rc=0; resource_run "$TMP/bad-policy" invalid touch "$TMP/invalid-policy" || rc=$?
+  [[ "$rc" == 64 && ! -e "$TMP/invalid-policy" ]]
+done
+printf '{"resources":{"test_workers":0}}' >"$TMP/bad"
+rc=0; resource_run "$TMP/bad" invalid touch "$TMP/invalid" || rc=$?; [[ "$rc" == 64 && ! -e "$TMP/invalid" ]]
+# Cancellation must terminate a resistant owned process tree and leave siblings alone.
+python3 - "$ROOT" "$TMP" <<'PY'
+import json, os, pathlib, signal, subprocess, sys, time
+root, tmp = map(pathlib.Path, sys.argv[1:])
+fixture = tmp / 'resistant.py'
+fixture.write_text('''import json, os, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+pid=os.fork()
+if pid:
+ with open(sys.argv[1], 'w') as f: json.dump([int(os.environ['SKILLCHAIN_RESOURCE_LOCK_OWNER']),os.getpid(),pid],f)
+while True: time.sleep(0.1)
+''')
+record = tmp / 'resistant-pids'
+config = tmp / 'cancel-config'
+config.write_text('{"resources":{"wait_seconds":0,"max_parallel_commands":1}}')
+sibling = subprocess.Popen(['sleep', '30'], start_new_session=True)
+outer = subprocess.Popen(['bash','-c','source "$1"; resource_run "$2" resistant python3 "$3" "$4"', '_', str(root/'codex/skills/5_executing/scripts/compat.sh'),str(config),str(fixture),str(record)], start_new_session=True)
+pids=[]
+def running(pid):
+ result=subprocess.run(['ps','-p',str(pid),'-o','stat='],capture_output=True,text=True)
+ return result.returncode==0 and not result.stdout.strip().startswith('Z')
+try:
+ for _ in range(100):
+  if record.exists():
+   try: pids=json.loads(record.read_text()); break
+   except ValueError: pass
+  time.sleep(.05)
+ assert pids, 'resistant child did not start'
+ os.kill(pids[0],signal.SIGTERM)
+ try: rc=outer.wait(timeout=5)
+ except subprocess.TimeoutExpired: raise AssertionError('resource wrapper hung after cancellation')
+ assert rc==143, f'unexpected cancellation exit {rc}'
+ for _ in range(50):
+  if not any(running(p) for p in pids): break
+  time.sleep(.05)
+ assert not any(running(p) for p in pids), f'owned process survived: {pids}'
+ assert sibling.poll() is None, 'unrelated sibling was terminated'
+ subprocess.run(['bash','-c','source "$1"; resource_run "$2" released true','_',str(root/'codex/skills/5_executing/scripts/compat.sh'),str(config)],check=True,timeout=5)
+finally:
+ for pid in [outer.pid,sibling.pid]:
+  try: os.killpg(pid,signal.SIGKILL)
+  except ProcessLookupError: pass
+ for pid in pids:
+  try: os.kill(pid,signal.SIGKILL)
+  except ProcessLookupError: pass
+ outer.wait(); sibling.wait()
+PY
+
+rm "$SKILLCHAIN_MEMINFO_FILE"
+export SKILLCHAIN_VMSTAT_FILE="$TMP/missing-vmstat"
+resource_run "$TMP/config" missing touch "$TMP/missing"; [[ -e "$TMP/missing" ]]
+echo 'resource_run tests: PASS'

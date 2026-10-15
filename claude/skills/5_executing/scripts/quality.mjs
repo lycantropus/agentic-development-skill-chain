@@ -38,7 +38,7 @@ function inputs() {
   const local = fs.readdirSync('.').filter(name => name === '.env' || name.startsWith('.env.'));
   for (const name of ['node_modules/.package-lock.json', 'node_modules/.modules.yaml']) if (fs.existsSync(name)) local.push(name);
   const installEpoch = fs.existsSync('node_modules') ? fs.statSync('node_modules').mtimeMs : null;
-  return hash(JSON.stringify([tree, local.sort().map(name => [name, hash(fs.readFileSync(name))]), installEpoch, Object.entries(process.env).filter(([name]) => !['_', 'SHLVL', 'PWD', 'OLDPWD'].includes(name)).sort(), process.version, process.platform, process.arch]));
+  return hash(JSON.stringify([tree, local.sort().map(name => [name, hash(fs.readFileSync(name))]), installEpoch, Object.entries(process.env).filter(([name]) => !['_', 'SHLVL', 'PWD', 'OLDPWD', 'SKILLCHAIN_RESOURCE_HEARTBEAT_FILE'].includes(name)).sort(), process.version, process.platform, process.arch]));
 }
 function artifacts(names) {
   if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !name.trim())) throw new Error('artifact paths must be non-empty strings');
@@ -251,8 +251,8 @@ async function act(config, fingerprint) {
     }
     let changedDir, mutationChild, interrupted = 0;
     const handlers = isMut ? ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGTERM'].map(signal => [signal, () => {
-      interrupted = 128 + os.constants.signals[signal];
-      mutationChild?.kill('SIGTERM');
+      interrupted ||= 128 + os.constants.signals[signal];
+      if (mutationChild) { try { process.kill(-mutationChild.pid, 'SIGTERM'); } catch { /* Child already exited. */ } }
     }]) : [];
     for (const [signal, handler] of handlers) process.on(signal, handler);
     try {
@@ -266,14 +266,15 @@ async function act(config, fingerprint) {
         env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES_FILE: changedFile };
         delete env.CHANGED_FILES;
       }
-      // GNU timeout, gtimeout or the perl shim from compat.sh (stock macOS has none); exec keeps the pid for signals.
-      const timeoutArgs = ['-c', 'source "$1"; shift; exec "${TIMEOUT_BIN[@]}" "$@"', '_', fileURLToPath(new URL('compat.sh', import.meta.url)), '--kill-after=5s', String(seconds), ...invocation];
+      // Mutation’s outer waiter survives TERM until the shared guard finishes child cleanup.
+      const timeoutArgs = ['-c', (isMut ? 'trap ":" TERM INT HUP; ' : '') + 'source "$1"; cfg="$2"; label="$3"; shift 3; resource_run "$cfg" "$label" "${TIMEOUT_BIN[@]}" "$@"', '_', fileURLToPath(new URL('compat.sh', import.meta.url)), configPath, `quality:${key}`, '--kill-after=5s', String(seconds), ...invocation];
       if (isMut) {
         // Await the child so cancellation reaches timeout and still runs our cleanup.
         rc = await new Promise((resolve, reject) => {
-          mutationChild = spawn('bash', timeoutArgs, { stdio: ['ignore', fd, fd], env });
+          mutationChild = spawn('bash', timeoutArgs, { stdio: ['ignore', fd, fd], env, detached: true });
           mutationChild.once('error', reject);
           mutationChild.once('close', (status, signal) => {
+            mutationChild = undefined;
             resolve(interrupted || (status ?? (signal ? 128 + os.constants.signals[signal] : 2)));
           });
         });
@@ -283,7 +284,8 @@ async function act(config, fingerprint) {
     } finally {
       fs.closeSync(fd);
       if (changedDir) fs.rmSync(changedDir, { recursive: true, force: true });
-      for (const [signal, handler] of handlers) process.removeListener(signal, handler);
+      // Absorb repeated cancellation through the failure record and process exit.
+      if (!interrupted) for (const [signal, handler] of handlers) process.removeListener(signal, handler);
     }
   }
   const output = fs.readFileSync(log, 'utf8');
@@ -299,10 +301,10 @@ async function act(config, fingerprint) {
     } else files = artifacts(artifactNames);
   }
   const survived = isMut ? survivors(output) : 0;
-  write(key, { head, inputs: fingerprint, command, rc, ...(isMut ? { mutants: count, survivors: survived, base_sha: baseSha } : { selected: count }), ...(ceTask ? { ce_task: ceTask } : {}), log, log_hash: snapshotFile(log), artifacts: files });
+  write(key, { head, inputs: fingerprint, command, rc, ...([64, 77].includes(rc) ? { classification: 'infrastructure' } : {}), ...(isMut ? { mutants: count, survivors: survived, base_sha: baseSha } : { selected: count }), ...(ceTask ? { ce_task: ceTask } : {}), log, log_hash: snapshotFile(log), artifacts: files });
   if (key === 'sonar' && rc === 0) fs.writeFileSync(roundsPath, JSON.stringify([...rounds(), { n: rounds().length + 1, head, ce_task: ceTask, at: new Date().toISOString() }], null, 2) + '\n');
-  if (rc) throw new Error(`${key} failed (${rc})${isMut && count && rc === 1 ? (survived ? ' — surviving mutants, see log' : ' — exit 1 without a "Survivors: N" line, see log') : ''}; log: ${log}`);
+  if (rc) throw Object.assign(new Error(`${key} failed (${rc})${isMut && count && rc === 1 ? (survived ? ' — surviving mutants, see log' : ' — exit 1 without a "Survivors: N" line, see log') : ''}; log: ${log}`), { exitCode: [64, 77].includes(rc) ? rc : 1 });
   if (key === 'sonar') fs.rmSync(evidencePath('sonar-skip'), { force: true });
   console.log(`✓ ${key}: ${log}`);
 }
-try { await main(); } catch (error) { console.error(`quality: ${error.message}`); process.exitCode = 1; }
+try { await main(); } catch (error) { console.error(`quality: ${error.message}`); process.exitCode = error.exitCode ?? 1; }

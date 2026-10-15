@@ -262,6 +262,8 @@ repo="$TMP_ROOT/open-pr/control"
 remote="$TMP_ROOT/open-pr/remote.git"
 mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 30 beta absent "$remote"
+printf 'app/dist/\n' >>"$repo/.gitignore"
+git -C "$repo" add .gitignore && git -C "$repo" commit -qm "ignore build outputs"
 wt="$(cd "$repo" && "$HELPER" prepare 30 beta)"
 advance_to_p8_done "$wt" 30 beta
 head="$(git -C "$wt" rev-parse HEAD)"
@@ -269,7 +271,21 @@ open_pr_bin="$TMP_ROOT/open-pr/bin"
 mkdir -p "$open_pr_bin"
 printf '#!/usr/bin/env bash\n[ "$1 $2" = "pr view" ] || exit 9\nprintf "OPEN\\n"\n' >"$open_pr_bin/gh"
 chmod +x "$open_pr_bin/gh"
-if (cd "$repo" && PATH="$open_pr_bin:$PATH" "$HELPER" cleanup 30 beta --ci-verified-head "$head" >/dev/null 2>&1); then fail "cleanup removed an unmerged PR worktree"; fi
+mkdir -p "$wt/app/dist"; printf sentinel >"$wt/app/dist/retained.txt"
+cp "$wt/specs/PROJ-30-beta/state.json" "$TMP_ROOT/open-state-before.json"
+real_git="$(command -v git)"
+cat >"$open_pr_bin/git" <<EOF
+#!/usr/bin/env bash
+case "\$*" in *"ls-files --others --ignored"*) touch "$TMP_ROOT/open-ignored-scan" ;; esac
+exec "$real_git" "\$@"
+EOF
+chmod +x "$open_pr_bin/git"
+rc=0
+(cd "$repo" && PATH="$open_pr_bin:$PATH" "$HELPER" cleanup 30 beta --ci-verified-head "$head" >/dev/null 2>&1) || rc=$?
+[ "$rc" -eq 2 ] || fail "open PR cleanup expected merge-wait exit 2, got $rc"
+cmp "$TMP_ROOT/open-state-before.json" "$wt/specs/PROJ-30-beta/state.json" || fail "open PR cleanup changed state bytes"
+[ ! -e "$TMP_ROOT/open-ignored-scan" ] || fail "open PR cleanup scanned ignored payloads"
+[ -f "$wt/app/dist/retained.txt" ] || fail "open PR cleanup removed ignored evidence"
 [ -d "$wt" ] || fail "open PR cleanup removed the worktree directory"
 [ "$(jq -r '.phase + ":" + .status' "$wt/specs/PROJ-30-beta/state.json")" = P8:done ] || fail "open PR cleanup changed the sealed lifecycle"
 ok "cleanup retains the worktree until the PR is merged"
@@ -304,7 +320,7 @@ wt="$(cd "$repo" && "$HELPER" prepare 22 tau)"
 advance_to_p8_done "$wt" 22 tau
 mkdir -p "$wt/.cache" && printf evidence >"$wt/.cache/result.bin"
 head="$(git -C "$wt" rev-parse HEAD)"
-if (cd "$repo" && "$HELPER" cleanup 22 tau --ci-verified-head "$head" >/dev/null 2>&1); then fail "unexpected ignored payload was deleted"; fi
+if (cd "$repo" && PATH="$merged_pr_bin:$PATH" "$HELPER" cleanup 22 tau --ci-verified-head "$head" >/dev/null 2>&1); then fail "unexpected ignored payload was deleted"; fi
 [ -f "$wt/.cache/result.bin" ] || fail "unexpected ignored payload was lost"
 jq -e '.worktree.cleanup_reason | contains("unexpected ignored payloads") and contains(".cache/")' "$wt/specs/PROJ-22-tau/state.json" >/dev/null || fail "ignored payload retention reason missing"
 ok "cleanup permits dependency/state-lock artifacts but retains unexpected ignored evidence"
@@ -576,6 +592,28 @@ set -e
 grep -E "registered PROJ worktree is already P[5-8]:" "$TMP_ROOT/runner-advanced-restart.out" >/dev/null || { cat "$TMP_ROOT/runner-advanced-restart.out" >&2; fail "advanced control-checkout restart relaunched P0"; }
 ok "auto restart re-enters an advanced PROJ lifecycle without relaunching P0"
 
+# Pending receipts are shared by both checkouts: route state writes to the
+# registered PROJ worktree before reconciling a killed supervisor.
+wt="$TMP_ROOT/runner-auto/control-proj27"
+control_before="$(cd "$repo" && bash scripts/chain state get 27 omega '.phase + ":" + .status')"
+(cd "$wt"
+ if [ "$(bash scripts/chain state get 27 omega .phase)" = P5 ]; then
+   bash scripts/chain state transition 27 omega P5 running >/dev/null
+   bash scripts/chain state transition 27 omega P5 done >/dev/null
+ fi
+ bash scripts/chain state transition 27 omega P6 running >/dev/null
+ bash scripts/chain state transition 27 omega P6 done >/dev/null)
+journal_dir="$repo/.git/skillchain-runs/PROJ-27-omega"
+sleep 30 & stale_owner=$!
+node "$ROOT/runner/lane-journal.mjs" start "$journal_dir" stale-routing "$stale_owner" P6 claude writer fixture.out >/dev/null
+kill "$stale_owner"; wait "$stale_owner" 2>/dev/null || true
+routing_rc=0
+(cd "$repo" && "$ROOT/runner/run-phase.sh" P6 27 omega --timeout 1 >"$TMP_ROOT/routing.out" 2>&1) || routing_rc=$?
+[ "$routing_rc" -ne 0 ] || fail "stale worktree receipt was skipped"
+[ "$(cd "$wt" && bash scripts/chain state get 27 omega '.phase + ":" + .status')" = P6:blocked ] || { cat "$TMP_ROOT/routing.out" >&2; fail "stale receipt parked control instead of registered PROJ worktree"; }
+[ "$(cd "$repo" && bash scripts/chain state get 27 omega '.phase + ":" + .status')" = "$control_before" ] || fail "receipt reconciliation changed the control checkout lifecycle"
+ok "stale-receipt restart routes to registered worktree before parking state"
+
 for copy in "$ROOT/claude/skills/5_executing/scripts/worktree.sh"; do
   cmp "$HELPER" "$copy" || fail "worktree helper copies differ"
 done
@@ -659,3 +697,23 @@ grep -F "P8 seal already exists but worktree cleanup is unfinished" "$resume_out
 ok "auto waits with an open PR and removes the worktree on a later post-merge rerun"
 
 echo "PASS: $PASS worktree behavior groups"
+
+# SC-10: install pressure never launches npm and preserves the infrastructure exit.
+pressure_repo="$TMP_ROOT/pressure/control"
+mkdir -p "$(dirname "$pressure_repo")"
+init_repo "$pressure_repo" 91 pressure absent
+printf '{"name":"resource-fixture","private":true}\n' >"$pressure_repo/package.json"
+printf '{"lockfileVersion":3,"packages":{}}\n' >"$pressure_repo/package-lock.json"
+pressure_config="$pressure_repo/specs/PROJ-91-pressure/3-4_plan/wave-gate-config.json"
+jq '.resources={min_available_mb:1024,wait_seconds:0}' "$pressure_config" >"$TMP_ROOT/config-new"
+mv "$TMP_ROOT/config-new" "$pressure_config"
+git -C "$pressure_repo" add .
+git -C "$pressure_repo" commit -qm "pressure fixture"
+printf 'MemAvailable: 100 kB\n' >"$TMP_ROOT/meminfo"
+printf '#!/usr/bin/env bash\necho called >"$RESOURCE_INSTALL_MARKER"\nexit 0\n' >"$fake_bin/npm"
+export RESOURCE_INSTALL_MARKER="$TMP_ROOT/install-child"
+rc=0
+(cd "$pressure_repo" && PATH="$fake_bin:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP_ROOT/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP_ROOT/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP_ROOT/resources" "$HELPER" prepare 91 pressure >"$TMP_ROOT/pressure.log" 2>&1) || rc=$?
+[ "$rc" -eq 77 ] || fail "install pressure must return 77, got $rc: $(cat "$TMP_ROOT/pressure.log")"
+[ ! -e "$RESOURCE_INSTALL_MARKER" ] || fail "install pressure launched npm"
+ok "dependency installer refuses pressure before launch"

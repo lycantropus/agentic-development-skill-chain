@@ -68,6 +68,14 @@ stub "echo unreachable"
 ! out="$(PATH="$CASE:$PATH" bash "$SCRIPT" --prompt "$CASE/over-limit.md" --timeout 10 2>&1)" && grep -q 'stdin is limited to 10 MB' <<<"$out" \
   || { echo "FAIL: adapter must name the 10 MB stdin ceiling (got: ${out:0:300})" >&2; exit 1; }
 
+# SC-14: a provider error is distinct from review content about rate limits.
+stub "echo '{\"is_error\":true,\"type\":\"error\",\"error\":\"usage_limit_reached\"}'; exit 1"
+rc=0; run >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 75 ] || { echo "FAIL: runtime quota must return 75, got $rc" >&2; exit 1; }
+stub "echo '{\"is_error\":false,\"structured_output\":{\"findings\":[{\"severity\":\"medium\",\"category\":\"reliability\",\"summary\":\"rate limit validation is missing\"}]}}'; exit 1"
+rc=0; run >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 1 ] || { echo "FAIL: an unrelated failed review mentioning rate limits must stay exit 1, got $rc" >&2; exit 1; }
+
 # Timeout kills the whole process group: neither the stub nor its child survives the adapter.
 stub "echo \$\$ >\"$CASE/pids\"; sleep 300 & echo \$! >>\"$CASE/pids\"; wait"
 if run --timeout 3 >/dev/null 2>&1; then echo "FAIL: timed-out adapter exited 0" >&2; exit 1; fi
@@ -78,3 +86,28 @@ while read -r pid; do
 done <"$CASE/pids"
 
 echo "review-with-claude max-turns and protocol tests passed"
+
+# SC-10: a refused resource admission cannot start the provider.
+printf '{"resources":{"test_workers":0,"wait_seconds":0}}\n' >"$CASE/resources.json"
+stub 'echo launched >"$RESOURCE_CHILD_MARKER"; exit 0'
+export RESOURCE_CHILD_MARKER="$CASE/resource-child"
+rc=0; resource_out="$(run --resource-config "$CASE/resources.json" 2>&1)" || rc=$?
+[ "$rc" -eq 64 ] || { echo "FAIL: resource validation must return 64, got $rc" >&2; exit 1; }
+grep -q "invalid resources policy" <<<"$resource_out" || { echo "FAIL: expected resource validation, got $resource_out" >&2; exit 1; }
+[ ! -e "$RESOURCE_CHILD_MARKER" ] || { echo "FAIL: provider launched after resource refusal" >&2; exit 1; }
+
+printf 'MemAvailable: 100 kB\n' >"$CASE/meminfo"
+printf 'full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' >"$CASE/psi"
+printf '{"resources":{"min_available_mb":1024,"wait_seconds":0}}\n' >"$CASE/resources.json"
+export SKILLCHAIN_MEMINFO_FILE="$CASE/meminfo" SKILLCHAIN_PSI_FILE="$CASE/psi" SKILLCHAIN_CGROUP_DIR="$CASE/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$CASE/resource-locks"
+rc=0; resource_out="$(run --resource-config "$CASE/resources.json" 2>&1)" || rc=$?
+[ "$rc" -eq 77 ] || { echo "FAIL: pressure must return 77, got $rc: $resource_out" >&2; exit 1; }
+[ ! -e "$RESOURCE_CHILD_MARKER" ] || { echo "FAIL: pressure launched provider" >&2; exit 1; }
+
+# Telemetry warnings must stay separate from provider structured output.
+printf 'unavailable\n' >"$CASE/vmstat"
+export SKILLCHAIN_VMSTAT_FILE="$CASE/vmstat"
+stub "echo '{\"is_error\":false,\"structured_output\":{\"findings\":[{\"severity\":\"low\",\"category\":\"review-clean\",\"summary\":\"clean\"}]}}'"
+run --resource-config "$CASE/resources.json" >"$CASE/recovered" 2>"$CASE/recovered.err"
+jq -e '.category == "review-clean"' "$CASE/recovered" >/dev/null
+grep -q 'resource telemetry unavailable' "$CASE/recovered.err"

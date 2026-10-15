@@ -27,6 +27,7 @@ CFG="${BASE}/3-4_plan/wave-gate-config.json"
 RALPH_STATE="${BASE}/5_progress/ralph-wave-${WAVE}.json"
 RALPH_PID="${BASE}/5_progress/ralph-wave-${WAVE}.pid"
 RALPH_HEARTBEAT="${BASE}/5_progress/ralph-wave-${WAVE}.heartbeat"
+export SKILLCHAIN_RESOURCE_HEARTBEAT_FILE="$RALPH_HEARTBEAT"
 WAVE_KEY=".waves[\"${WAVE}\"]"
 DEV_PID=""
 BUILD_PID=""
@@ -88,7 +89,7 @@ run_with_timeout() {
   local started rc elapsed
   started=$(date +%s)
   set +e
-  "${TIMEOUT_BIN[@]}" --foreground "$secs" "$@"
+  wave_resource_run "$label" "${TIMEOUT_BIN[@]}" --foreground "$secs" "$@"
   rc=$?
   set -e
   elapsed=$(( $(date +%s) - started ))
@@ -119,16 +120,6 @@ done
 for value in "$AC_TIMEOUT" "$BUILD_TIMEOUT" "$CODERABBIT_TIMEOUT" "$BROWSER_TIMEOUT"; do
   [[ "$value" -gt 0 ]] || fail "required timeouts must be greater than zero"
 done
-
-# Host-resource budget (all optional): test commands wait for memory headroom, then fail as infrastructure (77).
-MIN_AVAILABLE_MB=$(jq -r '.resources.min_available_mb // 1024' "$CFG")
-MAX_PSI_FULL=$(jq -r '.resources.max_memory_psi_full_avg10 // 20' "$CFG")
-MEM_WAIT_SECONDS=$(jq -r '.resources.wait_seconds // 300' "$CFG")
-TEST_WORKERS=$(jq -r '.resources.test_workers // empty' "$CFG")
-for pair in "min_available_mb:$MIN_AVAILABLE_MB" "max_memory_psi_full_avg10:$MAX_PSI_FULL" "wait_seconds:$MEM_WAIT_SECONDS" "test_workers:${TEST_WORKERS:-1}"; do
-  [[ "${pair#*:}" =~ ^[0-9]+$ ]] || fail "invalid resources.${pair%%:*}"
-done
-[[ -z "$TEST_WORKERS" ]] || export VITEST_MAX_WORKERS="${VITEST_MAX_WORKERS:-$TEST_WORKERS}"
 
 AUTH_PREFLIGHT_CMD=$(jq -r '.auth_budget.preflight_cmd // empty' "$CFG")
 AUTH_RATE_LIMIT_EVIDENCE_CMD=$(jq -r '.auth_budget.rate_limit_evidence_cmd // empty' "$CFG")
@@ -211,7 +202,7 @@ run_static_check() {
   log="${BASE}/5_progress/ralph-wave-${WAVE}-${kind}-attempt-${attempt}.log"
   resolve_wave_base
   heartbeat; set +e
-  WAVE_BASE_SHA="$WAVE_BASE" "${TIMEOUT_BIN[@]}" --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
+  WAVE_BASE_SHA="$WAVE_BASE" wave_resource_run "$label" "${TIMEOUT_BIN[@]}" --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
   set -e; heartbeat
   assert_verified_head; assert_clean_worktree
   STATIC_COUNT=$(analysed_count "$log")
@@ -268,58 +259,27 @@ ralph_status() {
 
 if [[ "$STATUS_ONLY" == true ]]; then ralph_status; exit 0; fi
 
-# macOS headroom in MiB: (free + inactive + speculative) pages x page size from vm_stat. No PSI counterpart on macOS.
-vm_stat_available_mb() {
-  local out
-  if [[ -n "${SKILLCHAIN_VMSTAT_FILE:-}" ]]; then out=$(cat "$SKILLCHAIN_VMSTAT_FILE") || return 1; else out=$(vm_stat 2>/dev/null) || return 1; fi
-  awk '/page size of/ {for(i=1;i<=NF;i++) if($i=="of") ps=$(i+1)} /^Pages (free|inactive|speculative):/ {gsub(/\./,"",$NF); n+=$NF} END {if (ps>0 && n>0) print int(n*ps/1048576); else exit 1}' <<<"$out"
+# Resource admission failures are infrastructure, never green test/build evidence.
+wave_resource_run() {
+  local label="$1" rc=0; shift
+  resource_run "$CFG" "$label" "$@" || rc=$?
+  [[ "$rc" -ne 77 ]] || infra_fail "host resources unavailable before ${label}; command not started" 77
+  return "$rc"
 }
 
-# Memory headroom in MiB: MemAvailable, capped by a cgroup v2 limit (Linux), or vm_stat (macOS). The *_FILE/_DIR overrides let tests mock telemetry.
-available_mem_mb() {
-  local kb max cur dir="${SKILLCHAIN_CGROUP_DIR:-/sys/fs/cgroup}" avail
-  if [[ -n "${SKILLCHAIN_VMSTAT_FILE:-}" || ! -r "${SKILLCHAIN_MEMINFO_FILE:-/proc/meminfo}" ]]; then vm_stat_available_mb; return; fi
-  kb=$(awk '/^MemAvailable:/{print $2}' "${SKILLCHAIN_MEMINFO_FILE:-/proc/meminfo}" 2>/dev/null) || return 1
-  [[ "$kb" =~ ^[0-9]+$ ]] || return 1
-  avail=$((kb / 1024))
-  max=$(cat "$dir/memory.max" 2>/dev/null || true); cur=$(cat "$dir/memory.current" 2>/dev/null || true)
-  if [[ "$max" =~ ^[0-9]+$ && "$cur" =~ ^[0-9]+$ && $(( (max - cur) / 1048576 )) -lt "$avail" ]]; then avail=$(( (max - cur) / 1048576 )); fi
-  echo "$avail"
-}
-
-# Pressure-stall "full avg10" of the memory resource (whole percent); empty without PSI.
-memory_psi_full() {
-  awk '/^full/{for(i=1;i<=NF;i++) if($i ~ /^avg10=/){v=substr($i,7); print int(v)}}' "${SKILLCHAIN_PSI_FILE:-/proc/pressure/memory}" 2>/dev/null || true
-}
-
-# Delays a heavy command while the host is short of memory, then reports an infrastructure prerequisite failure.
-# It never infers OOM from an exit code and never kills anything. No telemetry (neither /proc/meminfo nor vm_stat) = nothing to judge.
-check_memory_headroom() {
-  local what="$1" waited=0 avail psi problem
-  while :; do
-    avail=$(available_mem_mb) || return 0
-    psi=$(memory_psi_full); psi="${psi:-0}"; problem=""
-    [[ "$avail" -ge "$MIN_AVAILABLE_MB" ]] || problem="MemAvailable ${avail} MiB < ${MIN_AVAILABLE_MB} MiB"
-    [[ "$psi" -le "$MAX_PSI_FULL" ]] || problem="memory PSI full avg10=${psi} > ${MAX_PSI_FULL}"
-    [[ -n "$problem" ]] || return 0
-    [[ "$waited" -lt "$MEM_WAIT_SECONDS" ]] || infra_fail "host memory pressure before ${what}: ${problem} (waited ${waited}s); command not started" 77
-    echo "   ⏳ ${problem}; waiting before ${what}" >&2
-    sleep_with_heartbeat 15; waited=$((waited + 15))
-  done
-}
+resource_logged_command() { local log="$1"; shift; "$@" >"$log" 2>&1; }
 
 # Runs an auth-budget preflight and the test under the shared-project lock.
 # Return codes 73/74 and the configured exhausted code are infrastructure, not test failures.
 run_test_command() {
   local auth="$1" command="$2" timeout_secs="$3" log="$4" hook_log="$5" rc
-  check_memory_headroom "$(basename "$log")"
   if [[ "$auth" != true ]]; then
-    "${TIMEOUT_BIN[@]}" --foreground "$timeout_secs" bash -c "$command" >"$log" 2>&1; rc=$?
+    wave_resource_run "$(basename "$log")" resource_logged_command "$log" "${TIMEOUT_BIN[@]}" --foreground "$timeout_secs" bash -c "$command"; rc=$?
     return "$rc"
   fi
   [[ -n "$AUTH_PREFLIGHT_CMD" ]] || infra_fail "auth-consuming command has no auth_budget.preflight_cmd"
   [[ -x scripts/worktree.sh ]] || infra_fail "auth-consuming command requires executable scripts/worktree.sh"
-  env WAVE="$WAVE" WAVE_GATE_CONFIG="$CFG" RALPH_STATE="$RALPH_STATE" \
+  wave_resource_run "$(basename "$log")" env WAVE="$WAVE" WAVE_GATE_CONFIG="$CFG" RALPH_STATE="$RALPH_STATE" \
     scripts/worktree.sh with-shared-lock -- bash -c '
       source "$7"
       set +e
@@ -383,7 +343,7 @@ while IFS= read -r entry; do
   [[ -n "$check" && "$check" != null ]] || fail "regression ${label}: selection_check_cmd must be non-empty"
   log="${BASE}/5_progress/ralph-wave-${WAVE}-selection-$(jq -r '.index' <<<"$entry").log"
   selection_rc=0
-  "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" bash -c "$check" >"$log" 2>&1 || selection_rc=$?
+  wave_resource_run "selection check" "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" bash -c "$check" >"$log" 2>&1 || selection_rc=$?
   [[ "$selection_rc" -eq 0 ]] || fail "scenario selection preflight failed for ${label} rc=${selection_rc} (log: $log)"
   [[ $(selected_count "$log") -gt 0 ]] || fail "scenario selection preflight: ${label} selected no tests (log: $log)"
 done < <(jq -c "${WAVE_KEY}.regression_commands | to_entries[] | select(.value | has(\"selection_check_cmd\")) | .value + {index:.key}" "$CFG")
@@ -445,7 +405,7 @@ for ((index=0; index<AC_COUNT; index++)); do
     log="${BASE}/5_progress/ralph-wave-${WAVE}-ac-$((index+1))-dependency.log"
     check=$(jq -r '.external_dependency.check_command' <<<"$entry")
     set +e
-    "${TIMEOUT_BIN[@]}" --foreground "$AC_TIMEOUT" bash -c "$check" >"$log" 2>&1
+    wave_resource_run "dependency check" "${TIMEOUT_BIN[@]}" --foreground "$AC_TIMEOUT" bash -c "$check" >"$log" 2>&1
     dependency_rc=$?
     set -e
     assert_verified_head; assert_clean_worktree
@@ -509,7 +469,7 @@ for ((index=0; index<AC_COUNT; index++)); do
     provider_rate_limited "$log" && rate_limited=true
     if [[ "$rate_limited" == false && "$auth" == true && -n "$AUTH_RATE_LIMIT_EVIDENCE_CMD" ]]; then
       set +e
-      env WAVE="$WAVE" WAVE_GATE_CONFIG="$CFG" RALPH_STATE="$RALPH_STATE" AC_ID="$id" AC_LOG="$log" \
+      wave_resource_run "rate-limit evidence" env WAVE="$WAVE" WAVE_GATE_CONFIG="$CFG" RALPH_STATE="$RALPH_STATE" AC_ID="$id" AC_LOG="$log" \
         "${TIMEOUT_BIN[@]}" --foreground "$AC_TIMEOUT" bash -c "$AUTH_RATE_LIMIT_EVIDENCE_CMD" >"$rate_limit_log" 2>&1
       evidence_rc=$?
       if [[ "$evidence_rc" -eq 0 ]] && ! grep -q '[^[:space:]]' "$rate_limit_log"; then
@@ -634,6 +594,7 @@ if [[ "$ROUTE_COUNT" -eq 0 ]]; then echo "   (backend-only wave — skipped)"; e
     if ! curl -fsS --max-time 2 "$READY_URL" >/dev/null 2>&1; then
       [[ -n "$DEV_CMD" ]] || fail "dev server not ready at ${READY_URL} and frontend.dev_cmd is missing"
       DEV_LOG="${BASE}/5_progress/dev-server-wave-${WAVE}.log"
+      resource_check "$CFG" "dev server" || { rc=$?; [[ "$rc" != 77 ]] || infra_fail "dev server resource admission failed" 77; exit "$rc"; }
       "${SETSID_BIN[@]}" bash -c "$DEV_CMD" >"$DEV_LOG" 2>&1 & DEV_PID=$!; DEV_PROCESS_GROUP=$SETSID_GROUP
       deadline=$(( $(date +%s) + READY_TIMEOUT ))
       until curl -fsS --max-time 2 "$READY_URL" >/dev/null 2>&1; do kill -0 "$DEV_PID" 2>/dev/null || fail "dev server exited before readiness (log: $DEV_LOG)"; [[ $(date +%s) -lt "$deadline" ]] || fail "dev server readiness timed out (log: $DEV_LOG)"; sleep "$READY_INTERVAL"; done
@@ -646,9 +607,9 @@ if [[ "$ROUTE_COUNT" -eq 0 ]]; then echo "   (backend-only wave — skipped)"; e
       browser=(agent-browser --session "$session"); [[ -z "$auth_state" ]] || browser+=(--state "$auth_state")
       BROWSER_SESSION="$session"
       run_with_timeout "$BROWSER_TIMEOUT" "smoke ${path}" "${browser[@]}" open "$target"
-      actual=$("${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" get url) || fail "smoke ${path}: get url failed or timed out"; [[ "$actual" == "$expected" ]] || fail "smoke ${path} redirected/resolved to '${actual}', expected '${expected}'"
-      text_out=$("${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" snapshot) || fail "smoke ${path}: snapshot failed or timed out"; [[ -z "$expected_text" ]] || grep -Fq "$expected_text" <<<"$text_out" || fail "smoke ${path} missing expected_text '${expected_text}'"
-      "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" errors >/dev/null || fail "browser errors or timeout on ${path}"
+      actual=$(wave_resource_run browser "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" get url) || { rc=$?; [[ "$rc" != 77 ]] || infra_fail "browser resource admission failed" 77; fail "smoke ${path}: get url failed or timed out"; }; [[ "$actual" == "$expected" ]] || fail "smoke ${path} redirected/resolved to '${actual}', expected '${expected}'"
+      text_out=$(wave_resource_run browser "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" snapshot) || { rc=$?; [[ "$rc" != 77 ]] || infra_fail "browser resource admission failed" 77; fail "smoke ${path}: snapshot failed or timed out"; }; [[ -z "$expected_text" ]] || grep -Fq "$expected_text" <<<"$text_out" || fail "smoke ${path} missing expected_text '${expected_text}'"
+      wave_resource_run browser "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" errors >/dev/null || fail "browser errors or timeout on ${path}"
       "${TIMEOUT_BIN[@]}" --foreground "$BROWSER_TIMEOUT" "${browser[@]}" close >/dev/null 2>&1 || true
       BROWSER_SESSION=""
     done
@@ -681,10 +642,11 @@ CR_STDERR="${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}.stderr.
 # Without --foreground, timeout contains each command's children in its own group.
 BUILD_INPUTS=$(node "$SCRIPT_DIR/quality.mjs" "$PROJ" "$THEME" snapshot)
 started=$(date +%s)
-"${TIMEOUT_BIN[@]}" --kill-after=5s "$BUILD_TIMEOUT" bash -c "$BUILD_CMD" >"$BUILD_LOG" 2>&1 & BUILD_PID=$!
-"${TIMEOUT_BIN[@]}" --kill-after=5s "$CODERABBIT_TIMEOUT" coderabbit review --agent --base-commit "$WAVE_BASE" >"$CR_RAW" 2>"$CR_STDERR" & CR_PID=$!
+"${SETSID_BIN[@]}" bash -c 'source "$1"; shift; resource_run "$@"' _ "$SCRIPT_DIR/compat.sh" "$CFG" build "${TIMEOUT_BIN[@]}" --kill-after=5s "$BUILD_TIMEOUT" bash -c "$BUILD_CMD" >"$BUILD_LOG" 2>&1 & BUILD_PID=$!
+"${SETSID_BIN[@]}" bash -c 'source "$1"; shift; resource_run "$@"' _ "$SCRIPT_DIR/compat.sh" "$CFG" review "${TIMEOUT_BIN[@]}" --kill-after=5s "$CODERABBIT_TIMEOUT" coderabbit review --agent --base-commit "$WAVE_BASE" >"$CR_RAW" 2>"$CR_STDERR" & CR_PID=$!
 BUILD_RC=0; wait "$BUILD_PID" || BUILD_RC=$?; BUILD_PID=""
 CR_RC=0; wait "$CR_PID" || CR_RC=$?; CR_PID=""
+[[ "$BUILD_RC" != 77 && "$CR_RC" != 77 ]] || infra_fail "build/review resource admission failed" 77
 echo "   Build exit ${BUILD_RC}; CodeRabbit exit ${CR_RC}; parallel phase $(( $(date +%s) - started ))s"
 [[ ! -s "$CR_STDERR" ]] || cat "$CR_STDERR" >&2
 assert_verified_head; assert_clean_worktree
@@ -747,5 +709,5 @@ NEXT_PLAN="${BASE}/3-4_plan/PROJ-${PROJ}-wave-${NEXT}-plan.md"
 if [[ -f "$NEXT_PLAN" ]]; then
   echo "→ NEXT ACTION: Start Wave ${NEXT}."
 else
-  echo "→ NEXT ACTION: Start the PROJ-end Quality Gate (including the one-time Takahashi minimalism review), then QA."
+  echo "→ NEXT ACTION: Start the PROJ-end Quality Gate, then hand off to QA."
 fi

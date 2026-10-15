@@ -84,6 +84,35 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
   index (the working tree, including state.json and lane outputs, is
   never touched), state → `blocked` with the exact cause, rendered stop
   report with a cleanup list. Nothing is simply aborted.
+- **Interrupted-run receipts:** before each provider launch, the supervisor writes
+  an atomic, flushed `started` receipt under the Git common directory's
+  `skillchain-runs/PROJ-<X>-<theme>/`. These operational files stay outside the
+  checkout and survive a killed lane. The supervisor records the child exit and
+  timeout observation, then settles receipts only after phase verification (or
+  an explicit stop). Exit codes above 128 carry the shell signal convention;
+  an explicit exit can match that code, so this is never proof of OOM.
+  A per-PROJ supervisor lease serializes reconciliation and lane launch; on hosts
+  with `flock`, the supervisor holds the lease without passing it into provider
+  tools or long-lived preview daemons. A launch wrapper checks the recorded
+  supervisor identity and records its own process identity before executing the
+  provider; it refuses when that check detects a missing supervisor.
+  Reconciliation blocks while a prior attached lane remains
+  alive under a missing supervisor. P0 releases and reacquires the lease
+  when re-entering its worktree, before launching any subsequent provider.
+  Without `flock`, the portable directory lease fails closed after a killed
+  supervisor: verify no prior tools remain, then remove the named stale
+  `supervisor.lock.d` manually. It never races to reap another owner's lease.
+  A restart reconciles incomplete receipts before skipping sealed phases: a live
+  supervisor blocks a duplicate run; a missing supervisor produces an
+  `interrupted` / unverified outcome and parks state as `blocked`. Restarts from
+  the control checkout first re-enter the registered persistent PROJ worktree,
+  so recovery updates that worktree's state. Resume the
+  blocked phase only after inspecting prior lane outputs and stopping any
+  surviving orphan tools. Linux ownership uses boot ID plus process start ticks;
+  other supported hosts use `ps` start time and refuse uncertain ownership.
+  If the supervisor itself was killed, its signal and cause remain unknown.
+  No journal guarantees reporting while the entire host is down, or durable
+  storage surviving kernel, filesystem, or hardware failure.
 - **Sealing:** the writer lane seals its phase via
   `chain state transition <phase> done`; the runner verifies the seal and
   refuses to advance without it.

@@ -14,7 +14,7 @@
 //   node findings.mjs queue          <proj-x> <theme>               open critical/high clustered by file (fix queue, JSON)
 //   node findings.mjs stats          <proj-x> <theme>               counts by severity/status (JSON)
 //   node findings.mjs harvest        <proj-x> <theme> [search-root] record `ponytail:` markers (the debt-marker convention, CONCEPT.md §7)
-//                                    as `deferred` debt findings; same dedupe as add. search-root defaults to src
+//                                    as `deferred` debt findings; same dedupe as add. search-root defaults to <app_root>/src
 //                                    (pass . for the whole repo); zero markers or a missing root is not an error.
 //
 // Raw input record (one JSON object per line):
@@ -22,8 +22,8 @@
 //   optional: category, file, line, anchor, provider, wave, status, debt_marker
 //
 // Dedupe key: file | anchor-or-line | category (case-insensitive). Findings
-// without an anchor/line add a stable summary fingerprint so two distinct
-// findings in the same file cannot collapse. A re-reported finding merges
+// without a semantic anchor add a stable summary fingerprint so two distinct
+// concerns at the same line cannot collapse. A re-reported finding merges
 // (sources appended, severity escalated) instead of duplicating.
 // A re-report with status open REOPENS a previously `fixed` finding — a repair
 // that did not survive re-verification must not stay green. `deferred` and
@@ -37,7 +37,7 @@
 //
 // Exit codes: 0 ok · 1 invalid input / unknown severity / lock timeout (nothing written) · 2 findings.json missing · 64 usage
 import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { stageDirectory, readFindingLedgers } from "./findings-store.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -164,7 +164,7 @@ const summaryFingerprint = (summary) => createHash("sha256")
 
 const dedupeKey = (f) => {
   const location = f.anchor ?? (f.line != null ? String(f.line) : null);
-  const discriminator = location ?? `summary:${summaryFingerprint(f.summary)}`;
+  const discriminator = f.anchor ? location : `${location ?? ""}|summary:${summaryFingerprint(f.summary)}`;
   return [f.file ?? "", discriminator, f.category ?? "general"].join("|").toLowerCase();
 };
 
@@ -180,6 +180,16 @@ function findOrFail(ledger, id) {
   const f = ledger.findings.find((x) => x.id === id);
   if (!f) fail(`no finding with id '${id}'`);
   return f;
+}
+
+function defaultHarvestRoot() {
+  const config = join(base, "3-4_plan", "wave-gate-config.json");
+  const appRoot = existsSync(config) ? JSON.parse(readFileSync(config, "utf8")).app_root ?? "." : ".";
+  if (typeof appRoot !== "string" || !appRoot.trim() || isAbsolute(appRoot) || appRoot.split(/[\\/]/).includes("..")) {
+    fail("app_root must be a relative path without '..'");
+  }
+  if (!existsSync(appRoot) || !statSync(appRoot).isDirectory()) fail(`app_root '${appRoot}' is not a directory`);
+  return join(appRoot, "src");
 }
 
 // One raw debt finding per `ponytail:` marker; the summary is the marker text after it.
@@ -210,7 +220,7 @@ if (cmd === "add" || cmd === "harvest") {
   const wave = waveIdx >= 0 ? Number(rest[waveIdx + 1]) : undefined;
   if (waveIdx >= 0 && !Number.isInteger(wave)) fail("--wave must be an integer — nothing written");
   const lines = cmd === "harvest"
-    ? harvestLines(rest[0] ?? "src")
+    ? harvestLines(rest[0] ?? defaultHarvestRoot())
     : readFileSync(0, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) fail("add requires at least one JSON finding on stdin — nothing written");
 

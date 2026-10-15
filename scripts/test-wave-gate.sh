@@ -50,6 +50,25 @@ auth_control_gate() { (cd "$CASE" && PATH="$CASE/bin:$PATH" bash "$GATE" --auth-
 run_suite() {
   GATE="$1"; PLATFORM="$2"
 
+  case_dir build-review-resource-pressure
+  export SKILLCHAIN_MEMINFO_FILE="$TMP/$PLATFORM-build-mem" SKILLCHAIN_PSI_FILE="$TMP/$PLATFORM-build-psi" SKILLCHAIN_CGROUP_DIR="$TMP/$PLATFORM-no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/$PLATFORM-resource-locks"
+  printf 'MemAvailable: 4194304 kB\n' >"$SKILLCHAIN_MEMINFO_FILE"
+  printf 'full avg10=0.00\n' >"$SKILLCHAIN_PSI_FILE"
+  export CR_CALL_LOG="$TMP/$PLATFORM-resource-review"
+  write_config "$(default_config | jq '.resources={wait_seconds:0} | .build_cmd="touch \"$CASE_LOG-build\"" | .waves["1"].regression_commands[0].command += "; printf \"MemAvailable: 100 kB\\n\" > \"$SKILLCHAIN_MEMINFO_FILE\""')"; commit_case
+  expect_rc 77 run_gate
+  [[ ! -e "$CASE_LOG-build" && ! -e "$CR_CALL_LOG" ]] || fail "$LABEL: build/reviewer started under memory pressure"
+  jq -e '.ralph_status=="infrastructure_failed" and .infrastructure_failure.exit_code==77' "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1.json" >/dev/null || fail "$LABEL: missing infrastructure evidence"
+  [[ ! -e "$CASE/specs/PROJ-1-test/5_progress/quality-build.json" ]] || fail "$LABEL: refused build received quality evidence"
+  unset SKILLCHAIN_MEMINFO_FILE SKILLCHAIN_PSI_FILE SKILLCHAIN_CGROUP_DIR CR_CALL_LOG
+  [[ "${SC_RESOURCE_ONLY:-0}" != 1 ]] || return 0
+
+  case_dir final-guidance
+  write_config "$(default_config)"; commit_case
+  expect_rc 0 run_gate
+  grep -Fq 'NEXT ACTION: Start the PROJ-end Quality Gate, then hand off to QA.' "$GATE_OUT" || fail "$LABEL: final guidance differs from current execution/QA contract"
+  ! grep -q 'Takahashi\|minimalism review' "$GATE_OUT" || fail "$LABEL: retired persona procedure emitted"
+
   case_dir wrapped-lock-timeout
   write_config "$(default_config | jq '.waves["1"].ac_commands[0].command="echo SKILLCHAIN_LOCK_TIMEOUT pid=123 waited_seconds=1 path=/test-lock >&2; exit 1"')"; commit_case
   expect_rc 73 ac_only_gate
@@ -412,18 +431,19 @@ EOF
 
   case_dir coderabbit-archive
   config=$(default_config | jq '.waves["1"].advisory_severities=["high","low"]')
-  write_config "$config"; commit_case
+  write_config "$config"; cp "$ROOT/$PLATFORM/skills/6_qa/scripts/"findings{,-store}.mjs "$CASE/scripts/"; commit_case
   CR_FIXTURE="$TMP/$PLATFORM-coderabbit.jsonl"; export CR_FIXTURE
   printf '%s\n' \
     '{"type":"status","message":"reviewing"}' \
-    '{"type":"finding","severity":"minor","fileName":"src/a.ts","codegenInstructions":"**🤖 Prompt for AI Agents:** Verify each finding against the latest code and only fix it if needed. Fix A"}' \
-    '{"type":"finding","severity":"major","fileName":"src/a.ts","codegenInstructions":"Fix B"}' >"$CR_FIXTURE"
+    '{"type":"finding","severity":"minor","fileName":"src/a.ts","line":307,"codegenInstructions":"**🤖 Prompt for AI Agents:** Verify each finding against the latest code and only fix it if needed. Fix A"}' \
+    '{"type":"finding","severity":"major","fileName":"src/a.ts","line":307,"codegenInstructions":"Fix B"}' >"$CR_FIXTURE"
   run_gate >/dev/null; run_gate >/dev/null
   for attempt in 1 2; do
     [[ -s "$CASE/specs/PROJ-1-test/5_progress/coderabbit-wave-1-attempt-${attempt}.jsonl" ]] || fail "$LABEL: raw attempt ${attempt} missing"
     [[ $(wc -l <"$CASE/specs/PROJ-1-test/5_progress/coderabbit-wave-1-attempt-${attempt}-normalized.jsonl") -eq 2 ]] || fail "$LABEL: normalized attempt ${attempt} count wrong"
   done
   jq -e -s '.[0].file=="src/a.ts" and .[0].severity=="low" and .[0].category==null and (.[0].summary|startswith("Fix A"))' "$CASE/specs/PROJ-1-test/5_progress/coderabbit-wave-1-attempt-1-normalized.jsonl" >/dev/null || fail "$LABEL: CodeRabbit schema/prefix normalization wrong"
+  jq -e '.findings | length==2 and ([.[].summary]|sort)==["Fix A","Fix B"] and ([.[].severity]|sort)==["high","low"]' "$CASE/specs/PROJ-1-test/5_progress/findings.json" >/dev/null || fail "$LABEL: different CodeRabbit concerns at one line collapsed or retained stale text"
   unset CR_FIXTURE
 
   case_dir coderabbit-command-failure
@@ -513,7 +533,7 @@ EOF
 
   case_dir dev-server
   DEV_PID_FILE="$TMP/$PLATFORM-dev-pid"; READY_FILE="$TMP/$PLATFORM-ready"; export DEV_PID_FILE READY_FILE; CURL_ALWAYS_READY=0; export CURL_ALWAYS_READY
-  config=$(default_config | jq '.frontend={"dev_url":"http://app.test","dev_cmd":"echo $$ > \"$DEV_PID_FILE\"; touch \"$READY_FILE\"; sleep 30","readiness":{"path":"/ready","timeout_seconds":3,"interval_seconds":1},"routes":[{"wave":1,"path":"/","expected_url":"/","expected_text":"Welcome","protected":false}]}')
+  config=$(default_config | jq '.resources={max_parallel_commands:1,wait_seconds:3} | .frontend={"dev_url":"http://app.test","dev_cmd":"echo $$ > \"$DEV_PID_FILE\"; touch \"$READY_FILE\"; sleep 30","readiness":{"path":"/ready","timeout_seconds":3,"interval_seconds":1},"routes":[{"wave":1,"path":"/","expected_url":"/","expected_text":"Welcome","protected":false}]}')
   write_config "$config"; commit_case; run_gate >/dev/null
   [[ -f "$READY_FILE" && -s "$DEV_PID_FILE" ]] || fail "$LABEL: gate did not start configured dev server"
   pid=$(cat "$DEV_PID_FILE"); ! kill -0 "$pid" 2>/dev/null || fail "$LABEL: gate did not stop its dev server"

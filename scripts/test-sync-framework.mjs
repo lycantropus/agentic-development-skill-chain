@@ -24,6 +24,15 @@ try {
     bad(/refresh required/, "--check");
     assert.equal(fs.existsSync(manifest), false);
     ok(); ok("--check");
+    const permissionFile = path.join(target, "scripts/state.sh");
+    const permissionSource = path.join(skills, "5_executing/scripts/state.sh");
+    const permissionMode = fs.statSync(permissionSource).mode & 0o777;
+    fs.chmodSync(permissionFile, permissionMode ^ 0o032);
+    ok("--check");
+    assert.equal(fs.statSync(permissionFile).mode & 0o777, permissionMode ^ 0o032, "check must not normalize non-executable permission bits");
+    fs.chmodSync(permissionFile, permissionMode ^ 0o111);
+    bad(/refresh required/, "--check");
+    ok(); ok("--check");
     const copied = path.join(target, "scripts/sync-framework.mjs");
     assert.equal(spawnSync(process.execPath, [copied, "--target", target], { encoding: "utf8" }).status, 1);
     assert.equal(spawnSync(process.execPath, [copied, "--target", target, "--skills-root", skills], { encoding: "utf8" }).status, 0);

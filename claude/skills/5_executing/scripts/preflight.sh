@@ -57,6 +57,21 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # session any secret (SONAR_TOKEN or otherwise) was exported into.
 source "$SCRIPT_DIR/compat.sh"
 source "$SCRIPT_DIR/env-local.sh"
+resource_exit() {
+  local rc="$1"
+  if [ "$rc" -eq 64 ] || [ "$rc" -eq 77 ]; then
+    if [ -f "$BASE/state.json" ]; then
+      "$STATE_SH" set "$PROJ" "$THEME" .preflight "$(jq -cn --arg at "$(now_iso)" --argjson rc "$rc" '{at:$at,ok:false,hard_missing:["host-resources"],skipped:[],resource_exit:$rc}')" >/dev/null
+    fi
+  fi
+  exit "$rc"
+}
+if ! resource_lease_held; then
+  resource_rc=0
+  resource_run "$GATE_CFG" preflight bash "$0" "$@" || resource_rc=$?
+  resource_exit "$resource_rc"
+fi
+resource_check "$GATE_CFG" preflight || resource_exit "$?"
 agent_browser_contract() {
   agent-browser open --help >/dev/null 2>&1 \
     && agent-browser snapshot --help >/dev/null 2>&1 \

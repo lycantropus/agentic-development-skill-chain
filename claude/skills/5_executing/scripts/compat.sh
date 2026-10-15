@@ -104,11 +104,11 @@ lock_acquire() {
   dir="$file.d"; deadline=$((SECONDS + secs))
   while ! mkdir "$dir" 2>/dev/null; do
     owner="$(cat "$dir/pid" 2>/dev/null)"
-    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then rm -rf "$dir"; continue; fi
+    if [ "${COMPAT_LOCK_NO_REAP:-0}" != 1 ] && [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then rm -rf "$dir"; continue; fi
     [ "$SECONDS" -lt "$deadline" ] || return 1
     sleep 0.2
   done
-  echo $$ >"$dir/pid"
+  echo "$BASHPID" >"$dir/pid"
   _COMPAT_LOCK_DIRS+=("$dir")
   if [ -z "$_COMPAT_TRAPPED" ]; then # chain onto an existing EXIT trap (trap -p prints it already single-quote-escaped)
     owner="$(trap -p EXIT | sed -E "s/^trap -- '(.*)' EXIT$/\1/")"
@@ -118,3 +118,122 @@ lock_acquire() {
 }
 _COMPAT_LOCK_DIRS=() _COMPAT_TRAPPED=
 _compat_unlock() { local d; for d in ${_COMPAT_LOCK_DIRS[@]+"${_COMPAT_LOCK_DIRS[@]}"}; do rm -rf "$d"; done; }
+
+# macOS headroom in MiB: (free + inactive + speculative) pages x page size from vm_stat. No PSI counterpart on macOS.
+vm_stat_available_mb() {
+  local out
+  if [[ -n "${SKILLCHAIN_VMSTAT_FILE:-}" ]]; then out=$(cat "$SKILLCHAIN_VMSTAT_FILE") || return 1; else out=$(vm_stat 2>/dev/null) || return 1; fi
+  awk '/page size of/ {for(i=1;i<=NF;i++) if($i=="of") ps=$(i+1)} /^Pages (free|inactive|speculative):/ {gsub(/\./,"",$NF); n+=$NF} END {if (ps>0 && n>0) print int(n*ps/1048576); else exit 1}' <<<"$out"
+}
+
+# Memory headroom in MiB: MemAvailable, capped by a cgroup v2 limit (Linux), or vm_stat (macOS). The *_FILE/_DIR overrides let tests mock telemetry.
+available_mem_mb() {
+  local kb max cur dir root group avail
+  if [[ -n "${SKILLCHAIN_VMSTAT_FILE:-}" || ! -r "${SKILLCHAIN_MEMINFO_FILE:-/proc/meminfo}" ]]; then vm_stat_available_mb; return; fi
+  kb=$(awk '/^MemAvailable:/{print $2}' "${SKILLCHAIN_MEMINFO_FILE:-/proc/meminfo}" 2>/dev/null) || return 1
+  [[ "$kb" =~ ^[0-9]+$ ]] || return 1
+  avail=$((kb / 1024))
+  root=$(abspath "${SKILLCHAIN_CGROUP_DIR:-${SKILLCHAIN_CGROUP_MOUNT:-/sys/fs/cgroup}}") || return 1; dir="$root"
+  if [[ -z "${SKILLCHAIN_CGROUP_DIR:-}" ]]; then
+    group=$(awk -F: '$1=="0" && $2=="" {print $3; exit}' "${SKILLCHAIN_SELF_CGROUP_FILE:-/proc/self/cgroup}" 2>/dev/null) || group=""
+    case "$group" in /*) [[ "$group" == *'/../'* || "$group" == */.. ]] || dir=$(abspath "${root%/}${group%/}") ;; esac
+  fi
+  while :; do
+    max=$(cat "$dir/memory.max" 2>/dev/null || true); cur=$(cat "$dir/memory.current" 2>/dev/null || true)
+    if [[ "$max" =~ ^[0-9]+$ && "$cur" =~ ^[0-9]+$ && $(( (max - cur) / 1048576 )) -lt "$avail" ]]; then avail=$(( (max - cur) / 1048576 )); fi
+    [[ "$dir" != "$root" && "$dir" != / ]] || break
+    dir=${dir%/*}; dir=${dir:-/}
+    [[ "$dir" == "$root" || "$dir" == "${root%/}/"* ]] || break
+  done
+  echo "$avail"
+}
+
+# Pressure-stall "full avg10" of the memory resource (whole percent); empty without PSI.
+memory_psi_full() {
+  awk '/^full/{for(i=1;i<=NF;i++) if($i ~ /^avg10=/){v=substr($i,7); print int(v)}}' "${SKILLCHAIN_PSI_FILE:-/proc/pressure/memory}" 2>/dev/null || true
+}
+
+# A nested command may share only a live inherited kernel or portable owner lease.
+resource_lease_held() {
+  [[ "${SKILLCHAIN_RESOURCE_ACTIVE:-}" == 1 && -n "${SKILLCHAIN_RESOURCE_LOCK_FILE:-}" ]] || return 1
+  [[ /dev/fd/19 -ef "$SKILLCHAIN_RESOURCE_LOCK_FILE" ]] ||
+    { [[ "$(cat "$SKILLCHAIN_RESOURCE_LOCK_FILE.d/pid" 2>/dev/null)" == "${SKILLCHAIN_RESOURCE_LOCK_OWNER:-none}" ]] && kill -0 "${SKILLCHAIN_RESOURCE_LOCK_OWNER:-}" 2>/dev/null; }
+}
+
+# Called only by resource_run's signal traps; child is its owned process-group leader.
+_resource_cancel() {
+  local code="$1" until
+  trap '' TERM INT HUP
+  if [[ -n "$child" ]]; then
+    kill -TERM -- "-$child" 2>/dev/null || true
+    until=$((SECONDS + 2))
+    while kill -0 -- "-$child" 2>/dev/null && [[ "$SECONDS" -lt "$until" ]]; do sleep 0.1; done
+    kill -KILL -- "-$child" 2>/dev/null || true
+    wait "$child" 2>/dev/null || true
+  fi
+  exit "$code"
+}
+
+# resource_run CONFIG LABEL command args… — one host slot for a heavy process tree.
+# Missing config uses defaults; missing telemetry warns (never invents an OOM diagnosis).
+# Nested calls share the outer slot. Limits cover participating commands, not unrelated processes.
+resource_run() (
+  local cfg="$1" label="$2" policy min psi_limit wait workers cap deadline avail psi problem slot rc child=""
+  shift 2
+  policy='{}'
+  if [[ -f "$cfg" ]]; then policy=$(cat "$cfg") || return 64; fi
+  if ! jq -e '
+    def whole: type=="number" and floor==. and .>=0;
+    (if has("resources") then .resources else {} end) as $r | ($r|type=="object") and
+    ($r | keys - ["min_available_mb","max_memory_psi_full_avg10","wait_seconds","test_workers","max_parallel_commands"] | length==0) and
+    all(["min_available_mb","max_memory_psi_full_avg10","wait_seconds"][]; . as $k | (($r|has($k)|not) or ($r[$k]|whole))) and
+    all(["test_workers","max_parallel_commands"][]; . as $k | (($r|has($k)|not) or ($r[$k]|whole and .>0)))
+  ' <<<"$policy" >/dev/null 2>&1; then echo "invalid resources policy: $cfg" >&2; return 64; fi
+  read -r min psi_limit wait workers cap < <(jq -r '[.resources.min_available_mb // 1024,.resources.max_memory_psi_full_avg10 // 20,.resources.wait_seconds // 300,.resources.test_workers // 0,.resources.max_parallel_commands // 2]|@tsv' <<<"$policy")
+  deadline=$((SECONDS + wait))
+  local lockdir="${SKILLCHAIN_RESOURCE_LOCK_DIR:-${TMPDIR:-/tmp}/skillchain-resources-${UID}}"
+  (umask 077; mkdir -p "$lockdir") || return 77
+  node -e 'const fs=require("fs"),s=fs.lstatSync(process.argv[1]);if(!s.isDirectory()||s.isSymbolicLink()||s.uid!==process.getuid()||(s.mode&0o077))process.exit(1)' "$lockdir" || { echo "unsafe resource lock directory: $lockdir" >&2; return 77; }
+  # Kernel locks release on exit; the portable mkdir fallback deliberately never reaps a racing owner.
+  local COMPAT_LOCK_NO_REAP=1
+  _COMPAT_LOCK_DIRS=(); _COMPAT_TRAPPED=""
+  trap '_compat_unlock' EXIT
+  trap '_resource_cancel 143' TERM
+  trap '_resource_cancel 130' INT
+  trap '_resource_cancel 129' HUP
+  while :; do
+    problem=""
+    if avail=$(available_mem_mb); then
+      [[ "$avail" -ge "$min" ]] || problem="MemAvailable ${avail} MiB < ${min} MiB"
+      psi=$(memory_psi_full); psi=${psi:-0}
+      [[ "$psi" -le "$psi_limit" ]] || problem="memory PSI full avg10=${psi} > ${psi_limit}"
+    else
+      echo "resource telemetry unavailable before ${label}; continuing with command capacity guard" >&2
+    fi
+    if [[ -z "$problem" ]]; then
+      [[ "${SKILLCHAIN_RESOURCE_CHECK_ONLY:-}" != 1 ]] || return 0
+      if resource_lease_held; then "$@"; return; fi
+      for ((slot=1; slot<=cap; slot++)); do
+        if lock_acquire 19 exclusive 0 "$lockdir/slot-$slot"; then
+          export SKILLCHAIN_RESOURCE_ACTIVE=1 SKILLCHAIN_RESOURCE_LOCK_FILE="$lockdir/slot-$slot" SKILLCHAIN_RESOURCE_LOCK_OWNER="$BASHPID"
+          if [[ "$workers" -gt 0 ]]; then export VITEST_MAX_WORKERS="${VITEST_MAX_WORKERS:-$workers}"; fi
+          # Job control gives external commands and shell functions an owned group; disable notifications before waiting.
+          set -m
+          (set +m; "$@") <&0 & child=$!
+          set +m
+          rc=0; wait "$child" || rc=$?; child=""
+          return "$rc"
+        fi
+        exec 19>&-
+      done
+      problem="shared command capacity ${cap} exhausted"
+    fi
+    if [[ "$SECONDS" -ge "$deadline" ]]; then echo "host resource pressure before ${label}: ${problem}; command not started" >&2; return 77; fi
+    echo "waiting before ${label}: ${problem}" >&2
+    [[ -z "${SKILLCHAIN_RESOURCE_HEARTBEAT_FILE:-}" ]] || date +%s >"$SKILLCHAIN_RESOURCE_HEARTBEAT_FILE" || return 77
+    sleep 0.2
+  done
+)
+
+# Admission only for orchestrators: do not occupy a child-command slot.
+resource_check() ( SKILLCHAIN_RESOURCE_CHECK_ONLY=1 resource_run "$1" "$2" true; )
