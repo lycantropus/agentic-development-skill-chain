@@ -48,7 +48,7 @@ Optional top-level keys: `lint_cmd` (default `npm run lint`), `build_artifacts` 
 
 ## Mutation wrapper scope (breaking change)
 
-`CHANGED_FILES` is no longer exported, even if the parent shell sets it. Existing wrappers must migrate to `CHANGED_FILES_FILE`; there is no legacy or whole-repo fallback. The list exists only during the command and is removed after success, failure, or timeout. Read NUL records without line splitting, shell expansion, or `eval`; an empty list must never mean “mutate everything”. For example, adapt this Bash wrapper to the project's mutation tool:
+`CHANGED_FILES` is no longer exported, even if the parent shell sets it. Existing wrappers must migrate to `CHANGED_FILES_FILE`; there is no legacy or whole-repo fallback. The list exists only during the command and is removed after success, wrapper failure, timeout, or handled cancellation (SIGINT, SIGTERM, SIGHUP, SIGQUIT). Abrupt termination of the helper itself (for example SIGKILL or a runtime crash) may leave its private temporary directory behind. Read NUL records without line splitting, shell expansion, or `eval`; an empty list must never mean “mutate everything”. For example, adapt this Bash wrapper to the project's mutation tool:
 
 ```bash
 set -euo pipefail

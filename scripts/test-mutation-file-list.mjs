@@ -32,7 +32,7 @@ assert.ok(bytes.length > 0 && bytes.at(-1) === 0, 'missing NUL terminator');
 fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({file, base: process.env.BASE_SHA, files: bytes.toString('utf8').split('\\0').slice(0, -1)}));
 console.log('Mutants: 5'); console.log('Survivors: 0');
 `);
-    const config = { mutation_cmd: 'node wrapper.mjs', timeouts: { mutation_seconds: 1 } };
+    const config = { mutation_cmd: 'node wrapper.mjs', timeouts: { mutation_seconds: 10 } };
     const save = () => write(`${base}/3-4_plan/wave-gate-config.json`, JSON.stringify(config));
     save(); commit();
     const script = path.join(root, provider, 'skills/5_executing/scripts/quality.mjs');
@@ -53,9 +53,10 @@ console.log('Mutants: 5'); console.log('Survivors: 0');
     config.mutation_cmd = 'node wrapper.mjs; echo "Survivors: 2"; exit 1'; save(); commit(); check(1);
     config.mutation_cmd = 'node wrapper.mjs; echo "Survivors: 2"; kill -KILL "$PPID"'; save(); commit(); check(1);
     assert.equal(JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-mutation.json`), 'utf8')).rc, 137, 'killed runner must not become survivor evidence');
-    config.mutation_cmd = 'node wrapper.mjs; sleep 10'; save(); commit();
+    config.timeouts.mutation_seconds = 5;
+    config.mutation_cmd = 'node wrapper.mjs; sleep 30'; save(); commit();
     assert.match(check(1).stderr, /failed \(124\)/);
-    for (const signal of ['SIGTERM', 'SIGINT']) {
+    for (const [signal, exitCode] of Object.entries({ SIGHUP: 129, SIGINT: 130, SIGQUIT: 131, SIGTERM: 143 })) {
       config.timeouts.mutation_seconds = 30;
       config.mutation_cmd = `trap '' TERM; node wrapper.mjs; echo "Survivors: 2"; sleep 30`; save(); commit();
       fs.unlinkSync(path.join(cwd, capture));
@@ -70,7 +71,7 @@ console.log('Mutants: 5'); console.log('Survivors: 0');
       child.kill(signal);
       assert.equal(await closed, 1, 'interrupted run must fail');
       const record = JSON.parse(fs.readFileSync(path.join(cwd, `${progress}/quality-mutation.json`), 'utf8'));
-      assert.equal(record.rc, signal === 'SIGINT' ? 130 : 143, 'cancellation must not become survivor evidence');
+      assert.equal(record.rc, exitCode, 'cancellation must not become survivor evidence');
       assert.ok(!fs.existsSync(path.dirname(scope.file)), `${signal} leaked the file list`);
     }
     // A failed Git scope lookup must never run the wrapper against a broader scope.

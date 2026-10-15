@@ -246,7 +246,12 @@ async function act(config, fingerprint) {
       if (!config.auth_budget?.preflight_cmd || !fs.existsSync('scripts/worktree.sh')) throw new Error('auth quality command requires preflight and shared lock helper');
       invocation = ['bash', 'scripts/worktree.sh', 'with-shared-lock', '--', 'bash', '-c', 'bash -c "$1" && bash -c "$2"', '_', config.auth_budget.preflight_cmd, command];
     }
-    let changedDir;
+    let changedDir, mutationChild, interrupted = 0;
+    const handlers = isMut ? ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGTERM'].map(signal => [signal, () => {
+      interrupted = 128 + os.constants.signals[signal];
+      mutationChild?.kill('SIGTERM');
+    }]) : [];
+    for (const [signal, handler] of handlers) process.on(signal, handler);
     try {
       let env = process.env;
       if (isMut) {
@@ -262,14 +267,9 @@ async function act(config, fingerprint) {
       if (isMut) {
         // Await the child so cancellation reaches timeout and still runs our cleanup.
         rc = await new Promise((resolve, reject) => {
-          const child = spawn('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env });
-          let interrupted = 0;
-          const interrupt = () => { interrupted = 130; child.kill('SIGTERM'); };
-          const terminate = () => { interrupted = 143; child.kill('SIGTERM'); };
-          process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
-          child.once('error', reject);
-          child.once('close', (status, signal) => {
-            process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', terminate);
+          mutationChild = spawn('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env });
+          mutationChild.once('error', reject);
+          mutationChild.once('close', (status, signal) => {
             resolve(interrupted || (status ?? (signal ? 128 + os.constants.signals[signal] : 2)));
           });
         });
@@ -279,6 +279,7 @@ async function act(config, fingerprint) {
     } finally {
       fs.closeSync(fd);
       if (changedDir) fs.rmSync(changedDir, { recursive: true, force: true });
+      for (const [signal, handler] of handlers) process.removeListener(signal, handler);
     }
   }
   const output = fs.readFileSync(log, 'utf8');

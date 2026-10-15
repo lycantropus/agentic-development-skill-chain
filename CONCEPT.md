@@ -581,8 +581,8 @@ Procedure and variants:
 ### P0 — Setup (`5_executing/subskills/setup.md`; replaces the FIRST-ACTION block from Skill 5)
 
 Once per PROJ, fully automatic, in one subagent spawned by the Step 5 lead
-(or the runner's P0 lane); script-driven with exactly one judgment step, no
-user questions. In order: gate on `CP1:approved` and the plan validator;
+(or the runner's P0 lane); scripts run the checks, with bounded judgment for
+assumptions and a safe negative control, no user questions. In order: gate on `CP1:approved` and the plan validator;
 create or resume the persistent sibling worktree on `proj/PROJ-X`, tag
 `BASE_SHA`, install dependencies there (source isolated; `.env.local`, the
 development database and the hosted-auth budget shared and serialized
@@ -592,7 +592,7 @@ list (both provider auth states, Ponytail parity, migration drift — `codex`
 missing sets `degraded`, never silently); commit a checkpoint (the negative
 control's clean-tree gate stays strict); verify the verifier with one
 controlled red gate; suggest static-check commands; write the ground file
-(the judgment step: validated assumptions `docs/` does not already state);
+(validated assumptions `docs/` does not already state);
 compile the worker files for every wave once — delivered by path in each
 spawn prompt, no hook, canonical for both providers; seal `P0:done` with a
 second setup commit. Procedure: [setup.md](claude/skills/5_executing/subskills/setup.md);
