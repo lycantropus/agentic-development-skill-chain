@@ -13,6 +13,9 @@ jobs:
           node-version: 22
       # Stock macOS: bash 3.2, no GNU coreutils/flock. Homebrew bash first on PATH; timeout/flock stay absent on purpose
       # so the built-in fallbacks are what runs (jq and git come from the runner image).
-      - run: brew install bash jq
-      - run: echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+      # gnu-sed only for the test scripts' `sed -i` (BSD sed -i is out of scope); production helpers never use it.
+      - run: brew install bash jq gnu-sed
+      - run: |
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix gnu-sed)/libexec/gnubin" >> "$GITHUB_PATH"
       - run: ./scripts/validate.sh
