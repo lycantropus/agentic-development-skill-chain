@@ -161,7 +161,7 @@
         },
         "ponytail": {
           "type": "object",
-          "description": "chain check ponytail result: per-provider install/version/mode + parity verdict",
+          "description": "chain check ponytail result: per-provider install/version/mode + installation/mode/coverage verdict; versions are diagnostic only",
           "properties": {
             "claude": { "type": "object" },
             "codex": { "type": "object" },

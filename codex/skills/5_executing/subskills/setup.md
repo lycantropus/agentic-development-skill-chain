@@ -332,7 +332,7 @@ starts in between (lead discipline: a worker holding a path to an outdated file 
 not caught).
 
 **5d. Ponytail parity** is already gated inside step 3's preflight
-(`chain check ponytail`: absence or version/mode mismatch across active
+(`chain check ponytail`: absence or wrong mode on active
 providers blocks P0). Never work around a red gate; `PONYTAIL_ENFORCE=0`
 is the loud, recorded escape hatch — it lands in state.json and the
 reports, never silent.

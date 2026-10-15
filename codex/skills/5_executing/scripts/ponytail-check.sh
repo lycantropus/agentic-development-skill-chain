@@ -7,8 +7,8 @@
 #   installed?  version?  mode?  (mode: PONYTAIL_DEFAULT_MODE env, else
 #   ~/.config/ponytail/config.json defaultMode, else "full" — persisted to
 #   the config if absent: the ONE mutation this script makes, logged)
-# and gates PARITY: when both providers are active, Claude and Codex must
-# report the SAME plugin version and mode; a mismatch blocks P0. In degraded
+# and requires installation and full mode on all active providers. Versions
+# are reported for diagnostics only; they do not have to match. In degraded
 # single-provider mode the gate applies to the surviving provider alone.
 #
 # It also verifies no PONYTAIL_SUBAGENT_MATCHER is set. Ponytail's native
@@ -95,9 +95,6 @@ PROBLEMS=()
 [ "$CLAUDE_INSTALLED" = true ] || PROBLEMS+=("claude: ponytail not installed")
 if [ "$CODEX_ACTIVE" = true ]; then
   [ "$CODEX_INSTALLED" = true ] || PROBLEMS+=("codex: ponytail not installed")
-  if [ "$CLAUDE_INSTALLED" = true ] && [ "$CODEX_INSTALLED" = true ] && [ "$CLAUDE_VERSION" != "$CODEX_VERSION" ]; then
-    PROBLEMS+=("version mismatch: claude ${CLAUDE_VERSION} vs codex ${CODEX_VERSION} — pin ONE version on both providers")
-  fi
 fi
 if [ "$MODE" != "$REQUIRED_MODE" ]; then
   PROBLEMS+=("mode '$MODE' != required '$REQUIRED_MODE' — an off/lite ladder is a silent degradation; persist {\"defaultMode\":\"$REQUIRED_MODE\"} in $PT_CONFIG (or unset PONYTAIL_DEFAULT_MODE)")
@@ -129,7 +126,7 @@ if [ "$PARITY_OK" = true ]; then
 fi
 
 for p in "${PROBLEMS[@]}"; do note "$p"; done
-note "install/align ponytail (one version, both providers):"
+note "install ponytail on all active providers:"
 note "  claude plugin marketplace add DietrichGebert/ponytail && claude plugin install ponytail@ponytail"
 note "  codex plugin marketplace add DietrichGebert/ponytail && codex plugin add ponytail@ponytail"
 note "  intentional single-provider run: rerun P0 with PREFLIGHT_CODEX_INACTIVE=1 (recorded as degraded)"

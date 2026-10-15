@@ -102,7 +102,7 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
 - **Ponytail coverage (Stage 2):** the runner clears
   `PONYTAIL_SUBAGENT_MATCHER`, using Ponytail's native all-subagent path;
   P0 blocks any scoped matcher because it can miss generic implementation
-  fallbacks. Version and mode parity remain gated in `chain check ponytail`.
+  fallbacks. Installation and mode `full` remain gated in `chain check ponytail`; versions may differ.
 
 Env knobs: `CLAUDE_WRITER_MODEL`, `CLAUDE_REVIEW_MODEL`, `CLAUDE_MODEL_RANK`, `PEER_GRACE`
 (seconds a peer may outlive the writer, default 300), `SKILLCHAIN_POLL_SECONDS`

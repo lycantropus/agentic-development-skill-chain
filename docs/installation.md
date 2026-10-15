@@ -32,8 +32,9 @@ This copies the bundled chain into:
 
 The framework's minimalism ladder is the third-party
 [Ponytail](https://github.com/DietrichGebert/ponytail) plugin — installed
-on BOTH providers, same version, mode `full`. The P0 preflight
-(`chain check ponytail`) blocks runs on absence or version/mode mismatch.
+on all active providers in mode `full`. Versions may differ and are reported
+for diagnostics only. The P0 preflight (`chain check ponytail`) blocks runs
+on absence, wrong mode, or restricted subagent coverage.
 
 ```bash
 # Claude Code
