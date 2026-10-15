@@ -51,8 +51,60 @@ for ((i=0;i<100;i++)); do [[ ! -e "$TMP/started1" || ! -e "$TMP/started2" ]] || 
 [[ -e "$TMP/started1" && -e "$TMP/started2" ]]
 printf '{"resources":{"wait_seconds":0}}' >"$TMP/nowait"
 expect77 resource_run "$TMP/nowait" overflow touch "$TMP/overflow"; [[ ! -e "$TMP/overflow" ]]
+SKILLCHAIN_RESOURCE_ACTIVE=1 SKILLCHAIN_RESOURCE_LOCK_OWNER="$$" SKILLCHAIN_RESOURCE_LOCK_FILE="$SKILLCHAIN_RESOURCE_LOCK_DIR/slot-1" SKILLCHAIN_RESOURCE_LEASE_FILE="$TMP/forged-lease" expect77 resource_run "$TMP/nowait" forged touch "$TMP/forged"
+[[ ! -e "$TMP/forged" ]]
 touch "$TMP/release"; for pid in $pids; do wait "$pid"; done
 resource_run "$TMP/config" released true
+resource_run "$TMP/config" no-inherited-lock bash -c '[[ ! -e /dev/fd/19 ]]'
+# Portable cleanup must not delete a new owner's directory after releasing its own lock.
+(
+  export SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/one-shot-locks"
+  command() { if [[ "${1:-}" == -v && "${2:-}" == flock ]]; then return 1; else builtin command "$@"; fi; }
+  rm() {
+    builtin command rm "$@"
+    if [[ "${*: -1}" == "$SKILLCHAIN_RESOURCE_LOCK_DIR/slot-1.d" ]]; then
+      local count=0
+      [[ ! -f "$TMP/unlock-count" ]] || count=$(cat "$TMP/unlock-count")
+      count=$((count + 1)); printf '%s' "$count" >"$TMP/unlock-count"
+      if [[ "$count" == 1 ]]; then mkdir "$SKILLCHAIN_RESOURCE_LOCK_DIR/slot-1.d"; touch "$SKILLCHAIN_RESOURCE_LOCK_DIR/slot-1.d/contender"; fi
+    fi
+  }
+  resource_run "$TMP/config" one-shot-cleanup true
+  [[ $(cat "$TMP/unlock-count") == 1 && -f "$SKILLCHAIN_RESOURCE_LOCK_DIR/slot-1.d/contender" ]] || {
+    echo "FAIL: portable cleanup released a slot twice and removed its new owner" >&2; exit 1;
+  }
+)
+# A detached descendant must not retain the guard's capacity lock after its command exits.
+python3 - "$ROOT" "$TMP" <<'PY'
+import os, pathlib, signal, subprocess, sys, time
+root,tmp=map(pathlib.Path,sys.argv[1:])
+config=tmp/'daemon-config';config.write_text('{"resources":{"wait_seconds":0,"max_parallel_commands":1}}')
+pidfile=tmp/'daemon-pid'
+receiptfile=tmp/'daemon-receipt'
+helper=str(root/'codex/skills/5_executing/scripts/compat.sh')
+zombie=os.fork()
+if zombie==0: os._exit(0)
+try:
+ for _ in range(100):
+  state=subprocess.run(['ps','-p',str(zombie),'-o','stat='],capture_output=True,text=True).stdout.strip()
+  if state.startswith('Z'): break
+  time.sleep(.02)
+ assert state.startswith('Z'), 'zombie owner fixture did not become ready'
+ result=subprocess.run(['bash','-c','source "$1"; _resource_owner_identity "$2"','_',helper,str(zombie)])
+ assert result.returncode==1, 'zombie guard was accepted as a live lease owner'
+finally: os.waitpid(zombie,0)
+try:
+ subprocess.run(['bash','-c','source "$1"; resource_run "$2" daemon bash -c \'printf "%s" "$SKILLCHAIN_RESOURCE_LEASE_FILE" > "$2"; sleep 30 & echo $! > "$1"\' _ "$3" "$4"','_',helper,str(config),str(pidfile),str(receiptfile)],check=True,stdout=subprocess.DEVNULL)
+ pid=int(pidfile.read_text());os.kill(pid,0)
+ assert not pathlib.Path(receiptfile.read_text()).exists(), 'guard receipt survived command completion'
+ result=subprocess.run(['bash','-c','source "$1"; resource_run "$2" next-command true','_',helper,str(config)])
+ assert result.returncode==0, 'daemon retained the guard capacity lock after command exit'
+finally:
+ if pidfile.exists():
+  try:os.kill(int(pidfile.read_text()),signal.SIGKILL)
+  except ProcessLookupError:pass
+PY
+
 ln -s "$SKILLCHAIN_RESOURCE_LOCK_DIR" "$TMP/unsafe-locks"
 expect77 env SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/unsafe-locks" bash -c 'source "$1"; resource_run "$2" unsafe touch "$3"' _ "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$TMP/config" "$TMP/unsafe-launched"
 [[ ! -e "$TMP/unsafe-launched" ]]

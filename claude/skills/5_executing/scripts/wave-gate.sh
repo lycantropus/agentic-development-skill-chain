@@ -627,7 +627,7 @@ if [[ -f scripts/gen-component-registry.mjs && ( -d "$APP_ROOT/src/components" |
   [[ "$REG_RC" -eq 0 || "$REG_RC" -eq 3 ]] || fail "component registry out of date"
 else echo "   (component registry unavailable/not applicable — skipped)"; fi
 
-step "5–6/6 Build and CodeRabbit wave review (parallel; last so environmental smoke failures cost no review)"
+step "5–6/6 Build and CodeRabbit wave review (last so environmental smoke failures cost no review)"
 BUILD_CMD=$(jq -r '.build_cmd // empty' "$CFG"); [[ -n "$BUILD_CMD" ]] || fail "build_cmd missing"
 command -v coderabbit >/dev/null || fail "coderabbit not installed"
 resolve_wave_base
@@ -638,16 +638,19 @@ CR_RAW="${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}.jsonl"
 CR_NORMALIZED="${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}-normalized.jsonl"
 BUILD_LOG="${BASE}/5_progress/build-wave-${WAVE}-attempt-${attempt}.log"
 CR_STDERR="${BASE}/5_progress/coderabbit-wave-${WAVE}-attempt-${attempt}.stderr.log"
-# Only the commands overlap; the coordinator checks results and writes the ledger.
+# Commands overlap when capacity permits; the coordinator checks results and writes the ledger.
 # Without --foreground, timeout contains each command's children in its own group.
 BUILD_INPUTS=$(node "$SCRIPT_DIR/quality.mjs" "$PROJ" "$THEME" snapshot)
 started=$(date +%s)
+COMMAND_CAP=$(jq -r '.resources.max_parallel_commands // 2' "$CFG")
 "${SETSID_BIN[@]}" bash -c 'source "$1"; shift; resource_run "$@"' _ "$SCRIPT_DIR/compat.sh" "$CFG" build "${TIMEOUT_BIN[@]}" --kill-after=5s "$BUILD_TIMEOUT" bash -c "$BUILD_CMD" >"$BUILD_LOG" 2>&1 & BUILD_PID=$!
+BUILD_RC=0
+if [[ "$COMMAND_CAP" == 1 ]]; then wait "$BUILD_PID" || BUILD_RC=$?; BUILD_PID=""; fi
 "${SETSID_BIN[@]}" bash -c 'source "$1"; shift; resource_run "$@"' _ "$SCRIPT_DIR/compat.sh" "$CFG" review "${TIMEOUT_BIN[@]}" --kill-after=5s "$CODERABBIT_TIMEOUT" coderabbit review --agent --base-commit "$WAVE_BASE" >"$CR_RAW" 2>"$CR_STDERR" & CR_PID=$!
-BUILD_RC=0; wait "$BUILD_PID" || BUILD_RC=$?; BUILD_PID=""
+if [[ -n "$BUILD_PID" ]]; then wait "$BUILD_PID" || BUILD_RC=$?; BUILD_PID=""; fi
 CR_RC=0; wait "$CR_PID" || CR_RC=$?; CR_PID=""
 [[ "$BUILD_RC" != 77 && "$CR_RC" != 77 ]] || infra_fail "build/review resource admission failed" 77
-echo "   Build exit ${BUILD_RC}; CodeRabbit exit ${CR_RC}; parallel phase $(( $(date +%s) - started ))s"
+echo "   Build exit ${BUILD_RC}; CodeRabbit exit ${CR_RC}; build/review phase $(( $(date +%s) - started ))s"
 [[ ! -s "$CR_STDERR" ]] || cat "$CR_STDERR" >&2
 assert_verified_head; assert_clean_worktree
 [[ "$BUILD_RC" -ne 124 ]] || fail "build timed out (log: $BUILD_LOG)"

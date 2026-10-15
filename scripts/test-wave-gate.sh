@@ -61,6 +61,12 @@ run_suite() {
   jq -e '.ralph_status=="infrastructure_failed" and .infrastructure_failure.exit_code==77' "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1.json" >/dev/null || fail "$LABEL: missing infrastructure evidence"
   [[ ! -e "$CASE/specs/PROJ-1-test/5_progress/quality-build.json" ]] || fail "$LABEL: refused build received quality evidence"
   unset SKILLCHAIN_MEMINFO_FILE SKILLCHAIN_PSI_FILE SKILLCHAIN_CGROUP_DIR CR_CALL_LOG
+  case_dir single-capacity-build-review
+  export CR_CALL_LOG="$TMP/$PLATFORM-single-review"
+  write_config "$(default_config | jq '.resources={max_parallel_commands:1,wait_seconds:0} | .build_cmd="sleep 0.2; true"')"; commit_case
+  expect_rc 0 run_gate
+  [[ -s "$CR_CALL_LOG" ]] || fail "$LABEL: review did not run after sequential build"
+  unset CR_CALL_LOG
   [[ "${SC_RESOURCE_ONLY:-0}" != 1 ]] || return 0
 
   case_dir final-guidance

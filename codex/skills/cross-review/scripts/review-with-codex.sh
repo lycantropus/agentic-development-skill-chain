@@ -65,8 +65,8 @@ set +e; wait "$PID" 2>/dev/null; RC=$?; set -e
 trap 'rm -f "$RAW" "$RESOURCE_LOG"' EXIT
 cat "$RESOURCE_LOG" >&2
 # Inspect error envelopes only: a finding about rate limits is not provider failure.
-PROVIDER_ERRORS="$(jq -cs '[.[] | select(type == "object" and (.is_error == true or .type == "error" or .type == "turn.failed" or .error? != null))]' "$RAW" 2>/dev/null || true)"
-if [ -n "$PROVIDER_ERRORS" ] && grep -Eqi 'usage_limit_reached|insufficient_quota|rate_limit_exceeded|overloaded_error|quota[ _-]*(exhausted|exceeded)|usage limit|rate limit|HTTP[ /:_-]*429' <<<"$PROVIDER_ERRORS"; then
+PROVIDER_ERRORS="$(jq -Rsc '. as $raw | [(try ($raw | fromjson) catch ($raw | split("\n")[] | fromjson?)) | select(type == "object" and (.is_error == true or .type == "error" or .type == "turn.failed" or .error? != null))]' "$RAW" 2>/dev/null || true)"
+if [ "$RC" -ne 0 ] && [ -n "$PROVIDER_ERRORS" ] && grep -Eqi 'usage_limit_reached|insufficient_quota|rate_limit_exceeded|overloaded_error|quota[ _-]*(exhausted|exceeded)|usage limit|rate limit|HTTP[ /:_-]*429' <<<"$PROVIDER_ERRORS"; then
   echo "review-with-codex.sh: provider-unavailable (quota/rate limit/capacity); no review completed" >&2
   exit 75
 fi

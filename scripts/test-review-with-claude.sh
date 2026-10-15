@@ -69,6 +69,15 @@ stub "echo unreachable"
   || { echo "FAIL: adapter must name the 10 MB stdin ceiling (got: ${out:0:300})" >&2; exit 1; }
 
 # SC-14: a provider error is distinct from review content about rate limits.
+# A failed call may mix plain stderr with a structured quota envelope.
+stub "echo warning-before-json >&2; echo '{\"is_error\":true,\"type\":\"error\",\"error\":\"usage_limit_reached\"}'; exit 1"
+rc=0; run >/dev/null 2>&1 || rc=$?
+[ "$rc" -eq 75 ] || { echo "FAIL: mixed stderr quota must return 75, got $rc" >&2; exit 1; }
+# A recovered transient quota event cannot override a completed review.
+stub "echo '{\"is_error\":true,\"type\":\"error\",\"error\":\"usage_limit_reached\"}'; echo '{\"is_error\":false,\"structured_output\":{\"findings\":[{\"severity\":\"low\",\"category\":\"review-clean\",\"summary\":\"recovered review\"}]}}'; exit 0"
+rc=0; run >"$CASE/recovered-quota" 2>"$CASE/recovered-quota.err" || rc=$?
+[ "$rc" -eq 0 ] || { echo "FAIL: completed review after transient quota must succeed, got $rc" >&2; exit 1; }
+jq -e '.category == "review-clean"' "$CASE/recovered-quota" >/dev/null
 stub "echo '{\"is_error\":true,\"type\":\"error\",\"error\":\"usage_limit_reached\"}'; exit 1"
 rc=0; run >/dev/null 2>&1 || rc=$?
 [ "$rc" -eq 75 ] || { echo "FAIL: runtime quota must return 75, got $rc" >&2; exit 1; }

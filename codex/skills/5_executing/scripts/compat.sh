@@ -153,11 +153,21 @@ memory_psi_full() {
   awk '/^full/{for(i=1;i<=NF;i++) if($i ~ /^avg10=/){v=substr($i,7); print int(v)}}' "${SKILLCHAIN_PSI_FILE:-/proc/pressure/memory}" 2>/dev/null || true
 }
 
-# A nested command may share only a live inherited kernel or portable owner lease.
+_resource_owner_identity() {
+  local state identity
+  read -r state identity < <(LC_ALL=C TZ=UTC ps -p "$1" -o stat= -o lstart= 2>/dev/null)
+  [[ -n "$identity" && "$state" != Z* ]] || return 1
+  printf '%s\n' "$identity"
+}
+
+# Descendants share a private random receipt tied to the live guard's process identity, never its lock descriptor.
 resource_lease_held() {
-  [[ "${SKILLCHAIN_RESOURCE_ACTIVE:-}" == 1 && -n "${SKILLCHAIN_RESOURCE_LOCK_FILE:-}" ]] || return 1
-  [[ /dev/fd/19 -ef "$SKILLCHAIN_RESOURCE_LOCK_FILE" ]] ||
-    { [[ "$(cat "$SKILLCHAIN_RESOURCE_LOCK_FILE.d/pid" 2>/dev/null)" == "${SKILLCHAIN_RESOURCE_LOCK_OWNER:-none}" ]] && kill -0 "${SKILLCHAIN_RESOURCE_LOCK_OWNER:-}" 2>/dev/null; }
+  local owner="${SKILLCHAIN_RESOURCE_LOCK_OWNER:-}" lease="${SKILLCHAIN_RESOURCE_LEASE_FILE:-}" identity
+  local dir="${SKILLCHAIN_RESOURCE_LOCK_DIR:-${TMPDIR:-/tmp}/skillchain-resources-${UID}}"
+  [[ "${SKILLCHAIN_RESOURCE_ACTIVE:-}" == 1 && "$owner" =~ ^[1-9][0-9]*$ && "$lease" == "$dir"/lease.* && "${lease#"$dir"/}" != */* && -f "$lease" ]] || return 1
+  node -e 'const fs=require("fs");try {for(const [p,d] of [[process.argv[1],true],[process.argv[2],false]]){const s=fs.lstatSync(p);if(s.isSymbolicLink()||s.uid!==process.getuid()||(s.mode&0o077)||(d?!s.isDirectory():!s.isFile()))process.exit(1)}}catch{process.exit(1)}' "$dir" "$lease" || return 1
+  identity=$(_resource_owner_identity "$owner") || return 1
+  [[ -n "$identity" && "$(cat "$lease")" == "$(printf '%s\n' "$owner" "$identity" "${SKILLCHAIN_RESOURCE_LOCK_FILE:-}")" ]]
 }
 
 # Called only by resource_run's signal traps; child is its owned process-group leader.
@@ -178,7 +188,7 @@ _resource_cancel() {
 # Missing config uses defaults; missing telemetry warns (never invents an OOM diagnosis).
 # Nested calls share the outer slot. Limits cover participating commands, not unrelated processes.
 resource_run() (
-  local cfg="$1" label="$2" policy min psi_limit wait workers cap deadline avail psi problem slot rc child=""
+  local cfg="$1" label="$2" policy min psi_limit wait workers cap deadline avail psi problem slot rc child="" receipt="" identity
   shift 2
   policy='{}'
   if [[ -f "$cfg" ]]; then policy=$(cat "$cfg") || return 64; fi
@@ -196,8 +206,8 @@ resource_run() (
   node -e 'const fs=require("fs"),s=fs.lstatSync(process.argv[1]);if(!s.isDirectory()||s.isSymbolicLink()||s.uid!==process.getuid()||(s.mode&0o077))process.exit(1)' "$lockdir" || { echo "unsafe resource lock directory: $lockdir" >&2; return 77; }
   # Kernel locks release on exit; the portable mkdir fallback deliberately never reaps a racing owner.
   local COMPAT_LOCK_NO_REAP=1
-  _COMPAT_LOCK_DIRS=(); _COMPAT_TRAPPED=""
-  trap '_compat_unlock' EXIT
+  _COMPAT_LOCK_DIRS=(); _COMPAT_TRAPPED=1 # this scope installs the complete EXIT cleanup itself
+  trap '[[ -z "$receipt" ]] || rm -f "$receipt"; _compat_unlock' EXIT
   trap '_resource_cancel 143' TERM
   trap '_resource_cancel 130' INT
   trap '_resource_cancel 129' HUP
@@ -216,10 +226,15 @@ resource_run() (
       for ((slot=1; slot<=cap; slot++)); do
         if lock_acquire 19 exclusive 0 "$lockdir/slot-$slot"; then
           export SKILLCHAIN_RESOURCE_ACTIVE=1 SKILLCHAIN_RESOURCE_LOCK_FILE="$lockdir/slot-$slot" SKILLCHAIN_RESOURCE_LOCK_OWNER="$BASHPID"
+          identity=$(_resource_owner_identity "$SKILLCHAIN_RESOURCE_LOCK_OWNER") || return 77
+          [[ -n "$identity" ]] || return 77
+          receipt=$(mktemp "$lockdir/lease.XXXXXX") || return 77
+          printf '%s\n' "$SKILLCHAIN_RESOURCE_LOCK_OWNER" "$identity" "$SKILLCHAIN_RESOURCE_LOCK_FILE" >"$receipt" || return 77
+          export SKILLCHAIN_RESOURCE_LEASE_FILE="$receipt"
           if [[ "$workers" -gt 0 ]]; then export VITEST_MAX_WORKERS="${VITEST_MAX_WORKERS:-$workers}"; fi
           # Job control gives external commands and shell functions an owned group; disable notifications before waiting.
           set -m
-          (set +m; "$@") <&0 & child=$!
+          (exec 19>&-; set +m; "$@") <&0 & child=$!
           set +m
           rc=0; wait "$child" || rc=$?; child=""
           return "$rc"

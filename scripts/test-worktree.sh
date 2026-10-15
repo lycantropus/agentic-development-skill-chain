@@ -717,3 +717,21 @@ rc=0
 [ "$rc" -eq 77 ] || fail "install pressure must return 77, got $rc: $(cat "$TMP_ROOT/pressure.log")"
 [ ! -e "$RESOURCE_INSTALL_MARKER" ] || fail "install pressure launched npm"
 ok "dependency installer refuses pressure before launch"
+
+# Legacy plans must apply their own installer resource policy.
+legacy_repo="$TMP_ROOT/legacy-pressure/control"
+mkdir -p "$(dirname "$legacy_repo")"
+init_repo "$legacy_repo" 92 legacy absent
+printf '{"name":"legacy-resource-fixture","private":true}\n' >"$legacy_repo/package.json"
+printf '{"lockfileVersion":3,"packages":{}}\n' >"$legacy_repo/package-lock.json"
+mv "$legacy_repo/specs/PROJ-92-legacy/3-4_plan" "$legacy_repo/specs/PROJ-92-legacy/6_plan"
+legacy_config="$legacy_repo/specs/PROJ-92-legacy/6_plan/wave-gate-config.json"
+jq '.resources={min_available_mb:1024,wait_seconds:0}' "$legacy_config" >"$TMP_ROOT/legacy-config-new"
+mv "$TMP_ROOT/legacy-config-new" "$legacy_config"
+git -C "$legacy_repo" add .
+git -C "$legacy_repo" commit -qm "legacy pressure fixture"
+rc=0
+(cd "$legacy_repo" && PATH="$fake_bin:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP_ROOT/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP_ROOT/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP_ROOT/resources" "$HELPER" prepare 92 legacy >"$TMP_ROOT/legacy-pressure.log" 2>&1) || rc=$?
+[ "$rc" -eq 77 ] || fail "legacy install pressure must return 77, got $rc: $(cat "$TMP_ROOT/legacy-pressure.log")"
+[ ! -e "$RESOURCE_INSTALL_MARKER" ] || fail "legacy install pressure launched npm"
+ok "legacy dependency installer uses the validated plan policy"

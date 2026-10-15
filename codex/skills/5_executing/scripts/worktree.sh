@@ -114,7 +114,7 @@ detect_dev_port() {
     echo "$SKILLCHAIN_DEV_PORT"
     return
   fi
-  config="$worktree/specs/PROJ-${proj}-${theme}/3-4_plan/wave-gate-config.json"
+  config="$(plan_config "$worktree" "$proj" "$theme")"
   [ -f "$config" ] || { echo null; return; }
   url="$(jq -r '.frontend.dev_url // empty' "$config" 2>/dev/null || true)"
   [ -n "$url" ] || { echo null; return; }
@@ -128,7 +128,11 @@ detect_dev_port() {
 # Optional wave-gate-config.json keys (validated here again: this runs before the plan gate can be trusted by a resume):
 #   app_root       relative directory holding package.json + lockfile (default ".")
 #   worktree_links [{path,target}] git-ignored symlinks created after the install (e.g. prototype node_modules -> app/node_modules)
-plan_config() { echo "$1/specs/PROJ-$2-$3/3-4_plan/wave-gate-config.json"; }
+plan_config() {
+  local plan_dir="$1/specs/PROJ-$2-$3/3-4_plan"
+  [ -d "$plan_dir" ] || plan_dir="$1/specs/PROJ-$2-$3/6_plan"
+  echo "$plan_dir/wave-gate-config.json"
+}
 
 safe_relpath() { # <label> <value> — repo-relative, no absolute path, no .. segment
   case "$2" in
