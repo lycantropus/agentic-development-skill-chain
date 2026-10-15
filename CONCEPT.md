@@ -589,12 +589,12 @@ development database and the hosted-auth budget shared and serialized
 through the common lock); sync the framework helpers into the repo;
 permission and CodeRabbit-config preflight; tool + auth preflight of the §7
 list (both provider auth states, Ponytail parity, migration drift — `codex`
-missing sets `degraded`, never silently); verify the verifier with one
+missing sets `degraded`, never silently); commit a checkpoint (the negative
+control's clean-tree gate stays strict); verify the verifier with one
 controlled red gate; suggest static-check commands; write the ground file
 (the judgment step: validated assumptions `docs/` does not already state);
 compile the worker files for every wave once — delivered by path in each
-spawn prompt, no hook, canonical for both providers; commit a checkpoint before the
-negative control (its clean-tree gate stays strict) and seal `P0:done` with a
+spawn prompt, no hook, canonical for both providers; seal `P0:done` with a
 second setup commit. Procedure: [setup.md](claude/skills/5_executing/subskills/setup.md);
 the sequence diagram and the worker-file layout in
 [how-it-works.md](docs/how-it-works.md#p0-one-setup-run); lock diagnosis
