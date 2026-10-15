@@ -123,6 +123,45 @@ detect_dev_port() {
   case "$port" in ''|*[!0-9]*) echo null ;; *) echo "$port" ;; esac
 }
 
+# Optional wave-gate-config.json keys (validated here again: this runs before the plan gate can be trusted by a resume):
+#   app_root       relative directory holding package.json + lockfile (default ".")
+#   worktree_links [{path,target}] git-ignored symlinks created after the install (e.g. prototype node_modules -> app/node_modules)
+plan_config() { echo "$1/specs/PROJ-$2-$3/3-4_plan/wave-gate-config.json"; }
+
+safe_relpath() { # <label> <value> — repo-relative, no absolute path, no .. segment
+  case "$2" in
+    ''|/*|..|../*|*/..|*/../*) die "$1 must be a relative path without '..': '$2'" ;;
+  esac
+}
+
+app_root_of() { # <checkout> proj theme -> relative app dir, "." by default
+  local config rel
+  config="$(plan_config "$1" "$2" "$3")"
+  rel="$(jq -r '.app_root // "."' "$config" 2>/dev/null)" || die "cannot read app_root from $config"
+  [ "$rel" = . ] || { safe_relpath app_root "$rel"; [ -d "$1/$rel" ] || die "app_root '$rel' is not a directory in $1"; }
+  echo "$rel"
+}
+
+link_worktree_assets() { # worktree proj theme
+  local worktree="$1" config path target link dest
+  config="$(plan_config "$worktree" "$2" "$3")"
+  while IFS=$'\t' read -r path target; do
+    [ -n "$path" ] || continue
+    safe_relpath "worktree_links.path" "$path"; safe_relpath "worktree_links.target" "$target"
+    git -C "$worktree" check-ignore -q -- "$path" || die "worktree_links path '$path' must be git-ignored"
+    [ -e "$worktree/$target" ] || die "worktree_links target '$target' does not exist in the worktree (install first)"
+    [ -d "$(dirname "$worktree/$path")" ] || die "worktree_links parent of '$path' is missing"
+    link="$(realpath -m --relative-to="$(dirname "$worktree/$path")" "$worktree/$target")"
+    dest="$worktree/$path"
+    if [ -L "$dest" ]; then
+      [ "$(readlink "$dest")" = "$link" ] || die "$path is a symlink to something else"
+    else
+      [ ! -e "$dest" ] || die "$path exists and is not the declared symlink"
+      ln -s "$link" "$dest"
+    fi
+  done < <(jq -r '(.worktree_links // [])[] | [.path, .target] | @tsv' "$config" 2>/dev/null)
+}
+
 dependency_kind() {
   local root="$1" found=()
   [ -f "$root/pnpm-lock.yaml" ] && found+=(pnpm)
@@ -139,7 +178,7 @@ dependency_kind() {
 }
 
 install_dependencies() {
-  local worktree="$1" kind="$2"
+  local worktree="$1/$3" kind="$2"
   [ ! -L "$worktree/node_modules" ] || die "$worktree/node_modules is a symlink; dependencies must stay isolated"
   case "$kind" in
     none) echo not_applicable ;;
@@ -212,7 +251,7 @@ hide_env_during_install() {
 prepare() {
   [ $# -eq 2 ] || usage
   local proj="$1" theme="$2" branch control control_parent repo_name root target
-  local registered target_branch env_status dep_kind dep_status dep_rc env_hidden base_sha tag tag_sha dev_port metadata state target_lifecycle
+  local app_root registered target_branch env_status dep_kind dep_status dep_rc env_hidden base_sha tag tag_sha dev_port metadata state target_lifecycle
   branch="proj/PROJ-${proj}"
   control="$(canonical_path "$(git rev-parse --show-toplevel 2>/dev/null)")" || die "not inside the control checkout"
   [ "$(canonical_path "$PWD")" = "$control" ] || die "prepare must run from the control checkout root: $control"
@@ -224,7 +263,8 @@ prepare() {
     || die "state at committed control HEAD is not CP1:approved"
   validate_wave_plan "$control" "$proj" "$theme" >&2
   env_status="$(validate_env_source "$control")"
-  dep_kind="$(dependency_kind "$control")"
+  app_root="$(app_root_of "$control" "$proj" "$theme")"
+  dep_kind="$(dependency_kind "$control/$app_root")"
 
   control_parent="$(dirname "$control")"
   repo_name="$(basename "$control")"
@@ -274,7 +314,7 @@ prepare() {
 
   env_hidden="$(hide_env_during_install "$control" "$target" "$env_status")"
   set +e
-  dep_status="$(install_dependencies "$target" "$dep_kind")"
+  dep_status="$(install_dependencies "$target" "$dep_kind" "$app_root")"
   dep_rc=$?
   set -e
   if [ "$dep_rc" -ne 0 ]; then
@@ -284,6 +324,7 @@ prepare() {
     fi
     die "reproducible dependency install failed with exit $dep_rc; managed env state restored"
   fi
+  link_worktree_assets "$target" "$proj" "$theme"
   # Install before linking secrets: lifecycle/postinstall output can never
   # observe or print .env.local during dependency setup.
   link_env "$control" "$target" "$env_status"
@@ -394,10 +435,12 @@ cleanup() {
     retain "$proj" "$theme" "worktree has tracked or untracked changes"
     return 1
   fi
-  local ignored entry unexpected=()
+  local ignored entry declared_links unexpected=()
   ignored="$(git -C "$worktree" ls-files --others --ignored --exclude-standard)"
+  declared_links="$(jq -r '(.worktree_links // [])[].path' "$(plan_config "$worktree" "$proj" "$theme")" 2>/dev/null || true)"
   while IFS= read -r entry; do
     [ -n "$entry" ] || continue
+    grep -qxF -- "$entry" <<<"$declared_links" && [ -L "$worktree/$entry" ] && continue
     case "$entry" in
       node_modules/*|*/node_modules/*) : ;;
       "specs/PROJ-${proj}-${theme}/.state.lock") : ;;

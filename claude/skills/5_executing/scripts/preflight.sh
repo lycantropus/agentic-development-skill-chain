@@ -70,10 +70,13 @@ for tool in git gh claude node jq coderabbit realpath flock unlink; do
 done
 
 # npm or pnpm — hard when the project builds with node (package.json present)
-if [ -f package.json ]; then
+APP_ROOT="."
+[ -f "$GATE_CFG" ] && APP_ROOT=$(jq -r 'if (.app_root | type) == "string" then .app_root else "." end' "$GATE_CFG" 2>/dev/null || echo .)
+case "$APP_ROOT" in ''|/*|..|../*|*/..|*/../*) APP_ROOT="." ;; esac # an invalid app_root is the plan validator's and worktree.sh's job to refuse
+if [ -f "$APP_ROOT/package.json" ]; then
   if have pnpm || have npm; then say "✓ npm/pnpm"; else say "❌ npm/pnpm MISSING (hard — package.json present)"; HARD_MISSING+=("npm/pnpm"); fi
 else
-  say "– npm/pnpm: no package.json, not required"
+  say "– npm/pnpm: no $APP_ROOT/package.json, not required"
 fi
 
 # agent-browser — hard for legacy per-wave routes and structured top-level routes

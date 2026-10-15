@@ -602,8 +602,11 @@ stop_dev_server
 assert_verified_head; assert_clean_worktree
 
 step "4/6 Component registry"
-if [[ -f scripts/gen-component-registry.mjs && ( -d src/components || -d src/features ) ]]; then
-  set +e; node scripts/gen-component-registry.mjs --check; REG_RC=$?; set -e
+APP_ROOT="$(jq -r 'if (.app_root | type) == "string" then .app_root else "." end' "$CFG" 2>/dev/null || echo .)"
+case "$APP_ROOT" in ''|/*|..|../*|*/..|*/../*) fail "invalid app_root '$APP_ROOT' in wave-gate-config.json" ;; esac
+if [[ -f scripts/gen-component-registry.mjs && ( -d "$APP_ROOT/src/components" || -d "$APP_ROOT/src/features" ) ]]; then
+  REG_ARGS=(); [[ "$APP_ROOT" == . ]] || REG_ARGS=("$APP_ROOT" --out docs/components.md)
+  set +e; node scripts/gen-component-registry.mjs "${REG_ARGS[@]}" --check; REG_RC=$?; set -e
   [[ "$REG_RC" -eq 0 || "$REG_RC" -eq 3 ]] || fail "component registry out of date"
 else echo "   (component registry unavailable/not applicable — skipped)"; fi
 

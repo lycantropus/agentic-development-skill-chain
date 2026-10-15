@@ -182,6 +182,43 @@ if (cd "$repo" && "$HELPER" prepare 24 upsilon >/dev/null 2>&1); then fail "mult
 git -C "$repo" show-ref --verify --quiet refs/heads/proj/PROJ-24 && fail "lockfile conflict left a branch"
 ok "prepare rejects ambiguous reproducible dependency installers"
 
+# Nested app: install runs in app_root; declared ignored symlinks are created and survive cleanup.
+repo="$TMP_ROOT/nested-app/control"
+remote="$TMP_ROOT/nested-app/remote.git"
+mkdir -p "$(dirname "$repo")"
+init_repo "$repo" 25 phi absent "$remote"
+mkdir -p "$repo/app" "$repo/proto"
+printf '{"name":"fixture","private":true}\n' >"$repo/app/package.json"
+printf '{"name":"fixture","lockfileVersion":3,"packages":{}}\n' >"$repo/app/package-lock.json"
+: >"$repo/proto/index.js"
+printf 'node_modules\n' >>"$repo/.gitignore"
+cfg="$repo/specs/PROJ-25-phi/3-4_plan/wave-gate-config.json"
+jq '.app_root="app" | .worktree_links=[{path:"proto/node_modules",target:"app/node_modules"}]' "$cfg" >"$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+git -C "$repo" add -A && git -C "$repo" commit -qm "nested app"
+nested_bin="$TMP_ROOT/nested-bin"; mkdir -p "$nested_bin"
+printf '#!/usr/bin/env bash\n[ "$1" = ci ] || exit 9\n[ "$(basename "$PWD")" = app ] || exit 7\nmkdir -p node_modules\n' >"$nested_bin/npm"
+chmod +x "$nested_bin/npm"
+wt="$(cd "$repo" && PATH="$nested_bin:$PATH" "$HELPER" prepare 25 phi)"
+[ "$(jq -r .worktree.dependency_install "$wt/specs/PROJ-25-phi/state.json")" = installed ] || fail "nested app dependencies were not installed"
+[ -d "$wt/app/node_modules" ] && [ ! -e "$wt/node_modules" ] || fail "dependencies landed outside app_root"
+[ "$(readlink "$wt/proto/node_modules")" = ../app/node_modules ] || fail "declared worktree link missing or wrong"
+(cd "$repo" && PATH="$nested_bin:$PATH" "$HELPER" prepare 25 phi >/dev/null) || fail "prepare is not idempotent with declared links"
+merged_pr_bin="$TMP_ROOT/merged-pr-nested"; mkdir -p "$merged_pr_bin"
+printf '#!/usr/bin/env bash\n[ "$1 $2" = "pr view" ] || exit 9\nprintf "MERGED\\n"\n' >"$merged_pr_bin/gh"; chmod +x "$merged_pr_bin/gh"
+advance_to_p8_done "$wt" 25 phi
+head="$(git -C "$wt" rev-parse HEAD)"
+(cd "$repo" && PATH="$merged_pr_bin:$PATH" "$HELPER" cleanup 25 phi --ci-verified-head "$head" >"$TMP_ROOT/c.out" 2>&1) || { cat "$TMP_ROOT/c.out" >&2; jq -r .worktree.cleanup_reason "$wt/specs/PROJ-25-phi/state.json" >&2; fail "declared worktree link blocked cleanup"; }
+ok "app_root installs in the nested app and worktree_links are created, idempotent and cleanup-safe"
+
+repo="$TMP_ROOT/bad-link/control"
+mkdir -p "$(dirname "$repo")"
+init_repo "$repo" 26 chi absent
+cfg="$repo/specs/PROJ-26-chi/3-4_plan/wave-gate-config.json"
+jq '.worktree_links=[{path:"proto/node_modules",target:"missing"}]' "$cfg" >"$cfg.tmp" && mv "$cfg.tmp" "$cfg"
+git -C "$repo" add -A && git -C "$repo" commit -qm "bad link"
+if (cd "$repo" && "$HELPER" prepare 26 chi >/dev/null 2>&1); then fail "worktree link to a missing target was accepted"; fi
+ok "worktree_links refuse non-ignored paths and missing targets"
+
 repo="$TMP_ROOT/dirty-root/control"
 mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 25 phi absent

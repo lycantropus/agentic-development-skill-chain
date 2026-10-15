@@ -361,6 +361,14 @@ function validateMain(args) {
     }
   }
 
+  const relPath = (v) => isText(v) && !path.isAbsolute(v) && !v.split(/[\\/]/).includes("..");
+  if (config.app_root !== undefined && !relPath(config.app_root)) fail("app_root must be a relative path without '..'");
+  if (config.worktree_links !== undefined) {
+    const links = config.worktree_links;
+    if (!Array.isArray(links) || !links.length || !links.every((l) => l && typeof l === "object" && relPath(l.path) && relPath(l.target))) {
+      fail("worktree_links must be a non-empty array of {path, target}, both relative paths without '..'");
+    }
+  }
   for (const key of ["coverage_cmd", "lint_cmd", "complexity_cmd", "arch_rules_cmd", "mutation_cmd"]) {
     if (config[key] !== undefined && !isText(config[key])) fail(`${key} must be a non-empty string`);
   }

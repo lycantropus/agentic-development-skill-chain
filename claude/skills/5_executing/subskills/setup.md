@@ -142,7 +142,11 @@ occupied target path is a hard stop.
 and Git ignores it. If only `.env.local.example` exists, stop and require the
 local secret file. Secret values are never printed or stored. Dependencies are
 installed reproducibly from the one supported lockfile inside the worktree;
-`node_modules` is never linked. The helper records `.worktree` metadata,
+`node_modules` is never linked. With `app_root` in `wave-gate-config.json` (a nested
+app, e.g. `app`), the lockfile, install, preflight package-manager check and
+wave-gate registry check all use that directory. `worktree_links` (`[{path, target}]`,
+git-ignored `path`) recreates ignored dev-asset symlinks, e.g. a prototype's
+`node_modules` -> `app/node_modules`, after the install. The helper records `.worktree` metadata,
 `.base_sha`, and `.branch` through `chain state`, including shared database mode,
 dev port (`SKILLCHAIN_DEV_PORT` or `frontend.dev_url`), and cleanup status.
 
@@ -292,7 +296,7 @@ versioned framework helpers available for the run.
 Before committing the copied files, run the target's existing lint command
 when it has one (`npm run lint --if-present`, or its configured equivalent)
 and `bash scripts/chain render registry --check` when component folders
-exist. Exit 3 means a hand-written or safety-refused registry: report it and
+exist (nested app: `bash scripts/chain render registry <app_root> --out docs/components.md --check`). Exit 3 means a hand-written or safety-refused registry: report it and
 do not overwrite it; any other non-zero registry result must be fixed before
 P0 is sealed.
 
