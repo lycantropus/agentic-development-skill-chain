@@ -5,6 +5,33 @@ description: "Create wave-based implementation plans from architecture + PRDs. O
 
 # Writing Plans
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Turn the PROJ architecture + all PRDs into **one plan file per wave** plus `wave-gate-config.json`. A wave is a set of user stories (possibly across PRDs) that can run in parallel. Plans say WHAT and in what order; workers derive HOW. DRY, YAGNI, TDD, frequent commits.
 
 ## Inputs
@@ -210,11 +237,11 @@ bash scripts/chain review plan <X> <theme> \
 
 ### 7. Hand off to Step 5
 
-Present waves, stories per wave, execution mode, and the cross-review result. Don't ask for approval — Checkpoint 1 approves architecture and plans together (auto-approves when both cross-reviews are clean). Then **end the turn**: this session carries every PRD, the architecture and all plans, and a model cannot compact its own context. The user runs `/compact` (or opens a fresh session) and invokes **executing-large-model** (5b, the default Step 5), which runs CP1 and P0 through its checkpoint and setup subskills before any implementation. This is a context flush, not an approval stop. Report a blocker instead only if Critical/High findings remain after round 3, a product decision is open, a PRD/architecture handback is unresolved, or the user wants to review the plans first.
+Present waves, stories per wave, execution mode, and the cross-review result. Don't ask for approval — Checkpoint 1 approves architecture and plans together (auto-approves when both cross-reviews are clean). Then **end the turn** and provide the next-session start prompt. The user opens a new session and invokes **executing-large-model** (5b, the default Step 5), which runs CP1 and P0 through its checkpoint and setup subskills before any implementation. The session boundary adds no new approval gate. Report a blocker instead only if Critical/High findings remain after round 3, a product decision is open, a PRD/architecture handback is unresolved, or the user wants to review the plans first.
 
 Say once, then end the turn:
 
-> "Plans complete in `specs/PROJ-<X>-<theme>/3-4_plan/` (wave plans + `wave-gate-config.json`). Run `/compact` (or open a fresh session), then `/5b_executing-large-model` (or `/5_executing` on a weaker model): it runs CP1 and P0 (branch + preflight) through the Step 5 subskills; the setup subskill installs the gate scripts and preflights `jq`, `coderabbit`, and browser tooling in the PROJ worktree. Quality Gate and QA follow the last wave automatically.
+> "Plans complete in `specs/PROJ-<X>-<theme>/3-4_plan/` (wave plans + `wave-gate-config.json`). Open a new session, then `/5b_executing-large-model` (or `/5_executing` on a weaker model): it runs CP1 and P0 (branch + preflight) through the Step 5 subskills; the setup subskill installs the gate scripts and preflights `jq`, `coderabbit`, and browser tooling in the PROJ worktree. Quality Gate and QA follow the last wave automatically.
 >
 > Once P0 is done, Step 5 asks whether to run P5 to a PR unattended or continue interactively."
 

@@ -5,6 +5,20 @@ description: "Create component-based or standalone HTML mockups, a visual sitema
 
 # Prototyping: Mockups, Sitemap And Findings
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Create component-based or standalone HTML mockups and a visual sitemap from the concept and the approved Visual Companion decision. This skill is visual and structural only: no technical architecture and no acceptance criteria.
 
 For UI features, this skill is required before `requirements-engineer`. Pure backend/API features skip it.

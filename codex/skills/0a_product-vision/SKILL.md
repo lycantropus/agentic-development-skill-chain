@@ -5,6 +5,20 @@ description: "Establish what a product IS before any feature is designed: interv
 
 # Product Vision — What Are We Building, And In What Order
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 The chain's highest zoom level. `concept` (1) turns ONE idea into ONE
 buildable PROJ concept; it has no artifact above the PROJ. So on a new
 product the question "what is this thing, and what is it deliberately not"

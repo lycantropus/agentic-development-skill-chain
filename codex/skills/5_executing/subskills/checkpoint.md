@@ -1,5 +1,7 @@
 # Checkpoint — Structured Reconcile Loop For CP1, Bootstrap, CP2
 
+At CP1 and CP2, write generated artifacts, decision logs, reports and handoff prompts in English; converse with the user in their language. The bootstrap variant follows its owning intake skill.
+
 Subskill of `5_executing`, not a standalone skill; any Step 5 lead
 (`5b_executing-large-model` by default, or `5_executing`) runs it at CP1: its caller (the
 "orchestrator" below) runs it through subagents, see **Roles**.

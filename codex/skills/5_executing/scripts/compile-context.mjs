@@ -135,8 +135,10 @@ function loadManifests() {
 function checkManifests(manifests) {
   for (const m of manifests) {
     if (!["implementer", "frontend-implementer", "backend-implementer"].includes(m.name)) continue;
+    if (/## Deine Story/.test(m.preamble))
+      fail(`${m.file}: preamble names the retired German story heading — refresh the manifest via sync-framework or use \`## Your Story\``, 2);
     if (/tasks\s+arrive\s+in\s+the\s+spawn\s+prompt/.test(m.preamble))
-      fail(`${m.file}: preamble still says the story arrives in the spawn prompt — take the current manifest via sync-framework or align it by hand (story and ACs are in the worker file's \`## Deine Story\`)`, 2);
+      fail(`${m.file}: preamble still says the story arrives in the spawn prompt — take the current manifest via sync-framework or align it by hand (story and ACs are in the worker file's \`## Your Story\`)`, 2);
     if (m.name === "implementer" && !m.inject.includes("design-system"))
       fail(`${m.file}: inject list lacks design-system — take the current manifest via sync-framework or align it by hand`, 2);
   }
@@ -312,7 +314,7 @@ function renderWave(wave, manifests) {
     let storyText;
     try { storyText = slice(text, target.story.id); }
     catch (error) { fail(`${path}: ${target.story.id}: ${error.message}`, 2); }
-    files.set(join(OUT_DIR, "workers", `wave-${wave}`, `${target.name}.md`), `${head(target.role)}${body}\n## Deine Story\n\n${storyText}`);
+    files.set(join(OUT_DIR, "workers", `wave-${wave}`, `${target.name}.md`), `${head(target.role)}${body}\n## Your Story\n\n${storyText}`);
     storyReport.push(`${target.name} (${target.role}, story ${tokens(storyText)} tokens)`);
   }
   return { files, breaches, stories, fallback: stories.some((s) => s.fallback) ? path : null,

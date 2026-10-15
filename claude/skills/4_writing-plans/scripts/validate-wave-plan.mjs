@@ -211,6 +211,9 @@ function validateMain(args) {
   if (!waves || typeof waves !== "object" || Array.isArray(waves)) {
     fail("config.waves must be an object");
   }
+  if (Object.hasOwn(config ?? {}, "sonar_required") && typeof config.sonar_required !== "boolean") {
+    fail("sonar_required must be boolean when present");
+  }
   if (!isText(config?.sonar_cmd)) {
     fail("sonar_cmd must be a non-empty top-level string");
   }

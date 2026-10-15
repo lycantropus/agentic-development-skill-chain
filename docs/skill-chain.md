@@ -1,5 +1,14 @@
 # Skill Chain
 
+## Artifact language
+
+From Requirements Engineer (Step 2) onward, all newly authored artifacts are
+English, including PRDs, review findings, plans, handoffs, worker/QA reports,
+documentation and PR descriptions. Conversation may use the user's language.
+Identifiers, verbatim source evidence and required product localization are
+preserved. Non-English canonical ACs are revised and approved in their owning
+PRD before downstream verbatim copying; a planner does not translate them.
+
 ## Flow
 
 ```mermaid
@@ -40,7 +49,7 @@ The chain serves two delivery tracks: the full in-repo build (Steps 1–7) and a
 
 PRD structure is checked before Step 2 review; Step 3 checks PRD inputs and architecture output; Step 4 checks both inputs and its plan/config output. CP1 repeats all three checks before approval. Failures return to the owning skill; reviews still judge meaning and completeness.
 
-Architecture (3) continues into writing-plans (4) without a stop when its cross-review is clean; writing-plans ends its turn so the user can flush the session (`/compact` or a fresh one) before Step 5 (`executing-large-model`, 5b) — which opens with Checkpoint 1 — a context flush, not an approval stop; Checkpoint 1 is the single human approval of the planning package and cascades changes back into both. Either skill still stops on remaining Critical/High findings, open product decisions, or an explicit request to review one artifact alone. If planning exposes a PRD or architecture defect, it returns to the owning skill and its required cross-review before continuing to executing.
+Through Step 4, each producing skill has its own user-started session, including the optional discovery skills. Finish the current skill's checks, automatic cross-review, reconciliation and required user review before handing off. End with a copyable prompt containing the next skill, workspace, PROJ, actual artifact paths and blockers; the next session reloads these inputs. Internal helpers and cross-review stay in the current session. `/compact` does not satisfy this boundary. Architecture hands off to writing-plans in a new session, and writing-plans hands off to Step 5 in another new session. Checkpoint 1 remains the joint approval of architecture and plans; no additional approval gate is introduced. Blocked artifacts return to their owning skill through the same session boundary.
 
 `cross-review`, `bugfixing`, `refactor-dreamer`, `sonar-cli`, `update-chain` and `vibecoder` intentionally sit outside this flow. Step 5 has two skills with identical gates and state contracts: `5b_executing-large-model` is the default, with procedure reduced to invariants; `5_executing` is the full-procedure alternative for weaker writer models and hosts the shared subskills, scripts and the references both skills point to — shared rules live there once, and `validate.sh` caps 5b at 350 lines. `cross-review` is a mechanism, not a step — it is invoked by producing skills and never routed to directly, which is why it carries no chain number. Concept, requirements, architecture, and plan reviews start automatically as soon as their outputs are saved and applicable structure/cap checks pass, before user approval or handoff. Concept and requirements repeat the review automatically after user-requested changes. P6 QA and P7 documentation also require it. Use `bugfixing` for a reported defect that needs reproduction, a narrow repair, regression-test proof, and test-escape analysis without starting a feature PROJ. Launch `refactor-dreamer` separately for a long-form architecture drift/refactor discovery run, then feed its `chain-input.md` into the appropriate chain step. Use `sonar-cli` separately for SonarScanner/SonarQube CLI setup, analysis runs, and issue triage. Use `vibecoder` for a freeform exploratory coding session on a scratch branch: it keeps a live journal while you experiment, then distills it into a `chain-input.md` that feeds `1_concept` as raw input.
 

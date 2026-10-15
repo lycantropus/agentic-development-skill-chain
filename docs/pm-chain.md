@@ -2,6 +2,23 @@
 
 A track for pure product management: concept, wireframe, mockup, iterate with stakeholders, reconcile the concept, and hand a PRD to a developer via [Linear](https://linear.app). **No code is written and there is no codebase here.** The same skills as the full chain are reused — only the path through them and the endpoint differ.
 
+## Artifact language
+
+From Requirements Engineer (Step 2) onward, all newly authored artifacts are
+English, including PRDs, review findings, plans, handoffs, worker/QA reports,
+documentation and PR descriptions. Conversation may use the user's language.
+Identifiers, verbatim source evidence and required product localization are
+preserved. Non-English canonical ACs are revised and approved in their owning
+PRD before downstream verbatim copying; a planner does not translate them.
+
+## Sessions between steps
+
+Run each producing discovery skill in a new user-started session. Finish its
+checks, automatic cross-review, corrections and user review before stopping.
+Use the final copyable prompt to start the next skill with the saved artifact
+paths. Internal review stays in the current session; `/compact` does not replace
+the session boundary. No additional approval gate or handoff file is required.
+
 ## Flow
 
 ```mermaid

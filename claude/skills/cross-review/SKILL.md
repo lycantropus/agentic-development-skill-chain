@@ -12,6 +12,15 @@ invokes it automatically when its outputs are saved, before user approval or
 handoff. Concept, architecture, plan, requirements, QA, and P7 documentation
 reviews are mandatory gates; do not ask the user whether to start them.
 
+## Artifact Language
+
+In requirements, architecture, plan, QA and documentation mode, write finding
+summaries and review records in English, even for non-English source material.
+Flag newly authored non-English prose in artifacts from Step 2 onward; preserve
+paths, identifiers, quoted evidence and intended product localization. Concept
+reviews keep the concept's chosen language. User-facing explanations may use
+the user's language.
+
 ## Modes
 
 | Mode | Artifact | Review focus |

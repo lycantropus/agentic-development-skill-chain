@@ -80,7 +80,7 @@ A worker reads exactly one compiled file, named by path in its spawn prompt. Not
 | Project context for the role (its `inject` list) | `docs/PRODUCT.md`, `ARCHITECTURE.md`, `GUIDELINES.md`, `DESIGN-SYSTEM.md` or the security baseline, `ground-file.md` |
 | PROJ architecture, filtered to the PRDs of the wave | the PROJ architecture document |
 | API contracts of the wave | architecture and plan |
-| `## Deine Story` (story files only: story, ACs, gate commands) | the wave plan, cut out verbatim by `chain render slice` |
+| `## Your Story` (story files only: story, ACs, gate commands) | the wave plan, cut out verbatim by `chain render slice` |
 
 The role comes from the `Agent Type` column of the wave plan. Micro-fixer and explore spawns get no file. Whole PRDs, other stories' plans, `progress.md` and `agent.md` files are never injected. A role over its token budget makes `compile` fail before anything is written.
 

@@ -5,6 +5,20 @@ description: "Reconcile mockup iteration changes back into the concept before re
 
 # Concept Sync — Reconcile Mockup Iterations Into The Concept
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 During mockup review, stakeholders iterate by prompting changes directly into the mockups until everyone agrees. Those agreed changes drift away from the original concept. This skill closes that loop: it reads the tracked changes and updates the concept so the concept again reflects what was actually decided — before requirements are written.
 
 This is the bridge between visual iteration and `requirements-engineer`. It is the primary reconciliation step in the **Product Discovery track** (concept → visual-companion → prototyping ⟳ → concept-sync → requirements-engineer), and it is equally valid in the full 0-to-8 chain whenever mockups were iterated after the concept was written.

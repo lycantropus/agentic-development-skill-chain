@@ -5,6 +5,19 @@ description: "Default Step 5 of the chain: run Checkpoint 1 and P0 setup through
 
 # Executing — large-model variant (default Step 5)
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
 The chain's default execution skill. Same gates as `5_executing`, less
 procedure. This skill keeps every deterministic contract of
 `5_executing` (state, progress file, wave tag, wave gate, Outer Ralph recovery,

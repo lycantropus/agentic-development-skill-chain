@@ -159,8 +159,8 @@ W="$CTX/workers/wave-1/PROJ-1-PRD-1-US-1.md"
 PLAN1="specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-1-plan.md"
 [ "$(head -1 "$W")" = "Generated from $PLAN1 @ $(sha256sum "$PLAN1" | cut -c1-12) · role backend-implementer · wave 1" ] || die "story file header wrong: $(head -1 "$W")"
 bash "$SKILL/scripts/chain" render slice "$PLAN1" PROJ-1-PRD-1-US-1 >"$CASE/slice.out"
-sed '1,/^## Deine Story$/d' "$W" | tail -n +2 | cmp - "$CASE/slice.out" || die "story part is not the slice byte for byte"
-[ "$(tail -n +3 "$W" | sed '/^## Deine Story$/,$d')" = "$(tail -n +3 "$B")" ] || die "story file role context differs from the role file"
+sed '1,/^## Your Story$/d' "$W" | tail -n +2 | cmp - "$CASE/slice.out" || die "story part is not the slice byte for byte"
+[ "$(tail -n +3 "$W" | sed '/^## Your Story$/,$d')" = "$(tail -n +3 "$B")" ] || die "story file role context differs from the role file"
 grep -qF 'STORY_ONE_AC' "$B" && die "story leaked into the role file"
 # Split: contract -> two files with the side roles; fan-out -> one shared file
 for side in backend frontend; do
@@ -189,7 +189,7 @@ sha256sum -c --quiet "$CASE/foreign.sha" || die "compile touched a foreign agent
 T_PRODUCT='Product (docs/PRODUCT.md)'; T_ARCH='Architecture overview (docs/ARCHITECTURE.md)'; T_PROJ='PROJ architecture ('
 T_GUIDE='Guidelines (docs/GUIDELINES.md)'; T_DS='Design system (docs/DESIGN-SYSTEM.md)'; T_COMP='Component registry (docs/components.md)'
 T_API='API contracts — own wave only'; T_SEC='Security baseline (docs/security-baseline.md)'; T_TEST='Test conventions (docs/test-conventions.md)'
-T_GROUND='Validated assumptions ('; T_CRIT='Review criteria'; T_DIFF='Diff scope'; T_STORY='Deine Story'
+T_GROUND='Validated assumptions ('; T_CRIT='Review criteria'; T_DIFF='Diff scope'; T_STORY='Your Story'
 sections() { # file, then +title (must have a "## title..." line) / -title (must not)
   local f="$1" spec t; shift
   for spec in "$@"; do
@@ -214,7 +214,7 @@ for f in "$CTX"/workers/wave-1/*.md; do sections "$f" "+$T_STORY"; done  # every
 ls "$CTX"/workers/wave-1 | grep -q reviewer && die "reviewer got a worker file"
 # the preambles agree with the file: story in the file, design system also for the full-stack role
 for r in implementer frontend-implementer backend-implementer; do
-  grep -qF 'are in the `## Deine Story` section of this' "$CTX/roles/wave-1/$r.md" || die "$r preamble does not point to the story section"
+  grep -qF 'are in the `## Your Story` section of this' "$CTX/roles/wave-1/$r.md" || die "$r preamble does not point to the story section"
   grep -qF 'arrive in the spawn prompt from the orchestrator' "$CTX/roles/wave-1/$r.md" && die "$r preamble still says the story is in the spawn prompt"
 done
 grep -qF 'stays with frontend-implementer' "$CTX/roles/wave-1/implementer.md" && die "implementer preamble still keeps the design system with the frontend"
@@ -239,7 +239,7 @@ n=0
 for f in "$CTX"/workers/wave-*/*.md; do
   w="${f#*/workers/wave-}"; w="${w%%/*}"; id="$(basename "$f" .md)"; id="${id%.backend}"; id="${id%.frontend}"
   bash "$SKILL/scripts/chain" render slice "specs/PROJ-1-demo/3-4_plan/PROJ-1-wave-$w-plan.md" "$id" >"$CASE/slice.out"
-  sed '1,/^## Deine Story$/d' "$f" | tail -n +2 | cmp - "$CASE/slice.out" || die "$f: story part is not the slice byte for byte"
+  sed '1,/^## Your Story$/d' "$f" | tail -n +2 | cmp - "$CASE/slice.out" || die "$f: story part is not the slice byte for byte"
   n=$((n+1))
 done
 [ "$n" -eq 5 ] || die "expected 5 story files, found $n"
@@ -408,7 +408,7 @@ printf '\n```md\n## not a story heading\n```\n' >>"$PLAN1"
 sed -i 's/$/\r/' "$PLAN1" "$P/3-4_plan/PROJ-1-architecture.md"
 run compile 1 demo --wave 1 >/dev/null || die "CRLF plan failed to compile"
 bash "$SKILL/scripts/chain" render slice "$PLAN1" PROJ-1-PRD-1-US-3 >"$CASE/slice.out"
-sed '1,/^## Deine Story$/d' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" | tail -n +2 | cmp - "$CASE/slice.out" || die "CRLF story part is not the slice byte for byte"
+sed '1,/^## Your Story$/d' "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md" | tail -n +2 | cmp - "$CASE/slice.out" || die "CRLF story part is not the slice byte for byte"
 grep -qF 'Decision 1: Server-side totals' "$B" || die "CRLF architecture lost its decisions"
 restore_plans; cp "$CASE/arch.keep" "$P/3-4_plan/PROJ-1-architecture.md"
 
@@ -445,7 +445,7 @@ mkdir -p specs/PROJ-3-noplan
 mkdir -p templates/roles
 cp "$SKILL"/manifests/roles/*.md templates/roles/
 node "$COMPILE" compile 1 demo --wave 1 >/dev/null || die "unchanged local manifests rejected"
-sed -i 's/^Your story and its ACs are in the `## Deine Story` section of this$/Your US, ACs, and tasks arrive in the spawn prompt from the orchestrator./' templates/roles/frontend-implementer.md
+sed -i 's/^Your story and its ACs are in the `## Your Story` section of this$/Your US, ACs, and tasks arrive in the spawn prompt from the orchestrator./' templates/roles/frontend-implementer.md
 snap >"$CASE/before.snap"
 [ "$(rc node "$COMPILE" compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'templates/roles/frontend-implementer.md' "$CASE/err" || die "old local preamble: want 2 naming the file"
 [ "$(rc node "$COMPILE" check 1 demo)" -eq 2 ] || die "check must report the old local preamble"
@@ -456,6 +456,12 @@ sha256sum -c "$CASE/stale-roles.sha" >/dev/null || die "pre-P0 check changed loc
 cp "$SKILL"/manifests/roles/*.md templates/roles/
 node "$COMPILE" check 1 demo >/dev/null || die "post-sync default check must accept the six current project roles"
 snap | cmp - "$CASE/before.snap" || die "manifest error changed files"
+cp "$SKILL/manifests/roles/frontend-implementer.md" templates/roles/
+# Retired heading references must fail before writing mismatched worker files.
+sed -i 's/## Your Story/## Deine Story/g' templates/roles/frontend-implementer.md
+snap >"$CASE/before.snap"
+[ "$(rc node "$COMPILE" compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'retired German story heading' "$CASE/err" || die "old heading must request a manifest refresh"
+snap | cmp - "$CASE/before.snap" || die "old heading error changed files"
 cp "$SKILL/manifests/roles/frontend-implementer.md" templates/roles/
 sed -i '/^  - design-system$/d' templates/roles/implementer.md
 [ "$(rc node "$COMPILE" compile 1 demo --wave 1)" -eq 2 ] && grep -qF 'design-system' "$CASE/err" || die "local implementer without design system: want 2"

@@ -81,10 +81,10 @@ Sonar runs at PROJ end, with an initial scan and at most three fix/rescan rounds
 command -v sonar >/dev/null && command -v sonar-scanner >/dev/null
 ```
 
-- If both commands exist, run this gate using the `sonar-cli` skill guidance.
-- If either command is missing, skip this gate and record `SonarCloud: skipped (sonar CLI unavailable)` in `5_progress/PROJ-<X>-progress.md`.
-- If both commands exist but the project has no Sonar config and no explicit user/plan requirement to create one, skip this gate and record `SonarCloud: skipped (project not configured)`.
-- `scripts/chain quality seal` rejects a skip when both CLIs and `sonar-project.properties` are present — treat this gate as required whenever the project is Sonar-configured.
+- Required analysis means `sonar_required: true` in the gate config **or** root `sonar-project.properties` exists. Optional `sonar_required` must be boolean; `false` never overrides project configuration. A non-empty `sonar_cmd` remains mandatory metadata but does not alone require analysis.
+- When analysis is required, run this gate using the `sonar-cli` skill guidance. Missing scanner engine/auth stops P0; missing analysis prerequisites stop this gate. Neither `sonar CLI unavailable` nor `project not configured` is an allowed skip, including when sealing evidence.
+- Otherwise the project is unconfigured and analysis optional. P0 records `sonar: project not configured` in its preflight skips. If either CLI is missing, record `SonarCloud: skipped (sonar CLI unavailable)`; if both exist, record `SonarCloud: skipped (project not configured)`.
+- Record Quality Gate skips through `chain quality … skip-sonar` below. P0 disposition is prerequisite evidence, not completed Quality Gate evidence. Malformed Sonar policy fails closed in the validator, P0 and Quality Gate.
 
 ### Steps
 

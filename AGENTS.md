@@ -9,3 +9,7 @@
 - Keep the framework helper scripts byte-identical across their skill copies (`chain`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `validate-prds.mjs`, `validate-architecture.mjs`, `validate-wave-plan.mjs`, `compile-context.mjs`, `story-slice.mjs`, `document-parser.mjs`, `architecture-parser.mjs`, `render.mjs`, `worktree.sh`, the role manifests, `curation.sh`, the cross-review scripts/template, `agent-md-entry.md.tmpl`, `findings.mjs`, `findings-store.mjs`, `runner/prompts/p6-controller.md` (also as `5_executing/references/p6-controller.md`), `in-session-driver.md`, `wave-gate.sh`, `quality.mjs`, the 8_delivery scripts/templates); `validate.sh` enforces this.
 - `merge-project-settings.sh` and `references/project-settings-template.json` are Claude-only by design (they edit `.claude/settings.json`); do not copy them into the Codex tree for symmetry. The `wave-gate-enforcer.js` hook is an optional personal Claude hook outside this repo; no skill may present it as shipped or required.
 - Run `./scripts/validate.sh` before publishing changes.
+
+- Through Step 4, producing skills hand off via a copyable prompt to a new user-started session; checks and automatic cross-review finish in the current skill session. Do not replace this boundary with `/compact` or auto-invoke the next producing skill.
+
+- From Requirements Engineer (Step 2) onward, all newly authored artifacts are English; user conversation may remain in the user's language. Preserve identifiers, verbatim evidence and intended product localization.

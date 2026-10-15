@@ -31,11 +31,18 @@ expect_failure() {
   fi
 }
 
-for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7' '.mutation_cmd=[]'; do
+for expression in '.coverage_cmd="npm run coverage"' '.build_artifacts=[]' '.lint_cmd=42' '.complexity_cmd=""' '.arch_rules_cmd=7' '.mutation_cmd=[]' '.sonar_required="false"' '.sonar_required=null' '.sonar_required=1'; do
   prepare_case plan-valid.md config-valid.json
   jq "$expression" "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
   mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
   if run_validator >"$CASE/output" 2>&1; then echo "invalid quality config accepted: $expression" >&2; exit 1; fi
+done
+
+for required in true false; do
+  prepare_case plan-valid.md config-valid.json
+  jq --argjson required "$required" '.sonar_required=$required' "$CASE/plan/wave-gate-config.json" >"$CASE/config.tmp"
+  mv "$CASE/config.tmp" "$CASE/plan/wave-gate-config.json"
+  run_validator >/dev/null
 done
 
 prepare_case plan-valid.md config-valid.json

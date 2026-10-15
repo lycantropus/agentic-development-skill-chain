@@ -1,5 +1,7 @@
 # Setup — P0 Subskill of Executing (runs as a subagent)
 
+Write generated artifacts, decision logs, reports and handoff prompts in English; converse with the user in their language.
+
 Owns the P0 phase of the agent workflow (CONCEPT.md §4). This is a
 subskill of `5_executing`, not a standalone skill: the Step 5 lead
 (`5b_executing-large-model` by default, or `5_executing`) spawns ONE subagent with this file as its instructions once
@@ -73,7 +75,44 @@ validation before it creates anything.
 
 ### 1. Persistent PROJ worktree + BASE_SHA
 
-From the control checkout root, run:
+**Protected changes in the supplied control checkout:** keep them untouched.
+Do not stash, discard, or commit unrelated edits to satisfy the clean gate.
+Instead, use a separate clean detached control worktree at the explicitly
+identified, committed CP1-approved SHA. Approval in the working copy alone is
+insufficient: confirm that this commit contains the approved plans and sealed
+`CP1:approved` state. If those exist only as uncommitted changes, stop and return
+to the checkpoint lead to seal and commit only the authorized CP1 artifacts.
+
+From the supplied checkout root, substitute the approved commit and a new,
+unoccupied absolute sibling path, then run:
+
+```bash
+ORIGINAL_CONTROL=$(git rev-parse --show-toplevel)
+CP1_SHA=$(git rev-parse --verify '<approved-commit>^{commit}') || exit 1
+git show "$CP1_SHA:specs/PROJ-<X>-<theme>/state.json" |
+  jq -e '.phase == "CP1" and .status == "approved"' >/dev/null || exit 1
+CLEAN_CONTROL=/absolute/path/to/repo-cp1-control
+git worktree add --detach "$CLEAN_CONTROL" "$CP1_SHA" || exit 1
+cd "$CLEAN_CONTROL" || exit 1
+[ -z "$(git status --porcelain)" ] || exit 1
+```
+
+Repeat step 0's plan consistency gate in this clean checkout, then run the
+ordinary `prepare` below; its clean-checkout gate remains mandatory. Ignored
+local environment files are not copied by Git: satisfy the existing environment
+requirements without printing secrets or copying unrelated changes. Record the
+original checkout, detached control path, and approved SHA in `progress.md` in
+the resulting PROJ worktree. The helper records the clean control path as
+`.worktree.control_path`. Keep both new worktrees through the normal delivery
+cleanup; the PROJ worktree can depend on its control checkout's environment.
+
+The default target uses the **control directory's basename**, so a control named
+`repo-cp1-control` produces `repo-cp1-control-proj<X>`, not `repo-proj<X>`.
+Do not guess the PROJ path: the returned path and recorded `.worktree.path` are
+authoritative, including on resume. Reuse the same clean control checkout for
+P0 retries; do not create another control checkout or retarget the base tag.
+
+From the clean control checkout root (the supplied checkout if already clean), run:
 
 ```bash
 WORKTREE=$(~/.claude/skills/5_executing/scripts/chain worktree prepare <X> <theme>)

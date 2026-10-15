@@ -5,6 +5,20 @@ description: "Define the design system — starting with a mood-led minimum set 
 
 # Frontend Design — Design System Definition
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Define the design system for a project before any UI is built: the visual design language (tokens) **and** the component catalog built from it, plus a showcase page that renders every component. This ensures every component, page, and interaction follows a coherent aesthetic — instead of agents making random visual choices during implementation.
 
 The chain keeps this in three artifacts with one writer each, so a plan can say "use Button `primary/md`" instead of describing a button:
@@ -344,7 +358,7 @@ The design language document at `specs/PROJ-<X>-<theme>/1c_design/design-languag
 
 ## Handoff
 
-After the design language is approved, invoke `prototyping`. Do not invoke `requirements-engineer` directly from this skill; requirements must consume the approved mockups.
+After the design language is approved, hand off to `prototyping` in a new session. Do not invoke `requirements-engineer` directly from this skill; requirements must consume the approved mockups.
 
 ## Rules
 

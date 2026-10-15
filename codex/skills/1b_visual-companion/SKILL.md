@@ -5,6 +5,20 @@ description: "Explore interactive UI structure before requirements. Use when a c
 
 # Visual Companion — Interactive Layout Exploration
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Turn a UI concept into **multiple rough, clickable layout approaches** so the team can decide what the interface should broadly feel like before requirements are written.
 
 <HARD-GATE>
@@ -275,9 +289,9 @@ Iterate by editing the same files. Do not create many `v2` files unless the user
 After the user chooses a direction:
 
 - Update `layout-decision.md` with `## Selected Direction` and fill `## Finding` (answer to the Decision Question, deciding reason, rejected variants). If the concept had `Candidate Directions`, write `## Carried Forward` instead when several stay live, and append every dropped candidate to `1_concept/PROJ-<X>-direction-log.md` (format in `concept`); `layout-decision.md` names only live candidates. `layout-exploration.html` keeps all approaches as the comparison record; only `prototyping` reads it, and only for the live ones. `concept-sync` writes the final choice back into the concept before requirements.
-- Then invoke `frontend-design` if the recorded `## Design System State` decision says to build it — the default for `greenfield`, and for `hybrid` with meaningful design-language gaps.
+- Then hand off to `frontend-design` in a new session if the recorded `## Design System State` decision says to build it — the default for `greenfield`, and for `hybrid` with meaningful design-language gaps.
 - If the user chose to skip knowingly, go to `prototyping` directly and tell it to use greyscale wireframes.
-- Otherwise invoke `prototyping` directly for `brownfield`.
+- Otherwise hand off to `prototyping` in a new session for `brownfield`.
 - The selected layout direction, or the `Carried Forward` candidates, is the required input for `prototyping`.
 
 Do NOT invoke `requirements-engineer`, `architecture`, or implementation directly from this skill.

@@ -5,13 +5,40 @@ description: "Design the technical architecture for a PROJ, written for software
 
 # Solution Architect
 
+## Artifact Language
+
+From Requirements Engineer (Step 2) onward, write all newly authored artifacts
+in English: PRDs, plans, decision records, handoff packages/prompts, findings,
+worker reports, QA evidence summaries, documentation and PR descriptions.
+Converse with the user in their language. Preserve identifiers, file paths,
+verbatim source evidence and the product's required UI/localization language.
+Concepts and discovery inputs may use another language; derive English artifacts
+from them. If canonical PRD ACs are non-English, return them to Requirements
+Engineer for an approved English revision before downstream verbatim copying;
+never silently translate canonical ACs inside a plan.
+
+
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Turn all PRDs of one PROJ into one concise architecture document. Readers are
 software developers: the engineer who approves it at Checkpoint 1 and the agents
 that plan and implement from it (writing-plans, implementers).
 
 ## Rules
 
-- **English only** in every written file, whatever language the user chats in.
+- **English artifacts** regardless of the conversation language; see Artifact Language.
 - **No code** in the architecture: no SQL, no TypeScript, no API
   snippets. WHAT and WHY, not HOW. Only `migration-design.md` may carry DDL.
 - **Scope = architecturally significant only.** A decision belongs here when it
@@ -207,17 +234,19 @@ bash scripts/chain review architecture <X> <theme> \
 - Reconcile and re-review through round 3 while any findings remain; a changed
   decision gets a matching Summary. Further rounds only on user request.
 
-## Continue into writing-plans
+## Handoff to writing-plans in a new session
 
-Summarize decisions, cross-review result, and open questions, then invoke
-**writing-plans** (4) in the same session — approval happens at Checkpoint 1 (run by Step 5, executing-large-model).
-Stop instead only if Critical/High findings remain after round 3, the review
-failed to run (exit `1` is not a round), a product decision is open, or the user
-asked to review the architecture alone first.
+Summarize decisions, cross-review result and open questions, then stop. Provide
+a copyable start prompt for **writing-plans** (4) with this workspace, PROJ,
+architecture path and PRD directory. The user opens a new session; approval of
+architecture and plans still happens together at Checkpoint 1 (Step 5).
+If Critical/High findings remain after round 3, review failed to run (exit `1`
+is not a round), or a product decision is open, hand off the blocker to its
+owning skill instead of claiming the architecture is ready for planning.
 
 Update `specs/INDEX.md` status to "In Progress" if it exists. Say once:
 
-> "Architecture is ready at `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`. Cross-review: <clean | N findings reconciled>. Continuing into **writing-plans**; you approve architecture and plans together at Checkpoint 1."
+> "Architecture is ready at `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`. Cross-review: <clean | N findings reconciled>. Start **writing-plans** in a new session using the prompt below; you approve architecture and plans together at Checkpoint 1."
 
 Commit: `docs(PROJ-<X>): Add architecture for <theme>`
 

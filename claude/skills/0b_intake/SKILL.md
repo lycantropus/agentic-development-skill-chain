@@ -5,6 +5,20 @@ description: "Bootstrap the curated context baseline for a brownfield (or near-g
 
 # Intake — Bootstrap the Curated Context Baseline
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Complete this skill's checks, automatic cross-review, reconciliation and required
+user review here, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Owns the brownfield bootstrap of the agent workflow (CONCEPT.md §3).
 Produces the ONE curated docs baseline that every later phase injects
 into implementers — as early as possible, while the codebase is small

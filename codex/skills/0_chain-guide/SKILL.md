@@ -5,6 +5,19 @@ description: "Context-aware guide through the 0-to-8 skill chain. Use when: (1) 
 
 # 0-to-8 Chain Guide
 
+## Session Boundary
+
+Through Step 4, each producing skill runs in its own user-started session.
+Recommend the next skill from the saved artifacts, then stop at the handoff. Do not invoke the next producing
+skill, including a prerequisite or another PROJ, in this session. Internal
+helpers and cross-review remain in this session. `/compact` is not a new session.
+End with a copyable start prompt naming the next skill, workspace, PROJ (if any),
+actual input artifact paths and any blockers. The next session reads those
+artifacts rather than relying on chat history. Do not create a separate session-context file.
+If blocked, name the owning skill and issue in the prompt; do not claim readiness.
+If the track is complete, report completion without inventing a next step.
+
+
 Detect where the user is in the 0-to-8 skill chain and tell them what to do next.
 
 ## The Chain
