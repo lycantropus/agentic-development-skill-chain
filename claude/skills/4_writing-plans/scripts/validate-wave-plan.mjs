@@ -41,6 +41,7 @@ function validateMain(args) {
   const configPath = path.join(planDir, "wave-gate-config.json");
   if (!fs.existsSync(configPath)) {
     console.error(`plan consistency: missing ${configPath}`);
+    console.error("hint: this check takes the plan directory (specs/PROJ-<X>-<theme>/3-4_plan), not a PROJ number and theme");
     process.exit(1);
   }
 
@@ -367,6 +368,13 @@ function validateMain(args) {
     const links = config.worktree_links;
     if (!Array.isArray(links) || !links.length || !links.every((l) => l && typeof l === "object" && relPath(l.path) && relPath(l.target))) {
       fail("worktree_links must be a non-empty array of {path, target}, both relative paths without '..'");
+    }
+  }
+  if (config.resources !== undefined) {
+    const r = config.resources;
+    const keys = ["min_available_mb", "max_memory_psi_full_avg10", "wait_seconds", "test_workers"];
+    if (!r || typeof r !== "object" || Array.isArray(r) || !Object.keys(r).every((k) => keys.includes(k)) || !Object.values(r).every((v) => Number.isInteger(v) && v >= 0) || r.test_workers === 0) {
+      fail(`resources must be an object with non-negative integers (test_workers > 0) from: ${keys.join(", ")}`);
     }
   }
   for (const key of ["coverage_cmd", "lint_cmd", "complexity_cmd", "arch_rules_cmd", "mutation_cmd"]) {

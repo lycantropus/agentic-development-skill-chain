@@ -135,8 +135,9 @@ rm "$sonar/specs/PROJ-1-sonar/state.json"
 # A lone project preflight can resolve the new compiler from an installed tree.
 installed="$TMP/installed/5_executing"
 mkdir -p "$installed/scripts" "$sonar/scripts"
-cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$sonar/scripts/"
+cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$sonar/scripts/"
 cp "$ROOT/codex/skills/5_executing/scripts/ponytail-check.sh" \
+  "$ROOT/codex/skills/5_executing/scripts/compat.sh" \
   "$ROOT/codex/skills/5_executing/scripts/compile-context.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/document-parser.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/architecture-parser.mjs" "$installed/scripts/"

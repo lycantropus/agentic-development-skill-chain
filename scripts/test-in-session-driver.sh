@@ -19,7 +19,7 @@ block stop   >"$CASE/stop.sh";   [ -s "$CASE/stop.sh" ]   || die 'stop block mis
 
 # --- fixture: a PROJ sitting at P5:running (quality gate passed) -----------
 mkdir -p "$CASE/repo/scripts" "$CASE/repo/specs/PROJ-1-demo/5_progress" "$CASE/bin"
-cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$ROOT/claude/skills/6_qa/scripts/findings-store.mjs" "$CASE/repo/scripts/"
+cp "$ROOT/claude/skills/5_executing/scripts/chain" "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/claude/skills/5_executing/scripts/compat.sh" "$ROOT/claude/skills/6_qa/scripts/findings.mjs" "$ROOT/claude/skills/6_qa/scripts/findings-store.mjs" "$CASE/repo/scripts/"
 cd "$CASE/repo"
 S="bash scripts/chain state"
 $S init 1 demo >/dev/null

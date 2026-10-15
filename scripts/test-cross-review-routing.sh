@@ -19,7 +19,7 @@ cd "$FIX"
 git init -q -b main; git config user.email t@local; git config user.name t
 printf '# Architecture\nsrc/queue.js implements exponential backoff with a dead-letter queue for failed events.\n' >docs/ARCHITECTURE.md
 printf '# Rules\n- rule 1\n' >AGENTS.md
-for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
+for s in 5_executing/scripts/chain 5_executing/scripts/render.mjs 5_executing/scripts/state.sh 5_executing/scripts/compat.sh 5_executing/scripts/compile-context.mjs 5_executing/scripts/document-parser.mjs 5_executing/scripts/architecture-parser.mjs \
          6_qa/scripts/findings.mjs 6_qa/scripts/findings-store.mjs cross-review/scripts/cross-review.sh cross-review/scripts/review-with-claude.sh \
          cross-review/scripts/review-with-codex.sh; do
   cp "$SKILLS/$s" scripts/

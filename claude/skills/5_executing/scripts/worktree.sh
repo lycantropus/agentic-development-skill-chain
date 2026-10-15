@@ -37,13 +37,15 @@ EOF
 
 die() { echo "worktree.sh: $*" >&2; exit 1; }
 
-for required_command in git jq node realpath flock awk sed unlink; do
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/compat.sh"
+
+for required_command in git jq node awk sed unlink; do
   command -v "$required_command" >/dev/null 2>&1 \
     || die "required command '$required_command' is missing"
 done
 
 canonical_path() {
-  realpath -m -- "$1"
+  abspath "$1"
 }
 
 git_common_dir() {
@@ -151,7 +153,7 @@ link_worktree_assets() { # worktree proj theme
     git -C "$worktree" check-ignore -q -- "$path" || die "worktree_links path '$path' must be git-ignored"
     [ -e "$worktree/$target" ] || die "worktree_links target '$target' does not exist in the worktree (install first)"
     [ -d "$(dirname "$worktree/$path")" ] || die "worktree_links parent of '$path' is missing"
-    link="$(realpath -m --relative-to="$(dirname "$worktree/$path")" "$worktree/$target")"
+    link="$(relpath "$(dirname "$worktree/$path")" "$worktree/$target")"
     dest="$worktree/$path"
     if [ -L "$dest" ]; then
       [ "$(readlink "$dest")" = "$link" ] || die "$path is a symlink to something else"
@@ -499,9 +501,13 @@ lock_snapshot() {
       | jq -r --arg lock "$lock" '.locks[]? | select(.path==$lock and (.mode | endswith("*") | not)) | [.pid,.mode] | @tsv' 2>/dev/null) || holders=""
     while read -r pid mode; do
       [ -n "$pid" ] || continue
-      age=$(ps -p "$pid" -o etimes= 2>/dev/null | tr -d ' ') || age=""
+      age=$(proc_age_seconds "$pid")
       echo "SKILLCHAIN_LOCK_HOLDER pid=$pid mode=$mode process_age_seconds=${age:-unknown} (process age is not lock age)" >&2
     done <<<"$holders"
+  fi
+  if [ -r "$lock.d/pid" ]; then # mkdir-lock fallback (no flock): the owner pid is recorded
+    pid=$(cat "$lock.d/pid"); age=$(proc_age_seconds "$pid")
+    echo "SKILLCHAIN_LOCK_HOLDER pid=$pid mode=exclusive process_age_seconds=${age:-unknown} (process age is not lock age)" >&2
   fi
   echo "worktree.sh: inspect lslocks and fuser -v for $lock; absent holder data does not prove the lock is free" >&2
 }
@@ -530,11 +536,13 @@ with_shared_lock() {
     lock="$common/skillchain-shared-resources.lock"
   fi
   mkdir -p "$(dirname "$lock")"
-  exec 8>>"$lock" || die "cannot open shared-resource lock $lock"
-  if ! flock "--$mode" -n 8; then
+  local rc=0
+  lock_acquire 8 "$mode" 0 "$lock" || rc=$?
+  [ "$rc" -ne 2 ] || die "cannot open shared-resource lock $lock"
+  if [ "$rc" -ne 0 ]; then
     echo "SKILLCHAIN_LOCK_WAIT pid=$$ mode=$mode timeout_seconds=$timeout path=$lock" >&2
     lock_snapshot "$lock"
-    if ! flock "--$mode" -w "$timeout" 8; then
+    if ! lock_acquire 8 "$mode" "$timeout" "$lock"; then
       echo "SKILLCHAIN_LOCK_TIMEOUT pid=$$ waited_seconds=$((SECONDS-started)) path=$lock" >&2
       exit 73
     fi

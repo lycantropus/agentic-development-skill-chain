@@ -405,7 +405,7 @@ EOF
 
   case_dir auth-pacing
   AUTH_TIMES="$TMP/$PLATFORM-auth-times"; export AUTH_TIMES
-  config=$(default_config | jq '.auth_budget={"preflight_cmd":"true","exhausted_exit_code":75} | .waves["1"].auth_pacing_seconds=1 | .waves["1"].ac_commands=[{"id":"AC-1","task":"T-1","command":"date +%s%3N >> \"$AUTH_TIMES\"; printf '\''Running 1 test\\n1 passed\\n'\''","test_files":["tests/a.ts"],"auth_consuming":true},{"id":"AC-2","task":"T-2","command":"date +%s%3N >> \"$AUTH_TIMES\"; printf '\''Running 1 test\\n1 passed\\n'\''","test_files":["tests/b.ts"],"auth_consuming":true}]')
+  config=$(default_config | jq '.auth_budget={"preflight_cmd":"true","exhausted_exit_code":75} | .waves["1"].auth_pacing_seconds=1 | .waves["1"].ac_commands=[{"id":"AC-1","task":"T-1","command":"node -p '\''Date.now()'\'' >> \"$AUTH_TIMES\"; printf '\''Running 1 test\\n1 passed\\n'\''","test_files":["tests/a.ts"],"auth_consuming":true},{"id":"AC-2","task":"T-2","command":"node -p '\''Date.now()'\'' >> \"$AUTH_TIMES\"; printf '\''Running 1 test\\n1 passed\\n'\''","test_files":["tests/b.ts"],"auth_consuming":true}]')
   write_config "$config"; commit_case; run_gate >/dev/null
   mapfile -t auth_times <"$AUTH_TIMES"; [[ $((auth_times[1]-auth_times[0])) -ge 1000 ]] || fail "$LABEL: auth-consuming commands were not paced"
   unset AUTH_TIMES
@@ -555,6 +555,43 @@ EOF
   expect_rc 1 ac_only_gate
   grep -q 'complexity timed out after 1s' "$GATE_OUT" || fail "$LABEL: complexity timeout not enforced"
   grep -q 'partial-output' "$GATE_OUT" || fail "$LABEL: partial output lost on timeout"
+
+  case_dir cache-invalidation-keeps-logs
+  write_config "$(default_config)"; commit_case
+  expect_rc 0 run_gate
+  P="$CASE/specs/PROJ-1-test/5_progress"
+  printf 'old-ac\n' >>"$P/ralph-wave-1-ac-1-attempt-1.log"; printf 'old-reg\n' >>"$P/ralph-wave-1-regression-1.log"
+  old_ac=$(cat "$P/ralph-wave-1-ac-1-attempt-1.log"); old_reg=$(cat "$P/ralph-wave-1-regression-1.log")
+  rm "$P/ralph-wave-1.json"
+  expect_rc 0 run_gate
+  [[ $(cat "$P/ralph-wave-1-ac-1-attempt-1.log") == "$old_ac" ]] || fail "$LABEL: AC log overwritten after cache invalidation"
+  [[ $(cat "$P/ralph-wave-1-regression-1.log") == "$old_reg" ]] || fail "$LABEL: regression log overwritten after cache invalidation"
+  [[ -f "$P/ralph-wave-1-ac-1-attempt-2.log" && -f "$P/ralph-wave-1-regression-1-attempt-2.log" ]] || fail "$LABEL: rerun did not allocate fresh log names"
+
+  case_dir memory-pressure
+  write_config "$(default_config | jq '.resources={wait_seconds:0,min_available_mb:1024}')"; commit_case
+  printf 'MemAvailable:     204800 kB\n' >"$TMP/$PLATFORM-meminfo"
+  expect_rc 77 env SKILLCHAIN_MEMINFO_FILE="$TMP/$PLATFORM-meminfo" bash -c 'cd "$1" && PATH="$1/bin:$PATH" bash "$2" 1 1 test' _ "$CASE" "$GATE"
+  jq -e '.ralph_status=="infrastructure_failed" and .infrastructure_failure.exit_code==77' "$CASE/specs/PROJ-1-test/5_progress/ralph-wave-1.json" >/dev/null || fail "$LABEL: memory pressure not recorded as infrastructure"
+  [[ ! -s "$CASE_LOG" ]] || fail "$LABEL: test command started under memory pressure"
+  printf 'MemAvailable:    4194304 kB\n' >"$TMP/$PLATFORM-meminfo"
+  printf 'some avg10=50.00 avg60=0.00 avg300=0.00 total=0\nfull avg10=35.50 avg60=0.00 avg300=0.00 total=0\n' >"$TMP/$PLATFORM-psi"
+  expect_rc 77 env SKILLCHAIN_MEMINFO_FILE="$TMP/$PLATFORM-meminfo" SKILLCHAIN_PSI_FILE="$TMP/$PLATFORM-psi" bash -c 'cd "$1" && PATH="$1/bin:$PATH" bash "$2" 1 1 test' _ "$CASE" "$GATE"
+  grep -q 'PSI full avg10=35' "$GATE_OUT" || fail "$LABEL: PSI pressure not reported"
+  printf 'full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n' >"$TMP/$PLATFORM-psi"
+  expect_rc 0 env SKILLCHAIN_MEMINFO_FILE="$TMP/$PLATFORM-meminfo" SKILLCHAIN_PSI_FILE="$TMP/$PLATFORM-psi" bash -c 'cd "$1" && PATH="$1/bin:$PATH" bash "$2" --ac-only 1 1 test' _ "$CASE" "$GATE"
+
+  # macOS: headroom comes from vm_stat (free + inactive + speculative pages x page size); no PSI there.
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                               5000.\nPages active:                           900000.\nPages inactive:                           3000.\nPages speculative:                        1000.\n' >"$TMP/$PLATFORM-vmstat"
+  expect_rc 77 env SKILLCHAIN_VMSTAT_FILE="$TMP/$PLATFORM-vmstat" bash -c 'cd "$1" && PATH="$1/bin:$PATH" bash "$2" 1 1 test' _ "$CASE" "$GATE"
+  grep -q 'MemAvailable 140 MiB' "$GATE_OUT" || fail "$LABEL: vm_stat headroom not computed (expected 140 MiB)"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                              90000.\nPages inactive:                           3000.\nPages speculative:                        1000.\n' >"$TMP/$PLATFORM-vmstat"
+  expect_rc 0 env SKILLCHAIN_VMSTAT_FILE="$TMP/$PLATFORM-vmstat" bash -c 'cd "$1" && PATH="$1/bin:$PATH" bash "$2" --ac-only 1 1 test' _ "$CASE" "$GATE"
+
+  case_dir test-workers-budget
+  write_config "$(default_config | jq '.resources={test_workers:2} | .waves["1"].ac_commands[0].command="printf \"Running 1 test\\n1 passed\\n\"; printf %s \"$VITEST_MAX_WORKERS\" >> \"$CASE_LOG\""')"; commit_case
+  expect_rc 0 ac_only_gate
+  [[ $(cat "$CASE_LOG") == 2 ]] || fail "$LABEL: test_workers budget not exported"
 
   case_dir static-check-after-red-ac
   write_config "$(default_config | jq '.waves["1"].ac_commands[0].command="exit 1" | .complexity_cmd="echo Analysed 1 files"')"; commit_case

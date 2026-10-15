@@ -11,7 +11,7 @@ const inventory = [
   ["3_architecture/scripts/validate-architecture.mjs", "scripts/validate-architecture.mjs"],
   ...["validate-wave-plan.mjs", "document-parser.mjs"].map(name => [`4_writing-plans/scripts/${name}`, `scripts/${name}`]),
   ["3_architecture/scripts/architecture-parser.mjs", "scripts/architecture-parser.mjs"],
-  ...["chain", "render.mjs", "compile-context.mjs", "story-slice.mjs", "state.sh", "preflight.sh", "env-local.sh", "ponytail-check.sh", "worktree.sh", "migration-drift-check.sh", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
+  ...["chain", "render.mjs", "compile-context.mjs", "story-slice.mjs", "state.sh", "preflight.sh", "env-local.sh", "compat.sh", "ponytail-check.sh", "worktree.sh", "migration-drift-check.sh", "sync-framework.mjs"].map(name => [`5_executing/scripts/${name}`, `scripts/${name}`]),
   ...["backend-implementer", "explore", "frontend-implementer", "implementer", "micro-fixer", "reviewer"].map(name => [`5_executing/manifests/roles/${name}.md`, `templates/roles/${name}.md`]),
   ...["decisions", "morning-report", "stop-report"].map(name => [`5_executing/templates/${name}.md.tmpl`, `templates/${name}.md.tmpl`]),
   ...["cross-review.sh", "review-with-claude.sh", "review-with-codex.sh"].map(name => [`cross-review/scripts/${name}`, `scripts/${name}`]),

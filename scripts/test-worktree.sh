@@ -4,6 +4,7 @@ set -euo pipefail
 export SKILLCHAIN_POLL_SECONDS=0.1 # stubs return instantly; production default stays
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/codex/skills/5_executing/scripts/compat.sh"
 HELPER="$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 STATE_SOURCE="$ROOT/codex/skills/5_executing/scripts/state.sh"
 CHAIN_SOURCE="$ROOT/codex/skills/5_executing/scripts/chain"
@@ -20,6 +21,7 @@ init_repo() { # path proj theme env-mode [remote]
   local repo="$1" proj="$2" theme="$3" env_mode="$4" remote="${5:-}"
   mkdir -p "$repo/specs/PROJ-${proj}-${theme}/3-4_plan" "$repo/scripts"
   cp "$STATE_SOURCE" "$repo/scripts/state.sh"
+  cp "$(dirname "$STATE_SOURCE")/compat.sh" "$repo/scripts/compat.sh"
   cp "$CHAIN_SOURCE" "$repo/scripts/chain"
   cp "$PLAN_FIXTURES/plan-valid.md" "$repo/specs/PROJ-${proj}-${theme}/3-4_plan/PROJ-${proj}-wave-1-plan.md"
   cp "$PLAN_FIXTURES/config-valid.json" "$repo/specs/PROJ-${proj}-${theme}/3-4_plan/wave-gate-config.json"
@@ -240,17 +242,17 @@ wt="$(cd "$repo" && SKILLCHAIN_WORKTREE_ROOT="$custom_root" "$HELPER" prepare 7 
 [ -f "$wt/lock-proof" ] || fail "locked command did not run"
 common="$(git -C "$wt" rev-parse --git-common-dir)"
 case "$common" in /*) : ;; *) common="$wt/$common" ;; esac
-[ -f "$(realpath -m "$common")/skillchain-shared-resources.lock" ] || fail "default common-dir lock missing"
+[ -f "$(abspath "$common")/skillchain-shared-resources.lock" ] || fail "default common-dir lock missing"
 override="$TMP_ROOT/custom-locks/auth.lock"
 (cd "$wt" && SKILLCHAIN_SHARED_RESOURCE_LOCK="$override" "$HELPER" with-shared-lock -- true)
 [ -f "$override" ] || fail "override lock missing"
-exec 7>"$(realpath -m "$common")/skillchain-shared-resources.lock"
-flock 7
+shared_lock="$(abspath "$common")/skillchain-shared-resources.lock"
+lock_acquire 7 exclusive 0 "$shared_lock"
 set +e
 (cd "$repo" && "$HELPER" with-shared-lock --timeout 0 -- true >/dev/null 2>&1)
 lock_rc=$?
 set -e
-flock -u 7
+if command -v flock >/dev/null 2>&1; then flock -u 7; else rm -rf "$shared_lock.d"; fi
 [ "$lock_rc" -eq 73 ] || fail "control/worktree callers did not contend on the common-dir lock"
 if (cd "$wt" && SKILLCHAIN_SHARED_RESOURCE_LOCK=relative.lock "$HELPER" with-shared-lock -- true >/dev/null 2>&1); then fail "relative shared-lock override was accepted"; fi
 ok "custom worktree root and shared-resource lock contract work"
@@ -542,7 +544,7 @@ init_repo "$repo" 27 omega absent
 auto_bin="$TMP_ROOT/runner-auto-bin"
 mkdir -p "$auto_bin"
 printf '#!/usr/bin/env bash\nif [ "${1:-}" = login ] && [ "${2:-}" = status ]; then exit 0; fi\nexit 0\n' >"$auto_bin/codex"
-printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(realpath -m "$PWD")" = "$(realpath -m "$RUNNER_TEST_CONTROL")" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\ncp "$(dirname "$RUNNER_TEST_VALIDATOR")/document-parser.mjs" "$wt/scripts/document-parser.mjs"\n  printf "process.exit(0)\\n" >"$wt/scripts/quality.mjs"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs" "$wt/scripts/quality.mjs"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
+printf '#!/usr/bin/env bash\nset -euo pipefail\nif [ "$(pwd -P)" = "$(cd -P "$RUNNER_TEST_CONTROL" && pwd)" ]; then\n  wt="$(cd "$RUNNER_TEST_CONTROL" && "$RUNNER_TEST_HELPER" prepare "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME")"\n  cp "$RUNNER_TEST_HELPER" "$wt/scripts/worktree.sh"\n  cp "$RUNNER_TEST_VALIDATOR" "$wt/scripts/validate-wave-plan.mjs"\ncp "$(dirname "$RUNNER_TEST_VALIDATOR")/document-parser.mjs" "$wt/scripts/document-parser.mjs"\n  printf "process.exit(0)\\n" >"$wt/scripts/quality.mjs"\n  chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/validate-wave-plan.mjs" "$wt/scripts/quality.mjs"\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 running >/dev/null)\n  (cd "$wt" && bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P0 done >/dev/null)\n  git -C "$wt" add -A && git -C "$wt" commit -qm "seal P0"\n  exit 0\nfi\nphase="$(bash scripts/chain state get "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" .phase)"\nif [ "$phase" = P0 ]; then\n  printf "%%s\\n" "$PWD" >"$RUNNER_TEST_P5_PWD"\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 running >/dev/null\n  bash scripts/chain state transition "$SKILLCHAIN_PROJ" "$SKILLCHAIN_THEME" P5 done >/dev/null\n  git add -A && git commit -qm "seal P5"\n  exit 0\nfi\nexit 42\n' >"$auto_bin/claude"
 chmod +x "$auto_bin/codex" "$auto_bin/claude"
 set +e
 (cd "$repo" && \
@@ -580,7 +582,7 @@ done
 ok "the claude and codex copies of worktree.sh are byte-identical"
 
 PREFLIGHT="$ROOT/codex/skills/5_executing/scripts/preflight.sh"
-grep -F 'git gh claude node jq coderabbit realpath flock unlink' "$PREFLIGHT" >/dev/null || fail "preflight hard-tool list lacks worktree lifecycle tools"
+grep -F 'git gh claude node jq coderabbit unlink' "$PREFLIGHT" >/dev/null || fail "preflight hard-tool list lacks worktree lifecycle tools"
 jq -e '[.waves[]?.frontend_routes[]?, .frontend.routes[]?] | length > 0' "$PLAN_FIXTURES/config-protected-e2e-valid.json" >/dev/null || fail "structured frontend routes were not detected"
 grep -F '[.waves[]?.frontend_routes[]?, .frontend.routes[]?] | length > 0' "$PREFLIGHT" >/dev/null || fail "preflight does not use structured frontend detection"
 cmp "$PREFLIGHT" "$ROOT/claude/skills/5_executing/scripts/preflight.sh" || fail "preflight provider copies differ"
@@ -624,6 +626,7 @@ mkdir -p "$(dirname "$repo")"
 init_repo "$repo" 28 psi absent "$remote"
 wt="$(cd "$repo" && "$HELPER" prepare 28 psi)"
 cp "$HELPER" "$wt/scripts/worktree.sh"
+cp "$(dirname "$HELPER")/compat.sh" "$wt/scripts/compat.sh"
 cp "$CI_POLL" "$wt/scripts/delivery.sh"
 cp "$ROOT/codex/skills/5_executing/scripts/chain" "$wt/scripts/chain"
 chmod +x "$wt/scripts/worktree.sh" "$wt/scripts/delivery.sh" "$wt/scripts/chain"

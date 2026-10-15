@@ -22,7 +22,7 @@ and continue at the matching step, so a fresh session resumes anywhere.
       unchanged afterwards; compare this snapshot taken before and right after
       the finder, before any bookkeeping (it excludes only the ledger and state
       the QA scripts write):
-      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | sha1sum`.
+      `P=(. ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'); { git status --porcelain -- "${P[@]}"; git diff HEAD -- "${P[@]}"; } | git hash-object --stdin`.
       A finder that errors, changes the tree, or fails the ingest is re-run
       once; a second failure is a stop. `chain findings add` rejects the whole
       batch on any malformed line, so nothing partial is recorded:

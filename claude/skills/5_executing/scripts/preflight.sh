@@ -55,6 +55,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 # Preflight runs in the control checkout's shell, which may not be the same
 # session any secret (SONAR_TOKEN or otherwise) was exported into.
+source "$SCRIPT_DIR/compat.sh"
 source "$SCRIPT_DIR/env-local.sh"
 agent_browser_contract() {
   agent-browser open --help >/dev/null 2>&1 \
@@ -65,9 +66,13 @@ agent_browser_contract() {
 echo "→ P0 preflight (PROJ-${PROJ}-${THEME})"
 
 # --- hard tools ---------------------------------------------------------
-for tool in git gh claude node jq coderabbit realpath flock unlink; do
+for tool in git gh claude node jq coderabbit unlink; do
   if have "$tool"; then say "✓ $tool"; else say "❌ $tool MISSING (hard)"; HARD_MISSING+=("$tool"); fi
 done
+
+# Optional GNU tools: information only, the portable fallbacks in compat.sh cover their absence.
+have flock || say "– flock absent: exclusive mkdir-lock fallback in use (optional: brew install flock)"
+[ "${TIMEOUT_BIN[0]}" != perl ] || say "– timeout absent: built-in perl fallback in use (optional: brew install coreutils)"
 
 # npm or pnpm — hard when the project builds with node (package.json present)
 APP_ROOT="."
@@ -112,7 +117,7 @@ fi
 if have claude; then
   if [ "${PREFLIGHT_SKIP_LIVE_PROBE:-0}" = "1" ]; then
     say "– claude live probe SKIPPED (PREFLIGHT_SKIP_LIVE_PROBE=1 — test use only)"
-  elif timeout --foreground "$PROBE_TIMEOUT" claude -p "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
+  elif "${TIMEOUT_BIN[@]}" --foreground "$PROBE_TIMEOUT" claude -p "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
     say "✓ claude live probe (bounded, ${PROBE_TIMEOUT}s)"
   else
     say "❌ claude live probe FAILED (hard — it hosts the chain)"
@@ -133,7 +138,7 @@ elif ! codex login status >/dev/null 2>&1; then
   DEGRADED_REASON="codex CLI unauthenticated"
 elif [ "${PREFLIGHT_SKIP_LIVE_PROBE:-0}" = "1" ]; then
   say "– codex live probe SKIPPED (PREFLIGHT_SKIP_LIVE_PROBE=1 — test use only)"
-elif ! timeout --foreground "$PROBE_TIMEOUT" codex exec --sandbox read-only --skip-git-repo-check "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
+elif ! "${TIMEOUT_BIN[@]}" --foreground "$PROBE_TIMEOUT" codex exec --sandbox read-only --skip-git-repo-check "Reply with exactly: OK" </dev/null >/dev/null 2>&1; then
   CODEX_STATE="unauthenticated"
   DEGRADED_REASON="codex live probe failed"
 fi
@@ -370,7 +375,7 @@ OK=true
 
 if [ -f "$BASE/state.json" ]; then
   PREFLIGHT_JSON="$(jq -n \
-    --arg at "$(date -Iseconds)" \
+    --arg at "$(now_iso)" \
     --argjson ok "$OK" \
     --argjson hard "$(printf '%s\n' "${HARD_MISSING[@]:-}" | jq -R . | jq -s 'map(select(length > 0))')" \
     --argjson skipped "$(printf '%s\n' "${SKIPPED[@]:-}" | jq -R . | jq -s 'map(select(length > 0))')" \

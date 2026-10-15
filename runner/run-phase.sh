@@ -89,9 +89,13 @@ skill_file() { # <skill> <relative-path> -> first existing copy: chain checkout 
   return 1
 }
 
+COMPAT="$(skill_file 5_executing scripts/compat.sh || true)"; [ -n "$COMPAT" ] || COMPAT="$PWD/scripts/compat.sh"
+[ -f "$COMPAT" ] || { echo "run-phase.sh: compat.sh not found (skill tree or scripts/)" >&2; exit 1; }
+source "$COMPAT"
+
 # chain: per helper, the repo copy first (P0 setup installs it), then the skill tree. Pinned
 # absolute at start, so a later cd (re-entering the PROJ worktree, removing it) cannot lose it.
-CHAIN_REPO=""; [ -x scripts/chain ] && CHAIN_REPO="$(realpath -m scripts/chain)"
+CHAIN_REPO=""; [ -x scripts/chain ] && CHAIN_REPO="$(abspath scripts/chain)"
 CHAIN_SKILL="$(skill_file 5_executing scripts/chain || true)"
 [ -n "$CHAIN_REPO$CHAIN_SKILL" ] || { echo "run-phase.sh: chain not found (scripts/chain or skill tree)" >&2; exit 1; }
 # The skill-tree chain gets the project's scripts/ dir, so a project copy of any helper (also a customized one
@@ -109,7 +113,7 @@ WORKTREE_WAS_REMOVED=0
 P8_WAITING_FOR_MERGE=0
 WORKTREE_REMOVAL_SUMMARY=""
 
-step() { echo "→ [$(date -Iseconds)] $*"; }
+step() { echo "→ [$(now_iso)] $*"; }
 state_get() { chain state get "$PROJ" "$THEME" "$1"; }
 
 # A runner re-entered after P0 must really be in the state-recorded worktree.
@@ -117,7 +121,7 @@ state_get() { chain state get "$PROJ" "$THEME" "$1"; }
 if [ "${SKILLCHAIN_WORKTREE_REEXEC:-0}" = 1 ]; then
   expected_worktree="$(state_get '.worktree.path // empty')"
   [ -n "$expected_worktree" ] || { echo "run-phase.sh: re-exec guard is set but state.worktree.path is missing" >&2; exit 1; }
-  [ "$(realpath -m "$PWD")" = "$(realpath -m "$expected_worktree")" ] \
+  [ "$(abspath "$PWD")" = "$(abspath "$expected_worktree")" ] \
     || { echo "run-phase.sh: re-exec guard path mismatch (cwd=$PWD, expected=$expected_worktree)" >&2; exit 1; }
 fi
 
@@ -241,23 +245,23 @@ launch_lane() { # provider role promptfile outfile — sets LANE_PID/LANE_MODEL 
   case "${provider}:${role}" in
     claude:writer)
       LANE_MODEL="$WRITER_MODEL"
-      setsid claude -p "$(cat "$prompt")" --model "$WRITER_MODEL" \
+      "${SETSID_BIN[@]}" claude -p "$(cat "$prompt")" --model "$WRITER_MODEL" \
         --dangerously-skip-permissions </dev/null >"$out" 2>&1 &
       ;;
     claude:peer)
       local tools="Read,Grep,Glob"
       [ "$PHASE" = "P6" ] && tools="Read,Grep,Glob,Bash"   # the QA finder must run tests/browser
       LANE_MODEL="$REVIEW_MODEL"    # pinned explicitly — never the writer's model (review fix #4)
-      setsid claude -p "$(cat "$prompt")" --model "$LANE_MODEL" \
+      "${SETSID_BIN[@]}" claude -p "$(cat "$prompt")" --model "$LANE_MODEL" \
         --allowedTools "$tools" </dev/null >"$out" 2>&1 &
       ;;
     codex:writer)
       LANE_MODEL="codex-default"
-      setsid codex exec --sandbox workspace-write "$(cat "$prompt")" </dev/null >"$out" 2>&1 &
+      "${SETSID_BIN[@]}" codex exec --sandbox workspace-write "$(cat "$prompt")" </dev/null >"$out" 2>&1 &
       ;;
     codex:peer)
       LANE_MODEL="codex-default"
-      setsid codex exec --sandbox read-only "$(cat "$prompt")" </dev/null >"$out" 2>&1 &
+      "${SETSID_BIN[@]}" codex exec --sandbox read-only "$(cat "$prompt")" </dev/null >"$out" 2>&1 &
       ;;
     *) echo "run-phase.sh: unknown lane ${provider}:${role}" >&2; return 1 ;;
   esac
@@ -358,14 +362,14 @@ stop_run() { # reason error_file
        && git branch "$rescue" "$commit" 2>/dev/null; then
       step "rescue branch: $rescue (working tree untouched)"
       rm -f "$tmpidx"
-      chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\", \"rescue_branch\": \"$rescue\"}" >/dev/null
+      chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(now_iso)\", \"rescue_branch\": \"$rescue\"}" >/dev/null
     else
       rm -f "$tmpidx"
       step "WARNING: rescue branch creation failed — uncommitted work remains only in the working tree"
-      chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\"}" >/dev/null
+      chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(now_iso)\"}" >/dev/null
     fi
   else
-    chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(date -Iseconds)\"}" >/dev/null
+    chain state set "$PROJ" "$THEME" .stop "{\"reason\": $(jq -Rn --arg r "$reason" '$r'), \"at\": \"$(now_iso)\"}" >/dev/null
   fi
   local cur_ph cur_st
   cur_ph="$(chain state get "$PROJ" "$THEME" .phase 2>/dev/null || echo "$PHASE")"
@@ -419,7 +423,7 @@ setup_providers() {
 
 tree_snapshot() { # read-only proof for the finder: status + content of everything except the ledger and state the QA scripts legitimately write
   { git status --porcelain -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'
-    git diff HEAD -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'; } 2>/dev/null | sha1sum
+    git diff HEAD -- . ':(exclude)specs/*/state.json' ':(exclude)specs/*/findings.json' ':(exclude)specs/*/*/findings.json'; } 2>/dev/null | git hash-object --stdin
 }
 
 run_p6() {
@@ -432,10 +436,10 @@ run_p6() {
   tree_before="$(tree_snapshot)"
   step "P6 finder lane (sequential, before controller): $PEER — output $finder_out"
   launch_lane "$PEER" peer "$finder_prompt" "$finder_out"
-  finder_pid="$LANE_PID"; finder_start="$(date -Iseconds)"
+  finder_pid="$LANE_PID"; finder_start="$(now_iso)"
   wait_lanes "$finder_pid"
   tree_after="$(tree_snapshot)"   # before record_lane: runner bookkeeping is not the finder's write
-  record_lane "$PEER" peer "$LANE_MODEL" "$finder_start" "$(date -Iseconds)" "$WRITER_RC" "$finder_out"
+  record_lane "$PEER" peer "$LANE_MODEL" "$finder_start" "$(now_iso)" "$WRITER_RC" "$finder_out"
   [ "$TIMED_OUT" -eq 1 ] && stop_run "P6 finder timed out after ${TIMEOUT}s" "$finder_out"
   [ "$WRITER_RC" -ne 0 ] && stop_run "P6 finder lane ($PEER) exited $WRITER_RC — no QA verdict, cannot continue" "$finder_out"
   [ "$tree_before" = "$tree_after" ] || stop_run "P6 finder modified the working tree — finder must be read-only" "$finder_out"
@@ -455,9 +459,9 @@ Substitute <X>=${PROJ} and <theme>=${THEME} in every command above."
   render_prompt writer "$task" ctl_prompt
   step "P6 controller lane: $WRITER — output $ctl_out"
   launch_lane "$WRITER" writer "$ctl_prompt" "$ctl_out"
-  ctl_pid="$LANE_PID"; ctl_start="$(date -Iseconds)"
+  ctl_pid="$LANE_PID"; ctl_start="$(now_iso)"
   wait_lanes "$ctl_pid"
-  record_lane "$WRITER" writer "$LANE_MODEL" "$ctl_start" "$(date -Iseconds)" "$WRITER_RC" "$ctl_out"
+  record_lane "$WRITER" writer "$LANE_MODEL" "$ctl_start" "$(now_iso)" "$WRITER_RC" "$ctl_out"
   [ "$TIMED_OUT" -eq 1 ] && stop_run "P6 controller timed out after ${TIMEOUT}s" "$ctl_out"
   [ "$WRITER_RC" -ne 0 ] && stop_run "P6 controller lane ($WRITER) exited $WRITER_RC" "$ctl_out"
   verify_sealed "$ctl_out"
@@ -538,14 +542,14 @@ run_generic() {
   writer_pid="$LANE_PID"
   local writer_model="$LANE_MODEL" peer_model=""
   local writer_start peer_start
-  writer_start="$(date -Iseconds)"
+  writer_start="$(now_iso)"
 
   if peer_wanted "$PHASE"; then
     render_prompt peer "Independently review the ${PHASE} work of specs/PROJ-${PROJ}-${THEME} (peer of skill ${skill}): prepare test/risk input and flag defects." peer_prompt
     step "$PHASE peer lane: $PEER (read-only) — output $peer_out"
     launch_lane "$PEER" peer "$peer_prompt" "$peer_out"
     peer_pid="$LANE_PID"; peer_model="$LANE_MODEL"
-    peer_start="$(date -Iseconds)"
+    peer_start="$(now_iso)"
   fi
 
   wait_lanes "$writer_pid" ${peer_pid:+"$peer_pid"}
@@ -583,9 +587,9 @@ run_generic() {
     return 0
   fi
 
-  record_lane "$WRITER" writer "$writer_model" "$writer_start" "$(date -Iseconds)" "$WRITER_RC" "$writer_out"
+  record_lane "$WRITER" writer "$writer_model" "$writer_start" "$(now_iso)" "$WRITER_RC" "$writer_out"
   if [ -n "$peer_pid" ]; then
-    record_lane "$PEER" peer "$peer_model" "$peer_start" "$(date -Iseconds)" "$PEER_RC" "$peer_out"
+    record_lane "$PEER" peer "$peer_model" "$peer_start" "$(now_iso)" "$PEER_RC" "$peer_out"
     ingest_findings "$peer_out"
     [ "$PEER_RC" -ne 0 ] && step "peer lane ($PEER) exited $PEER_RC — advisory only, continuing (logged in state.json)"
   fi
@@ -630,7 +634,7 @@ run_one_phase() {
     existing_worktree="$(chain worktree locate "$PROJ" 2>/dev/null || true)"
     if [ -n "$existing_worktree" ]; then
       existing_lifecycle="$(jq -r '.phase + ":" + .status' "$existing_worktree/specs/PROJ-${PROJ}-${THEME}/state.json" 2>/dev/null || true)"
-      existing_topology="$(jq -r --arg control "$(realpath -m "$PWD")" --arg path "$(realpath -m "$existing_worktree")" --arg branch "proj/PROJ-${PROJ}" \
+      existing_topology="$(jq -r --arg control "$(abspath "$PWD")" --arg path "$(abspath "$existing_worktree")" --arg branch "proj/PROJ-${PROJ}" \
         '(.worktree.control_path == $control and .worktree.path == $path and .worktree.branch == $branch)' \
         "$existing_worktree/specs/PROJ-${PROJ}-${THEME}/state.json" 2>/dev/null || true)"
       case "$existing_lifecycle" in

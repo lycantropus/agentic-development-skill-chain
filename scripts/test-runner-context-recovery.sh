@@ -11,7 +11,7 @@ die() { echo "runner-context-recovery: $*" >&2; exit 1; }
 cd "$CASE"
 BASE="specs/PROJ-1-demo"
 mkdir -p "$BASE/3-4_plan" "$BASE/5_progress/lanes" scripts templates/roles
-cp "$SKILL/scripts/compile-context.mjs" "$SKILL/scripts/document-parser.mjs" "$SKILL/scripts/architecture-parser.mjs" "$SKILL/scripts/state.sh" "$SKILL/scripts/chain" scripts/
+cp "$SKILL/scripts/compile-context.mjs" "$SKILL/scripts/document-parser.mjs" "$SKILL/scripts/architecture-parser.mjs" "$SKILL/scripts/state.sh" "$SKILL/scripts/compat.sh" "$SKILL/scripts/chain" scripts/
 cp "$SKILL/manifests/roles/backend-implementer.md" templates/roles/
 bash scripts/chain state init 1 demo >/dev/null
 node --input-type=module <<'JS'

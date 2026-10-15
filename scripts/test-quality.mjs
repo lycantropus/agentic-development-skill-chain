@@ -75,6 +75,7 @@ try {
     config.sonar_cmd = 'true'; saveConfig(); commit(); ok('run', 'coverage'); bad('run', 'sonar');
     fs.mkdirSync(path.join(cwd, 'scripts'));
     fs.copyFileSync(path.join(root, platform, 'skills/5_executing/scripts/worktree.sh'), path.join(cwd, 'scripts/worktree.sh'));
+    fs.copyFileSync(path.join(root, platform, 'skills/5_executing/scripts/compat.sh'), path.join(cwd, 'scripts/compat.sh'));
     config.auth_budget = { preflight_cmd: 'true' };
     config.phase_commands = [{ label: 'auth', phase: 'quality', auth_consuming: true, command: `test -e /proc/$$/fd/8 && echo called >> ${progress}/auth-calls.log && echo "# tests 1"` }];
     saveConfig(); commit(); ok('run', 'test:auth');

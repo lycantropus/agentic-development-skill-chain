@@ -10,6 +10,8 @@
 # Usage: review-with-codex.sh --prompt <file> [--model M] [--timeout S]
 # Exit:  0 valid finding lines on stdout · 1 CLI failed/timeout/zero valid lines · 64 usage
 set -euo pipefail
+_compat_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$_compat_dir/compat.sh" ]; then source "$_compat_dir/compat.sh"; else source "$_compat_dir/../../5_executing/scripts/compat.sh"; fi
 
 PROMPT="" MODEL="" TIMEOUT=600
 while [ $# -gt 0 ]; do
@@ -39,7 +41,7 @@ MODEL_ARGS=()
 # limits; JSON events distinguish Codex runtime chatter from its final answer.
 # User config/rules and persisted sessions are deliberately excluded so a local
 # customization cannot change a supposedly deterministic review gate.
-setsid codex exec --skip-git-repo-check --ephemeral --ignore-user-config \
+"${SETSID_BIN[@]}" codex exec --skip-git-repo-check --ephemeral --ignore-user-config \
   --ignore-rules --json ${MODEL_ARGS[@]+"${MODEL_ARGS[@]}"} - \
   <"$PROMPT" >"$RAW" 2>&1 &
 PID=$!

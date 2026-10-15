@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawnSync, spawn } from 'node:child_process';
 
@@ -265,18 +266,19 @@ async function act(config, fingerprint) {
         env = { ...process.env, BASE_SHA: baseSha, CHANGED_FILES_FILE: changedFile };
         delete env.CHANGED_FILES;
       }
-      const timeoutArgs = ['--kill-after=5s', String(seconds), ...invocation];
+      // GNU timeout, gtimeout or the perl shim from compat.sh (stock macOS has none); exec keeps the pid for signals.
+      const timeoutArgs = ['-c', 'source "$1"; shift; exec "${TIMEOUT_BIN[@]}" "$@"', '_', fileURLToPath(new URL('compat.sh', import.meta.url)), '--kill-after=5s', String(seconds), ...invocation];
       if (isMut) {
         // Await the child so cancellation reaches timeout and still runs our cleanup.
         rc = await new Promise((resolve, reject) => {
-          mutationChild = spawn('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env });
+          mutationChild = spawn('bash', timeoutArgs, { stdio: ['ignore', fd, fd], env });
           mutationChild.once('error', reject);
           mutationChild.once('close', (status, signal) => {
             resolve(interrupted || (status ?? (signal ? 128 + os.constants.signals[signal] : 2)));
           });
         });
       } else {
-        rc = spawnSync('timeout', timeoutArgs, { stdio: ['ignore', fd, fd], env }).status ?? 1;
+        rc = spawnSync('bash', timeoutArgs, { stdio: ['ignore', fd, fd], env }).status ?? 1;
       }
     } finally {
       fs.closeSync(fd);

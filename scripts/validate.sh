@@ -108,6 +108,8 @@ check_identical "$ROOT/runner/prompts/p6-controller.md" "$ROOT/claude/skills/5_e
 check_identical "$ROOT/claude/skills/5_executing/references/in-session-driver.md" "$ROOT/codex/skills/5_executing/references/in-session-driver.md"
 check_identical "$ROOT/claude/skills/5_executing/scripts/state.sh" "$ROOT/codex/skills/5_executing/scripts/state.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/env-local.sh"
+check_identical "$ROOT/claude/skills/5_executing/scripts/compat.sh" "$ROOT/codex/skills/5_executing/scripts/compat.sh"
+bash "$ROOT/scripts/check-portability.sh" || fail "GNU-only usage outside compat.sh"
 check_identical "$ROOT/claude/skills/5_executing/scripts/worktree.sh" \
   "$ROOT/codex/skills/5_executing/scripts/worktree.sh"
 # Removed duplicates and folded scripts must stay gone (a second copy would drift silently).
@@ -231,6 +233,7 @@ harness migration-drift     bash "$ROOT/scripts/test-migration-drift-check.sh"
 harness worktree            bash "$ROOT/scripts/test-worktree.sh"
 harness shared-lock         bash "$ROOT/scripts/test-shared-lock.sh"
 harness wave-gate           bash "$ROOT/scripts/test-wave-gate.sh"
+harness portability         bash "$ROOT/scripts/test-portability.sh"
 harness quality             node "$ROOT/scripts/test-quality.mjs"
 harness mutation-file-list  node "$ROOT/scripts/test-mutation-file-list.mjs"
 harness cross-review        bash "$ROOT/scripts/test-cross-review.sh"
