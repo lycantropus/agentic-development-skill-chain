@@ -3,6 +3,7 @@
 # lacks timeout/flock/setsid/realpath and whose date/ps reject or mangle what BSD rejects or mangles
 # (date -I/-d fail, %N/%3N print a literal "N"/"3N", ps has no etimes). Then the fast suites run on it.
 set -euo pipefail
+[ "$(uname)" = Linux ] || { echo "portability (shim userland): skipped, not Linux (the real macOS CI job covers it)"; exit 0; }
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 COMPAT="$ROOT/claude/skills/5_executing/scripts/compat.sh"
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
