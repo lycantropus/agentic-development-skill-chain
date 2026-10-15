@@ -66,7 +66,6 @@ const fill = (template, values) => {
 };
 
 // ---- pr -------------------------------------------------------------------
-const storyStatus = (metadata) => (metadata && typeof metadata === "object" ? metadata.status : metadata);
 const storySummary = (metadata) => {
   if (!metadata || typeof metadata !== "object") return String(metadata ?? "unknown");
   return [metadata.title, metadata.status, Number.isInteger(metadata.wave) ? `wave ${metadata.wave}` : null]
@@ -79,7 +78,6 @@ function pr([projX, theme, templateArg]) {
     if (storySummary("complete") !== "complete") throw new Error("string story metadata changed");
     if (storySummary({ status: "complete", wave: 2 }) !== "complete — wave 2") throw new Error("object story metadata failed");
     if (storySummary({ title: "Register", status: "complete" }) !== "Register — complete") throw new Error("story title failed");
-    if (storyStatus({ status: "gap" }) !== "gap") throw new Error("object gap status failed");
     console.log("✓ render pr story metadata self-test");
     return;
   }
@@ -110,10 +108,7 @@ function pr([projX, theme, templateArg]) {
     `- Open blocking (critical/high): ${count((f) => f.status === "open" && (f.severity === "critical" || f.severity === "high"))}`,
   ].join("\n");
 
-  const gaps = [
-    ...stories.filter(([, metadata]) => storyStatus(metadata) === "gap").map(([us]) => `- ${us}: shipped as known gap`),
-    ...externalPrerequisites(base),
-  ];
+  const gaps = externalPrerequisites(base);
   const knownGaps = gaps.length ? gaps.join("\n") : "none";
 
   const debt = findings.filter((f) => f.status === "deferred");
@@ -194,7 +189,6 @@ function morning([specsArg]) {
     const f = findingsFor(base);
     const deferred = f.filter((x) => x.status === "deferred");
     const openBlocking = f.filter((x) => x.status === "open" && (x.severity === "critical" || x.severity === "high"));
-    const gaps = Object.entries(s.waves?.stories ?? {}).filter(([, st]) => st === "gap");
     const wt = s.worktree;
     if (s.pr?.url) prs++;
     if (s.status === "blocked") stops++;
@@ -207,7 +201,6 @@ function morning([specsArg]) {
       `- **Waves:** ${s.waves?.current ?? "—"}/${s.waves?.total ?? "—"}`,
       "- **Wave-gate scope:** current ACs plus each wave's declared broad regressions; earlier AC commands are not implicitly rerun",
       `- **Findings:** ${f.length} total · ${openBlocking.length} open blocking · ${deferred.length} deferred debt`,
-      `- **Known gaps:** ${gaps.length ? gaps.map(([us]) => us).join(", ") : "none"}`,
       ...externalPrerequisites(base),
       wt
         ? `- **Worktree:** \`${wt.path}\` (${cleanupDisplay(wt)}${wt.cleanup_reason ? ` — ${wt.cleanup_reason}` : ""})`

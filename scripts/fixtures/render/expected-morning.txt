@@ -8,7 +8,6 @@
 - **Waves:** 1/2
 - **Wave-gate scope:** current ACs plus each wave's declared broad regressions; earlier AC commands are not implicitly rerun
 - **Findings:** 2 total · 1 open blocking · 1 deferred debt
-- **Known gaps:** PROJ-1-PRD-1-US-2
 - External prerequisite (declaration, not a pass): AC-1 / wave 1 — needs sso; decided by me at 2026. Readiness: `curl x`; evidence: 5_progress/ralph-wave-1.json.
 - **Worktree:** `/nonexistent/wt` (retained — ci red)
 - **Isolation:** dependencies installed; .env.local linked; database/auth infrastructure shared; dev port 3001
