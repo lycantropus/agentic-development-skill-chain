@@ -1,5 +1,35 @@
 # Installation
 
+## Both providers (recommended)
+
+From the repository root:
+
+```bash
+./scripts/install.sh
+```
+
+It verifies `claude`, `codex`, bash >= 4.4, `git`, `jq` and `node` first, plus
+`perl` where `timeout` is absent (stock macOS; perl ships with it). If any are missing it lists all of them, prints the commands that would
+install them and asks before running anything:
+
+- `git`, `jq`, `perl`, `node`/`npm` (and `curl` if needed) through `brew`,
+  `apt-get` or `dnf` (with `sudo` when not root);
+- [Claude Code](https://code.claude.com/docs/en/setup) via
+  `curl -fsSL https://claude.ai/install.sh | bash`;
+- [Codex](https://github.com/openai/codex) via `npm install -g @openai/codex`
+  (with `sudo` only when the global npm prefix is not writable).
+
+An old bash, or tools without a supported package manager, stay manual. Any
+answer but `y` (or a non-interactive stdin) declines; then, or when an install
+command fails, nothing is copied. Start newly installed `claude` and `codex`
+once to sign in.
+
+With everything present it runs both installers below and then
+`chain check ponytail`. A missing Ponytail
+plugin only warns (with the install commands), because it is needed for
+framework runs, not for installing skills. The per-provider installers stay
+available for single-provider machines and for `update-chain`.
+
 ## Codex
 
 From the repository root:
@@ -30,16 +60,16 @@ This copies the bundled chain into:
 
 ## Platforms
 
-The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq`, `node` and `perl` (perl ships with macOS).
+The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq` and `node`; where `timeout` is absent (stock macOS) also `perl`, which ships with macOS.
 
 - **macOS**: `/bin/bash` is 3.2, which is too old. Install a current bash and put it before `/bin` on `PATH`
   (`chain` and the gates stop with this hint otherwise):
 
   ```bash
-  brew install bash jq coreutils flock
+  brew install bash jq
   ```
 
-  `coreutils` (`timeout`) and `flock` are optional: without them the helpers use a built-in perl `timeout` and an
+  `coreutils` (`timeout`) and `flock` are optional (`brew install coreutils flock`): without them the helpers use a built-in perl `timeout` and an
   exclusive `mkdir` lock (a `--shared` request degrades to exclusive: safe, slower). The wave gate's `resources`
   budget reads `vm_stat` on macOS; there is no memory-pressure (PSI) check there.
 - **Windows**: use WSL2 (it is Linux). Native Windows shells are not supported.
@@ -73,6 +103,31 @@ matcher because it silently misses those fallbacks.
 
 `PONYTAIL_ENFORCE=0` is the loud escape hatch — the run continues without
 the ladder, recorded in state.json and flagged in the reports.
+
+## Uninstall
+
+From the repository root:
+
+```bash
+./scripts/uninstall.sh
+```
+
+It lists what it found and asks separately before removing each part:
+
+- **Skill folders**: every skill this repository ships (plus the retired
+  `4a_checkpoint`/`4b_setup`) in `~/.claude/skills/` and `~/.codex/skills/`
+  (or `CLAUDE_HOME`/`CODEX_HOME`). It matches by name, so your other skills
+  and the directories themselves stay.
+- **Ponytail**, where installed: `claude plugin uninstall ponytail@ponytail`,
+  `claude plugin marketplace remove ponytail`, `codex plugin remove
+  ponytail@ponytail`, `codex plugin marketplace remove ponytail`, and the
+  shared `~/.config/ponytail/config.json`. A failed command is reported and the
+  rest still run (exit 1). If a provider's CLI is missing, its Ponytail is named
+  for manual removal.
+
+Any answer but `y` (or a non-interactive stdin) keeps that part. Claude Code,
+Codex, the toolchain, and helper copies already synced into projects
+(`chain sync`) are not touched.
 
 ## Notes
 

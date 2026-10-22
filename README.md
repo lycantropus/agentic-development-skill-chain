@@ -139,22 +139,25 @@ enforces it.
 
 ## Install
 
-Install the Codex skills:
-
 ```bash
-./scripts/install-codex.sh
+./scripts/install.sh
 ```
 
-Install the Claude skills:
+It checks the prerequisites ([Claude Code](https://code.claude.com/docs/en/setup),
+[Codex](https://github.com/openai/codex), bash >= 4.4, `git`, `jq`, `node`,
+and `perl` where `timeout` is absent), lists everything missing at once and offers to install it (showing the
+exact commands first), then installs both chains and reports Ponytail status.
+Start newly installed `claude` and `codex` once to sign in. On a single-provider
+machine run `./scripts/install-claude.sh` or `./scripts/install-codex.sh` alone.
 
-```bash
-./scripts/install-claude.sh
-```
-
-Both scripts copy the bundled core chain and optional skills into the
+The installers copy the bundled core chain and optional skills into the
 default local skill directories as one unit (no per-skill install). Framework runs additionally need the
 Ponytail plugin on both providers — install commands and the mode/scoping
 setup are in [docs/installation.md](docs/installation.md), together with the macOS (bash >= 4.4) and Windows (WSL2) notes.
+
+To remove it again, run `./scripts/uninstall.sh`: it removes the chain's skill
+folders and Ponytail, asking before each, and leaves Claude Code, Codex and your
+other skills installed ([details](docs/installation.md#uninstall)).
 
 ## Validate
 
