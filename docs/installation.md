@@ -1,5 +1,44 @@
 # Installation
 
+## Both providers (recommended)
+
+From the repository root:
+
+```bash
+./scripts/install.sh
+```
+
+It verifies `claude`, `codex`, bash >= 4.4, `git`, `jq` and Node.js >= 22 (the
+oldest maintained LTS; the version CI runs) first, plus
+`perl` where `timeout` is absent (stock macOS; perl ships with it). If any are missing it lists all of them, prints the commands that would
+install them and asks before running anything:
+
+- `git`, `jq`, `perl` (and `curl` if needed) through `brew`, `apt-get` or
+  `dnf` (with `sudo` when not root);
+- Node.js, missing or older than 22, as the current LTS through
+  [nvm](https://github.com/nvm-sh/nvm) (`nvm install --lts`, set as nvm's
+  default; nvm itself is installed first if absent and adds its loader to your
+  shell profile). Distro `nodejs` packages are not used: they often ship an
+  end-of-life Node;
+- [Claude Code](https://code.claude.com/docs/en/setup) via
+  `curl -fsSL https://claude.ai/install.sh | bash`;
+- [Codex](https://github.com/openai/codex) via `npm install -g @openai/codex`
+  (no `sudo` with nvm; with an existing system Node only when the global npm
+  prefix is not writable).
+
+An old bash, or tools without a supported package manager, stay manual. Any
+answer but `y` (or a non-interactive stdin) declines; then, or when an install
+command fails, nothing is copied. Start newly installed `claude` and `codex`
+once to sign in.
+
+With everything present it runs both installers below. Then, for each provider
+still without [Ponytail](#ponytail-required-for-framework-runs-stage-2), it shows
+that provider's marketplace and plugin commands and asks `Install Ponytail now?`
+before running them, and finally runs `chain check ponytail`. Declining, or a
+failed check, only warns: Ponytail is needed for framework runs, not for
+installing skills. The per-provider installers stay
+available for single-provider machines and for `update-chain`.
+
 ## Codex
 
 From the repository root:
@@ -30,16 +69,16 @@ This copies the bundled chain into:
 
 ## Platforms
 
-The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq`, `node` and `perl` (perl ships with macOS).
+The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq` and Node.js >= 22 (an LTS line); where `timeout` is absent (stock macOS) also `perl`, which ships with macOS.
 
 - **macOS**: `/bin/bash` is 3.2, which is too old. Install a current bash and put it before `/bin` on `PATH`
   (`chain` and the gates stop with this hint otherwise):
 
   ```bash
-  brew install bash jq coreutils flock
+  brew install bash jq
   ```
 
-  `coreutils` (`timeout`) and `flock` are optional: without them the helpers use a built-in perl `timeout` and an
+  `coreutils` (`timeout`) and `flock` are optional (`brew install coreutils flock`): without them the helpers use a built-in perl `timeout` and an
   exclusive `mkdir` lock (a `--shared` request degrades to exclusive: safe, slower). The wave gate's `resources`
   budget reads `vm_stat` on macOS; there is no memory-pressure (PSI) check there.
 - **Windows**: use WSL2 (it is Linux). Native Windows shells are not supported.
@@ -54,7 +93,8 @@ The framework's minimalism ladder is the third-party
 [Ponytail](https://github.com/DietrichGebert/ponytail) plugin — installed
 on all active providers in mode `full`. Versions may differ and are reported
 for diagnostics only. The P0 preflight (`chain check ponytail`) blocks runs
-on absence, wrong mode, or restricted subagent coverage.
+on absence, wrong mode, or restricted subagent coverage. `./scripts/install.sh`
+offers the install commands below for each provider that lacks it.
 
 ```bash
 # Claude Code
@@ -73,6 +113,86 @@ matcher because it silently misses those fallbacks.
 
 `PONYTAIL_ENFORCE=0` is the loud escape hatch — the run continues without
 the ladder, recorded in state.json and flagged in the reports.
+
+## After pulling updates
+
+The installed skills are copies, so a pull does not reach them, and a pull may
+raise a tool's required version. From the repository root:
+
+```bash
+./scripts/check-setup.sh
+```
+
+It changes nothing and reports:
+
+- **Tools**: each prerequisite with its version, against the minimums in
+  [`scripts/requirements.sh`](../scripts/requirements.sh) (`REQ_NODE`,
+  `REQ_BASH`, ...; empty means any version).
+- **Installed skills**, per provider, compared with a fresh install of this
+  checkout: skills changed or added since the last install, retired folders
+  still installed, or no install at all. Other skills in those directories are
+  ignored.
+- **Ponytail** per provider, as a warning only (framework runs need it).
+
+It exits 1 when anything but Ponytail needs fixing; `./scripts/install.sh`
+fixes all of it (it treats a tool below its minimum like a missing one and
+offers the upgrade, reinstalls the skills, and offers Ponytail).
+
+### Optional: run it after every pull
+
+Nothing runs the check for you. If you want it after each pull, add local git
+hooks in your own clone (hooks are not versioned, so this affects only you).
+They only report, and never block or undo the pull:
+
+```bash
+hooks="$(git rev-parse --git-path hooks)"
+cat >"$hooks/post-merge" <<'EOF'
+#!/bin/sh
+# Local, optional: check the setup after each pull. Never blocks the pull.
+./scripts/check-setup.sh || true
+EOF
+cat >"$hooks/post-rewrite" <<'EOF'
+#!/bin/sh
+# Same for `git pull --rebase` (post-rewrite also runs on commit --amend: skip that).
+[ "$1" = rebase ] && ./scripts/check-setup.sh
+exit 0
+EOF
+chmod +x "$hooks/post-merge" "$hooks/post-rewrite"
+```
+
+`post-merge` covers `git pull` (merge or fast-forward), `post-rewrite` covers
+`git pull --rebase`. This overwrites existing hooks of the same name, so check
+`ls "$hooks"` first and merge by hand if you already have them. To stop, delete
+the two files.
+
+**Maintainers**: when a change needs a newer tool, raise its `REQ_*` minimum in
+`scripts/requirements.sh`. `install.sh` and `check-setup.sh` both read it.
+
+## Uninstall
+
+From the repository root:
+
+```bash
+./scripts/uninstall.sh
+```
+
+It lists what it found and asks separately before removing each part:
+
+- **Skill folders**: every skill this repository ships (plus the retired
+  `4a_checkpoint`/`4b_setup`) in `~/.claude/skills/` and `~/.codex/skills/`
+  (or `CLAUDE_HOME`/`CODEX_HOME`). It matches by name, so your other skills
+  and the directories themselves stay.
+- **Ponytail**, where installed: `claude plugin uninstall ponytail@ponytail`,
+  `claude plugin marketplace remove ponytail`, `codex plugin remove
+  ponytail@ponytail` and `codex plugin marketplace remove ponytail`. A failed
+  command is reported and the rest still run (exit 1). If a provider's CLI is
+  missing, its Ponytail is named for manual removal. The shared
+  `~/.config/ponytail/config.json` stays, since other Ponytail installs read it
+  too.
+
+Any answer but `y` (or a non-interactive stdin) keeps that part. Claude Code,
+Codex, the toolchain, and helper copies already synced into projects
+(`chain sync`) are not touched.
 
 ## Notes
 
