@@ -97,10 +97,10 @@ rm -rf "$H"; mkdir -p "$H"; run
 [ "$rc" = 1 ] || fail "no install should exit 1, got $rc"
 has_line "  ✗ claude: not installed in $H/.claude/skills"; has_line "  ✗ codex: not installed in $H/.codex/skills"
 
-# Ponytail missing: warned with install commands, but not a problem.
+# Ponytail missing: warned with the fix, but not a problem.
 install_all; ponytail off; run
 [ "$rc" = 0 ] || fail "missing Ponytail must only warn, got $rc: $(cat "$TMP/out")"
-has_line "  ! claude: not installed: claude plugin marketplace add DietrichGebert/ponytail"
-has_line "  ! codex: not installed: codex plugin marketplace add DietrichGebert/ponytail"
+has_line "  ! claude: not installed (./scripts/install.sh offers it)"
+has_line "  ! codex: not installed (./scripts/install.sh offers it)"
 
 echo "test-check-setup: ok"

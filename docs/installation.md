@@ -31,10 +31,12 @@ answer but `y` (or a non-interactive stdin) declines; then, or when an install
 command fails, nothing is copied. Start newly installed `claude` and `codex`
 once to sign in.
 
-With everything present it runs both installers below and then
-`chain check ponytail`. A missing Ponytail
-plugin only warns (with the install commands), because it is needed for
-framework runs, not for installing skills. The per-provider installers stay
+With everything present it runs both installers below. Then, for each provider
+still without [Ponytail](#ponytail-required-for-framework-runs-stage-2), it shows
+that provider's marketplace and plugin commands and asks `Install Ponytail now?`
+before running them, and finally runs `chain check ponytail`. Declining, or a
+failed check, only warns: Ponytail is needed for framework runs, not for
+installing skills. The per-provider installers stay
 available for single-provider machines and for `update-chain`.
 
 ## Codex
@@ -91,7 +93,8 @@ The framework's minimalism ladder is the third-party
 [Ponytail](https://github.com/DietrichGebert/ponytail) plugin — installed
 on all active providers in mode `full`. Versions may differ and are reported
 for diagnostics only. The P0 preflight (`chain check ponytail`) blocks runs
-on absence, wrong mode, or restricted subagent coverage.
+on absence, wrong mode, or restricted subagent coverage. `./scripts/install.sh`
+offers the install commands below for each provider that lacks it.
 
 ```bash
 # Claude Code
@@ -133,7 +136,7 @@ It changes nothing and reports:
 
 It exits 1 when anything but Ponytail needs fixing; `./scripts/install.sh`
 fixes all of it (it treats a tool below its minimum like a missing one and
-offers the upgrade, then reinstalls the skills).
+offers the upgrade, reinstalls the skills, and offers Ponytail).
 
 ### Optional: run it after every pull
 

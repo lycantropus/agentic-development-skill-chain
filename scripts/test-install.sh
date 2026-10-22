@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # install.sh: missing prerequisites are all reported with an install offer; declining or a
 # failed install copies nothing; accepting installs them and continues; with every
-# prerequisite present both chains install, and a Ponytail gap only warns. PATH is a farm
+# prerequisite present both chains install, then a missing Ponytail is offered (only for
+# the providers lacking it) and a declined offer only warns. PATH is a farm
 # of the real tools minus the ones under test, with stubbed claude/codex and fake
 # installers (sudo, apt-get, curl, npm) that log calls and drop stubs into the farm,
 # so whatever is installed on the host never counts and nothing real is installed.
@@ -17,7 +18,23 @@ REAL="$TMP/real" FAKES="$TMP/fakes" LOG="$TMP/installs.log"
 mkdir -p "$REAL" "$FAKES" "$TMP/npm-prefix"
 for tool in $TOOLS; do ln -s "$(command -v "$tool")" "$REAL/$tool"; done
 
-printf '#!/bin/sh\nexit 0\n' >"$FAKES/claude"; cp "$FAKES/claude" "$FAKES/codex"
+# Provider CLIs log their arguments; a Ponytail install writes what chain check ponytail reads.
+cat >"$FAKES/claude" <<'EOF'
+#!/bin/sh
+echo "claude $*" >>"$FAKE_LOG"
+if [ "$*" = "plugin install ponytail@ponytail" ]; then
+  echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' >"$PONYTAIL_CLAUDE_REGISTRY"
+fi
+EOF
+cat >"$FAKES/codex" <<'EOF'
+#!/bin/sh
+echo "codex $*" >>"$FAKE_LOG"
+if [ "$*" = "plugin add ponytail@ponytail" ]; then
+  printf '[plugins."ponytail@ponytail"]\nenabled = true\n' >"$PONYTAIL_CODEX_CONFIG"
+  mkdir -p "$PONYTAIL_CODEX_CACHE/4.8.4/.codex-plugin"
+  echo '{"version":"4.8.4"}' >"$PONYTAIL_CODEX_CACHE/4.8.4/.codex-plugin/plugin.json"
+fi
+EOF
 cat >"$FAKES/sudo" <<'EOF'
 #!/bin/sh
 echo "sudo $*" >>"$FAKE_LOG"; exec "$@"
@@ -59,7 +76,7 @@ cat >"$FAKES/npm" <<'EOF'
 echo "npm $*" >>"$FAKE_LOG"
 case "$*" in
   "config get prefix") echo "$FAKE_NPM_PREFIX" ;;
-  "install -g @openai/codex") printf '#!/bin/sh\nexit 0\n' >"$FAKE_BIN/codex"; chmod +x "$FAKE_BIN/codex" ;;
+  "install -g @openai/codex") cp "$FAKE_FAKES/codex" "$FAKE_BIN/codex" ;;
 esac
 EOF
 chmod +x "$FAKES"/*
@@ -75,10 +92,13 @@ farm() { # farm <omitted tool>...: real TOOLS plus stubs and fake installers, mi
 }
 
 PT="$TMP/pt"
-ponytail() { # ponytail healthy|absent: plugin registries for both providers, mode full
-  rm -rf "$PT"; mkdir -p "$PT/cache/4.8.4/.codex-plugin" "$PT/cfg"
+ponytail() { # ponytail healthy|absent|claude-only: plugin registries per provider, mode full
+  rm -rf "$PT"; mkdir -p "$PT/cfg"
   echo '{"defaultMode":"full"}' >"$PT/cfg/config.json"
-  if [ "$1" = healthy ]; then
+  if [ "$1" = claude-only ]; then
+    echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' >"$PT/claude.json"
+  elif [ "$1" = healthy ]; then
+    mkdir -p "$PT/cache/4.8.4/.codex-plugin"
     echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' >"$PT/claude.json"
     echo '{"version":"4.8.4"}' >"$PT/cache/4.8.4/.codex-plugin/plugin.json"
     printf '[plugins."ponytail@ponytail"]\nenabled = true\n' >"$PT/codex.toml"
@@ -188,14 +208,34 @@ for provider in claude codex; do
   [ -d "$TMP/home/.$provider/skills/5_executing/runner" ] || fail "$provider runner not installed"
 done
 grep -q 'ponytail parity ok' "$TMP/out" || fail "ponytail status not reported: $(cat "$TMP/out")"
-! grep -q 'install Ponytail' "$TMP/err" || fail "healthy Ponytail must not warn"
+! grep -q 'Ponytail' "$TMP/err" || fail "healthy Ponytail must be neither offered nor warned: $(cat "$TMP/err")"
 ! grep -q 'newly installed' "$TMP/err" || fail "sign-in reminder without new installs"
 
-# Ponytail absent: skills still installed, exit 0, loud warning with the install commands.
-ponytail absent; run
+# Ponytail absent, offer declined: skills still installed, nothing run, exit 0, loud warning.
+farm; ponytail absent; run
 [ "$rc" = 0 ] || fail "Ponytail gap must not fail the install, got $rc"
 [ -f "$TMP/home/.codex/skills/0_chain-guide/SKILL.md" ] || fail "skills not installed with Ponytail absent"
-grep -q 'claude plugin install ponytail@ponytail' "$TMP/err" || fail "Ponytail install commands not printed"
-grep -q 'install Ponytail (commands above) before framework runs' "$TMP/err" || fail "Ponytail warning missing"
+for c in 'claude plugin marketplace add DietrichGebert/ponytail' 'claude plugin install ponytail@ponytail' \
+         'codex plugin marketplace add DietrichGebert/ponytail' 'codex plugin add ponytail@ponytail'; do
+  grep -qxF "    $c" "$TMP/err" || fail "Ponytail plan line missing: $c: $(cat "$TMP/err")"
+done
+grep -q 'Install Ponytail now? \[y/N\]' "$TMP/err" || fail "Ponytail not offered"
+! grep -q 'plugin' "$LOG" || fail "Ponytail commands ran without consent: $(cat "$LOG")"
+grep -q 'Ponytail is not ready (see above), fix it before framework runs' "$TMP/err" || fail "Ponytail warning missing"
+
+# Ponytail absent, offer accepted: marketplace then plugin per provider, then the check passes.
+farm; ponytail absent; run y
+[ "$rc" = 0 ] || fail "Ponytail install should exit 0, got $rc: $(cat "$TMP/err")"
+[ "$(grep plugin "$LOG")" = "claude plugin marketplace add DietrichGebert/ponytail
+claude plugin install ponytail@ponytail
+codex plugin marketplace add DietrichGebert/ponytail
+codex plugin add ponytail@ponytail" ] || fail "Ponytail commands wrong: $(cat "$LOG")"
+grep -q 'ponytail parity ok' "$TMP/out" || fail "Ponytail not ready after install: $(cat "$TMP/err")"
+! grep -q 'not ready' "$TMP/err" || fail "warned after a successful Ponytail install"
+
+# Only Codex lacks Ponytail: only Codex's commands are offered.
+farm; ponytail claude-only; run
+grep -qxF '    codex plugin add ponytail@ponytail' "$TMP/err" || fail "codex Ponytail not offered"
+! grep -q '^    claude plugin' "$TMP/err" || fail "claude Ponytail offered although installed"
 
 echo "test-install: ok"

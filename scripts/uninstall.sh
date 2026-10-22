@@ -9,15 +9,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/scripts/requirements.sh"
-ask() { # ask <question>: succeeds on y/yes
-  local answer=""
-  printf '%s [y/N] ' "$1" >&2
-  read -r answer || true
-  [ -t 0 ] || echo >&2 # a piped answer is not echoed; end the prompt line
-  case "$answer" in y|Y|yes|Yes|YES) return 0 ;; esac
-  return 1
-}
-show() { printf '%s\n' "$1" | sed 's/^/    /' >&2; }
 
 # Skill folders: every name this repo ships, plus the folded-away ones the installers clear.
 skills=""

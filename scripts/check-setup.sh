@@ -58,10 +58,8 @@ echo "Ponytail (framework runs only):"
 for provider in claude codex; do
   if ponytail_on "$provider"; then
     echo "  ✓ $provider"
-  elif [ "$provider" = claude ]; then
-    echo "  ! claude: not installed: claude plugin marketplace add DietrichGebert/ponytail && claude plugin install ponytail@ponytail"
   else
-    echo "  ! codex: not installed: codex plugin marketplace add DietrichGebert/ponytail && codex plugin add ponytail@ponytail"
+    echo "  ! $provider: not installed (./scripts/install.sh offers it)"
   fi
 done
 

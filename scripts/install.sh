@@ -111,14 +111,8 @@ if [ -n "$missing" ]; then
   fi
   if [ -n "$plan" ]; then
     echo "install: these commands install the rest:" >&2
-    printf '%s\n' "$plan" | sed 's/^/    /' >&2
-    printf 'Run them now? [y/N] ' >&2
-    answer=""
-    read -r answer || true
-    [ -t 0 ] || echo >&2 # a piped answer is not echoed; end the prompt line
-    case "$answer" in
-      y|Y|yes|Yes|YES) run_plan; check_prereqs ;;
-    esac
+    show "$plan"
+    if ask "Run them now?"; then run_plan; check_prereqs; fi
   fi
 fi
 
@@ -131,10 +125,28 @@ fi
 bash "$ROOT/scripts/install-claude.sh"
 bash "$ROOT/scripts/install-codex.sh"
 
-# Ponytail is required for framework runs only (P0 blocks without it), so a gap warns
-# instead of failing the install. The check prints the exact install commands.
+# Ponytail is required for framework runs only (P0 blocks without it): it is offered
+# once the skills are in place, and a declined or failed install only warns.
+pt_plan=""
+if ! ponytail_on claude; then pt_plan="$PONYTAIL_INSTALL_CLAUDE"; fi
+if ! ponytail_on codex; then pt_plan="$pt_plan$NL$PONYTAIL_INSTALL_CODEX"; fi
+pt_plan="${pt_plan#"$NL"}"
+if [ -n "$pt_plan" ]; then
+  echo "install: Ponytail (needed for framework runs) is missing; these commands install it:" >&2
+  show "$pt_plan"
+  if ask "Install Ponytail now?"; then
+    # Run every line (adding a marketplace that is already there may fail harmlessly);
+    # the check below decides whether Ponytail is in place.
+    old_ifs="$IFS"; IFS="$NL"; set -f
+    for cmd in $pt_plan; do
+      echo "install: running: $cmd" >&2
+      bash -c "$cmd" || echo "install: failed: $cmd" >&2
+    done
+    IFS="$old_ifs"; set +f
+  fi
+fi
 if ! (cd "$ROOT" && bash "${CLAUDE_HOME:-$HOME/.claude}/skills/5_executing/scripts/chain" check ponytail); then
-  echo "install: skills installed; install Ponytail (commands above) before framework runs" >&2
+  echo "install: skills installed; Ponytail is not ready (see above), fix it before framework runs" >&2
 fi
 if [ -n "$new_clis" ]; then
   echo "install: newly installed:$new_clis; start each once to sign in" >&2

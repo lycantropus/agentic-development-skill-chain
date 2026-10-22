@@ -1,7 +1,7 @@
-# requirements.sh — the setup's tool requirements, sourced (not run) by install.sh,
-# check-setup.sh and uninstall.sh. When a change needs a newer tool, raise its minimum
-# here: check-setup.sh then flags machines still below it after a pull, and install.sh
-# offers the upgrade. Empty = any version. Keep this file bash-3.2-safe.
+# requirements.sh — the setup's tool requirements and shared helpers, sourced (not run)
+# by install.sh, check-setup.sh and uninstall.sh. When a change needs a newer tool, raise
+# its minimum here: check-setup.sh then flags machines still below it after a pull, and
+# install.sh offers the upgrade. Empty = any version. Keep this file bash-3.2-safe.
 
 REQ_CLAUDE=
 REQ_CODEX=
@@ -18,6 +18,15 @@ RETIRED_SKILLS="4a_checkpoint 4b_setup"
 NL='
 '
 has() { command -v "$1" >/dev/null 2>&1; }
+ask() { # ask <question>: succeeds on y/yes
+  local answer=""
+  printf '%s [y/N] ' "$1" >&2
+  read -r answer || true
+  [ -t 0 ] || echo >&2 # a piped answer is not echoed; end the prompt line
+  case "$answer" in y|Y|yes|Yes|YES) return 0 ;; esac
+  return 1
+}
+show() { printf '%s\n' "$1" | sed 's/^/    /' >&2; }
 lacks() { case "$missing_cmds " in *" $1 "*) return 0 ;; esac; return 1; }
 
 tool_version() { # tool_version <command>: first dotted number in its --version output, or empty
@@ -69,6 +78,9 @@ check_prereqs() { # sets $missing/$missing_cmds (what to fix) and $found (what i
   fi
 }
 
+# Ponytail install commands per provider (docs/installation.md § Ponytail), one per line.
+PONYTAIL_INSTALL_CLAUDE="claude plugin marketplace add DietrichGebert/ponytail${NL}claude plugin install ponytail@ponytail"
+PONYTAIL_INSTALL_CODEX="codex plugin marketplace add DietrichGebert/ponytail${NL}codex plugin add ponytail@ponytail"
 ponytail_on() { # ponytail_on claude|codex: the Ponytail plugin is installed there (read-only; same files and overrides as chain check ponytail)
   case "$1" in
     claude) grep -q '"ponytail@ponytail"' "${PONYTAIL_CLAUDE_REGISTRY:-$HOME/.claude/plugins/installed_plugins.json}" 2>/dev/null ;;
