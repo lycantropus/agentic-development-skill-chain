@@ -8,16 +8,23 @@ From the repository root:
 ./scripts/install.sh
 ```
 
-It verifies `claude`, `codex`, bash >= 4.4, `git`, `jq` and `node` first, plus
+It verifies `claude`, `codex`, bash >= 4.4, `git`, `jq` and Node.js >= 22 (the
+oldest maintained LTS; the version CI runs) first, plus
 `perl` where `timeout` is absent (stock macOS; perl ships with it). If any are missing it lists all of them, prints the commands that would
 install them and asks before running anything:
 
-- `git`, `jq`, `perl`, `node`/`npm` (and `curl` if needed) through `brew`,
-  `apt-get` or `dnf` (with `sudo` when not root);
+- `git`, `jq`, `perl` (and `curl` if needed) through `brew`, `apt-get` or
+  `dnf` (with `sudo` when not root);
+- Node.js, missing or older than 22, as the current LTS through
+  [nvm](https://github.com/nvm-sh/nvm) (`nvm install --lts`, set as nvm's
+  default; nvm itself is installed first if absent and adds its loader to your
+  shell profile). Distro `nodejs` packages are not used: they often ship an
+  end-of-life Node;
 - [Claude Code](https://code.claude.com/docs/en/setup) via
   `curl -fsSL https://claude.ai/install.sh | bash`;
 - [Codex](https://github.com/openai/codex) via `npm install -g @openai/codex`
-  (with `sudo` only when the global npm prefix is not writable).
+  (no `sudo` with nvm; with an existing system Node only when the global npm
+  prefix is not writable).
 
 An old bash, or tools without a supported package manager, stay manual. Any
 answer but `y` (or a non-interactive stdin) declines; then, or when an install
@@ -60,7 +67,7 @@ This copies the bundled chain into:
 
 ## Platforms
 
-The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq` and `node`; where `timeout` is absent (stock macOS) also `perl`, which ships with macOS.
+The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq` and Node.js >= 22 (an LTS line); where `timeout` is absent (stock macOS) also `perl`, which ships with macOS.
 
 - **macOS**: `/bin/bash` is 3.2, which is too old. Install a current bash and put it before `/bin` on `PATH`
   (`chain` and the gates stop with this hint otherwise):

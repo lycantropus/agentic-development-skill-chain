@@ -144,7 +144,7 @@ enforces it.
 ```
 
 It checks the prerequisites ([Claude Code](https://code.claude.com/docs/en/setup),
-[Codex](https://github.com/openai/codex), bash >= 4.4, `git`, `jq`, `node`,
+[Codex](https://github.com/openai/codex), bash >= 4.4, `git`, `jq`, Node.js LTS >= 22,
 and `perl` where `timeout` is absent), lists everything missing at once and offers to install it (showing the
 exact commands first), then installs both chains and reports Ponytail status.
 Start newly installed `claude` and `codex` once to sign in. On a single-provider

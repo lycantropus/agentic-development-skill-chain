@@ -31,9 +31,28 @@ EOF
 cat >"$FAKES/curl" <<'EOF'
 #!/bin/sh
 echo "curl $*" >>"$FAKE_LOG"
-cat <<'SCRIPT'
+case "$*" in
+  *nvm-sh/nvm*) echo 'mkdir -p "$HOME/.nvm" && cp "$FAKE_FAKES/nvm.sh" "$HOME/.nvm/nvm.sh"' ;;
+  *) cat <<'SCRIPT'
 mkdir -p "$HOME/.local/bin" && printf '#!/bin/sh\nexit 0\n' >"$HOME/.local/bin/claude" && chmod +x "$HOME/.local/bin/claude"
 SCRIPT
+  ;;
+esac
+EOF
+# nvm stand-in: "install" puts the real node and the fake npm into a versioned bin dir.
+cat >"$FAKES/nvm.sh" <<'EOF'
+nvm() {
+  echo "nvm $*" >>"$FAKE_LOG"
+  b="$HOME/.nvm/versions/node/v24.0.0/bin"
+  case "$1" in
+    install) mkdir -p "$b" && ln -sf "$FAKE_REAL/node" "$b/node" && cp "$FAKE_FAKES/npm" "$b/npm" ;;
+    which) echo "$b/node" ;;
+  esac
+}
+EOF
+cat >"$FAKES/node-old" <<'EOF'
+#!/bin/sh
+case "$1" in -p) echo 18 ;; *) echo v18.20.0 ;; esac
 EOF
 cat >"$FAKES/npm" <<'EOF'
 #!/bin/sh
@@ -70,12 +89,13 @@ ponytail() { # ponytail healthy|absent: plugin registries for both providers, mo
 run() { # run [answer]: install into a scratch home, answering the prompt (none: closed stdin);
         # exit code in $rc, output in $TMP/out, $TMP/err
   rm -rf "$TMP/home"; mkdir -p "$TMP/home"
+  if [ -n "${SEED_NVM:-}" ]; then mkdir -p "$TMP/home/.nvm"; cp "$FAKES/nvm.sh" "$TMP/home/.nvm/nvm.sh"; fi
   rc=0
   { if [ $# -gt 0 ]; then printf '%s\n' "$1"; fi; } | env -i PATH="$BIN" HOME="$TMP/home" \
     CLAUDE_HOME="$TMP/home/.claude" CODEX_HOME="$TMP/home/.codex" \
     PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
     PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
-    FAKE_LOG="$LOG" FAKE_REAL="$REAL" FAKE_BIN="$BIN" FAKE_NPM_PREFIX="$TMP/npm-prefix" \
+    FAKE_LOG="$LOG" FAKE_REAL="$REAL" FAKE_BIN="$BIN" FAKE_NPM_PREFIX="$TMP/npm-prefix" FAKE_FAKES="$FAKES" \
     FAKE_APT_FAILS="${FAKE_APT_FAILS:-}" \
     "$(command -v bash)" "$ROOT/scripts/install.sh" >"$TMP/out" 2>"$TMP/err" || rc=$?
 }
@@ -122,10 +142,27 @@ grep -q 'install: failed: .*apt-get' "$TMP/err" || fail "failure not reported: $
 grep -q 'missing prerequisites, nothing installed' "$TMP/err" || fail "remaining gaps not reported"
 [ ! -e "$TMP/home/.claude" ] || fail "skills copied after a failed install"
 
-# Node and npm missing: distro packages for both, and the system npm prefix needs sudo.
+# Node missing: never a distro package; nvm (installed first if absent) takes the current LTS,
+# and Codex then installs into nvm's npm without sudo.
+nvm_line="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash && . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default 'lts/*'"
 farm codex node npm; run
-grep -qE 'apt-get install -y nodejs npm$' "$TMP/err" || fail "node/npm package plan wrong: $(cat "$TMP/err")"
-grep -qE "^    $([ "$(id -u)" = 0 ] || echo 'sudo ')npm install -g @openai/codex$" "$TMP/err" || fail "system npm needs sudo"
+grep -qxF "    $nvm_line" "$TMP/err" || fail "nvm plan wrong: $(cat "$TMP/err")"
+! grep -q 'nodejs\|apt-get' "$TMP/err" || fail "node offered as a distro package"
+grep -qxF '    npm install -g @openai/codex' "$TMP/err" || fail "codex via nvm npm must not need sudo"
+farm codex node npm; SEED_NVM=1 run
+grep -qxF "    . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default 'lts/*'" "$TMP/err" || fail "existing nvm not reused: $(cat "$TMP/err")"
+
+# Node too old: reported with its version and replaced through nvm.
+farm codex; rm "$BIN/node"; cp "$FAKES/node-old" "$BIN/node"; run
+grep -q '^  - node: found v18.20.0, need the current Node.js LTS (>= 22)' "$TMP/err" || fail "old node not reported: $(cat "$TMP/err")"
+grep -qxF "    $nvm_line" "$TMP/err" || fail "old node not replaced through nvm"
+
+# Accepted with node missing: nvm installs the LTS, its node goes on PATH, Codex installs with it.
+farm codex node npm; ponytail healthy; run y
+[ "$rc" = 0 ] || fail "nvm install should exit 0, got $rc: $(cat "$TMP/err")"
+grep -q "^nvm install --lts$" "$LOG" && grep -q "^nvm alias default lts/\*$" "$LOG" || fail "nvm not driven: $(cat "$LOG")"
+grep -q '^npm install -g @openai/codex$' "$LOG" && [ -x "$BIN/codex" ] || fail "codex not installed with nvm's npm: $(cat "$LOG")"
+[ -f "$TMP/home/.codex/skills/0_chain-guide/SKILL.md" ] || fail "skills not installed after nvm"
 
 # perl backs only the timeout fallback: required without timeout/gtimeout, ignored with either.
 farm perl; run

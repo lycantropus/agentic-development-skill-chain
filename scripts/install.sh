@@ -11,12 +11,22 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NL='
 '
+# Oldest maintained Node.js LTS (22: end of life April 2027) and the version CI runs.
+# Raise it when that line reaches end of life. Installs always take the current LTS.
+NODE_MIN=22
+NVM_VERSION=v0.40.5
+# Where nvm lives, resolved the way nvm's own installer does.
+if [ -n "${NVM_DIR:-}" ]; then nvm_dir="$NVM_DIR"
+elif [ -n "${XDG_CONFIG_HOME:-}" ]; then nvm_dir="$XDG_CONFIG_HOME/nvm"
+else nvm_dir="$HOME/.nvm"
+fi
 
+gap() { # gap <name> <report line>: record a missing prerequisite
+  missing="$missing$NL  - $1: $2"
+  missing_cmds="$missing_cmds $1"
+}
 need() { # need <command> <manual install hint>
-  if ! command -v "$1" >/dev/null 2>&1; then
-    missing="$missing$NL  - $1: $2"
-    missing_cmds="$missing_cmds $1"
-  fi
+  if ! has "$1"; then gap "$1" "$2"; fi
 }
 check_prereqs() { # sets $missing (report lines) and $missing_cmds (names)
   missing="" missing_cmds=""
@@ -24,14 +34,17 @@ check_prereqs() { # sets $missing (report lines) and $missing_cmds (names)
   need codex "npm install -g @openai/codex, then run codex once to sign in"
   need git "install it with your package manager"
   need jq "install it with your package manager (macOS: brew install jq)"
-  need node "install Node.js 18 or newer"
+  if ! has node; then
+    gap node "install the current Node.js LTS (>= $NODE_MIN), e.g. with nvm: nvm install --lts"
+  elif [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -lt "$NODE_MIN" ]; then
+    gap node "found $(node --version), need the current Node.js LTS (>= $NODE_MIN), e.g. with nvm: nvm install --lts"
+  fi
   # perl only backs compat.sh's timeout fallback (stock macOS); Linux has timeout built in.
   if ! has timeout && ! has gtimeout; then
     need perl "needed because timeout is absent; install it with your package manager"
   fi
   if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 4 ]; }; then
-    missing="$missing$NL  - bash >= 4.4 (found $BASH_VERSION): macOS: brew install bash, and put it before /bin on PATH"
-    missing_cmds="$missing_cmds bash"
+    gap bash "found $BASH_VERSION, need >= 4.4: macOS: brew install bash, and put it before /bin on PATH"
   fi
 }
 lacks() { case "$missing_cmds " in *" $1 "*) return 0 ;; esac; return 1; }
@@ -39,23 +52,32 @@ has() { command -v "$1" >/dev/null 2>&1; }
 
 plan_installs() { # sets $plan (one command per line, dependency order) and $manual (what it cannot install)
   plan="" manual=""
-  local sudo="" pm="" pkgs="" npm_sudo="" t
+  local sudo="" pm="" pkgs="" npm_sudo="" node_cmd="" nvm_q t
   [ "$(id -u)" = 0 ] || sudo="sudo "
   for t in brew apt-get dnf; do
     if has "$t"; then pm="$t"; break; fi
   done
 
+  # Node comes from nvm, never the package manager: distro packages often ship an
+  # end-of-life Node, and nvm installs the current LTS per user, so npm -g needs no sudo.
+  if lacks node; then
+    nvm_q="$(printf '%q' "$nvm_dir")"
+    if [ -s "$nvm_dir/nvm.sh" ]; then
+      node_cmd=". $nvm_q/nvm.sh"
+    else
+      node_cmd="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh | bash && . $nvm_q/nvm.sh"
+    fi
+    node_cmd="$node_cmd && nvm install --lts && nvm alias default 'lts/*'"
+  fi
+
   for t in git jq perl; do
     if lacks "$t"; then pkgs="$pkgs $t"; fi
   done
-  # Codex installs through npm; Homebrew's node ships npm, distro packages split it out.
-  if lacks node || { lacks codex && ! has npm; }; then
-    if [ "$pm" = brew ]; then pkgs="$pkgs node"
-    elif lacks node; then pkgs="$pkgs nodejs npm"
-    else pkgs="$pkgs npm"
-    fi
+  # A supported node without npm (split-out distro package) still needs npm for Codex.
+  if lacks codex && ! lacks node && ! has npm && [ "$pm" != brew ]; then pkgs="$pkgs npm"; fi
+  if ! has curl; then
+    case "$node_cmd" in curl*) pkgs="$pkgs curl" ;; *) if lacks claude; then pkgs="$pkgs curl"; fi ;; esac
   fi
-  if lacks claude && ! has curl; then pkgs="$pkgs curl"; fi
   if [ -n "$pkgs" ]; then
     case "$pm" in
       brew) plan="brew install$pkgs" ;;
@@ -65,10 +87,13 @@ plan_installs() { # sets $plan (one command per line, dependency order) and $man
     esac
   fi
 
+  if [ -n "$node_cmd" ]; then plan="$plan$NL$node_cmd"; fi
   if lacks claude; then plan="$plan${NL}curl -fsSL https://claude.ai/install.sh | bash"; fi
   if lacks codex; then
     # A root-owned global prefix (system node) needs sudo; nvm and Homebrew prefixes do not.
-    if has npm; then
+    if [ -n "$node_cmd" ]; then
+      :
+    elif has npm; then
       [ -w "$(npm config get prefix)" ] || npm_sudo="$sudo"
     elif [ "$pm" != brew ]; then
       npm_sudo="$sudo"
@@ -77,6 +102,13 @@ plan_installs() { # sets $plan (one command per line, dependency order) and $man
   fi
   if lacks bash; then manual="$manual bash>=4.4"; fi
   plan="${plan#"$NL"}"
+}
+
+use_nvm_node() { # put the node nvm just installed first on PATH, so the Codex step uses it
+  local bin
+  bin="$(bash -c '. "$1/nvm.sh" >/dev/null 2>&1; nvm which default' _ "$nvm_dir" 2>/dev/null)" || return 0
+  if [ -x "$bin" ]; then PATH="$(dirname "$bin"):$PATH"; hash -r; fi
+  return 0
 }
 
 run_plan() { # runs $plan line by line, stopping at the first failure
@@ -88,6 +120,7 @@ run_plan() { # runs $plan line by line, stopping at the first failure
       echo "install: failed: $cmd" >&2
       break
     fi
+    case "$cmd" in *"nvm install --lts"*) use_nvm_node ;; esac
   done
   IFS="$old_ifs"; set +f
   # The Claude installer puts claude in ~/.local/bin, which may not be on PATH yet.
