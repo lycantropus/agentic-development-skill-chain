@@ -61,6 +61,12 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
   Peer findings are ingested into the ledger; a failed peer never stops
   the run — but a failed or timed-out WRITER cancels the peer
   immediately, and SIGINT/SIGTERM kill both lane process groups.
+- **Permissions are not bypassed by default:** the claude writer lane runs
+  under the project's `.claude/settings.json` (allowlist + deny list,
+  `defaultMode: acceptEdits`, merged by `merge-project-settings.sh`); a
+  command outside the allowlist is denied and the run parks.
+  `SKILLCHAIN_SKIP_PERMISSIONS=1` adds `--dangerously-skip-permissions` as an
+  explicit opt-in only. Peer lanes always keep their read-only tool lists.
 - **Persistent PROJ worktree:** P0 creates or resumes the registered sibling
   worktree and `run-phase.sh` re-executes there before later phases. Dependencies
   are local to that checkout; `.env.local`, development data, and hosted-auth
