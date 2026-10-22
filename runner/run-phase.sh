@@ -275,8 +275,12 @@ launch_lane() { # provider role promptfile outfile — sets LANE_PID/LANE_MODEL 
   case "${provider}:${role}" in
     claude:writer)
       LANE_MODEL="$WRITER_MODEL"
+      # Default: the project's .claude/settings.json permissions govern the lane.
+      # Full bypass only on explicit opt-in (SKILLCHAIN_SKIP_PERMISSIONS=1).
+      local perm=()
+      [ "${SKILLCHAIN_SKIP_PERMISSIONS:-}" = 1 ] && perm=(--dangerously-skip-permissions)
       "${SETSID_BIN[@]}" bash "$RUNNER_DIR/launch-lane.sh" "$JOURNAL_DIR" "$RUN_ID" "$receipt" claude -p "$(cat "$prompt")" --model "$WRITER_MODEL" \
-        --dangerously-skip-permissions </dev/null >"$out" 2>&1 18>&- &
+        ${perm[@]+"${perm[@]}"} </dev/null >"$out" 2>&1 18>&- &
       ;;
     claude:peer)
       local tools="Read,Grep,Glob"

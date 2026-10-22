@@ -33,10 +33,16 @@ else
   { command -v codex >/dev/null && codex login status >/dev/null 2>&1; } \
     && echo "codex: ok" \
     || echo "codex: missing or unauthenticated -> single-provider run, flagged in the morning report and PR body"
-  off=; for f in ~/.claude/settings.json .claude/settings.json .claude/settings.local.json /etc/claude-code/managed-settings.json; do
-    jq -e '.permissions.disableBypassPermissionsMode == "disable"' "$f" >/dev/null 2>&1 && off=1
-  done
-  [ -z "$off" ] && echo "permissions: ok" || echo "permissions: bypass mode disabled -> the claude lane stops at its first prompt"
+  if [ "${SKILLCHAIN_SKIP_PERMISSIONS:-}" = 1 ]; then   # explicit opt-in: full bypass
+    off=; for f in ~/.claude/settings.json .claude/settings.json .claude/settings.local.json /etc/claude-code/managed-settings.json; do
+      jq -e '.permissions.disableBypassPermissionsMode == "disable"' "$f" >/dev/null 2>&1 && off=1
+    done
+    [ -z "$off" ] && echo "permissions: ok" || echo "permissions: bypass mode disabled -> the claude lane stops at its first prompt"
+  else                                                   # default: project allowlist
+    jq -e '(.permissions.allow // []) | length > 0' .claude/settings.json >/dev/null 2>&1 \
+      && echo "permissions: ok" \
+      || echo "permissions: no project allowlist -> run scripts/merge-project-settings.sh, or the claude lane is denied its first command"
+  fi
   RUN="${SKILLCHAIN_RUNNER:-$(for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do [ -x "$c" ] && { echo "$c"; break; }; done)}"
   [ -x "$RUN" ] && echo "runner: ok" \
     || echo "runner: NOT FOUND (unattended only) -> run the chain's install script, or set SKILLCHAIN_RUNNER=<path>/run-phase.sh"
@@ -47,6 +53,11 @@ fi
 
 Detached, never a foreground Bash call: a foreground call is capped at 10 minutes
 and a background call at 2 hours, and an overnight run outlives both.
+
+The claude writer lane runs under the project's `.claude/settings.json`
+permissions. Only when the user explicitly opts into full bypass, export
+`SKILLCHAIN_SKIP_PERMISSIONS=1` before this block (`setup.md` §2, Claude host);
+never set it on the user's behalf.
 
 ```bash launch
 RUN="${SKILLCHAIN_RUNNER:-$(for c in runner/run-phase.sh ~/.claude/skills/5_executing/runner/run-phase.sh ~/.codex/skills/5_executing/runner/run-phase.sh; do [ -x "$c" ] && { echo "$c"; break; }; done)}"

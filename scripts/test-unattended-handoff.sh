@@ -35,13 +35,16 @@ chmod +x bin/* runner/run-phase.sh
 export PATH="$CASE/bin:$PATH" HOME="$CASE"   # HOME: no user settings leak in
 unset SKILLCHAIN_RUNNER_MANAGED SKILLCHAIN_RUNNER || true
 
-# 1. P0:done, not runner-managed -> exactly one ASK with all-ok prerequisites.
+# 1. P0:done, not runner-managed, project allowlist merged -> exactly one ASK with all-ok prerequisites.
+mkdir -p .claude; echo '{"permissions":{"allow":["Read"],"defaultMode":"acceptEdits"}}' >.claude/settings.json
 out="$(bash probe.sh 2>&1)" || die 'probe failed'
 [ "$(printf '%s\n' "$out" | grep -c '^ASK$')" = 1 ] || die "expected exactly one ASK, got: $out"
 [ "$(printf '%s\n' "$out" | grep -c -E '^(SKIP)$')" = 0 ] || die 'ASK and SKIP together'
 for l in 'codex: ok' 'permissions: ok' 'runner: ok'; do
   printf '%s\n' "$out" | grep -qx "$l" || die "missing prerequisite line '$l' in: $out"
 done
+
+rm -f .claude/settings.json
 
 # 2. runner-managed lane -> SKIP, no question, no prerequisite lines.
 out="$(SKILLCHAIN_RUNNER_MANAGED=1 bash probe.sh 2>&1)"
@@ -60,9 +63,12 @@ rm runner/run-phase.sh
 mkdir bin2; ln -s "$(command -v jq)" bin2/jq   # PATH with only jq: codex absent
 mkdir -p .claude; echo '{"permissions":{"disableBypassPermissionsMode":"disable"}}' >.claude/settings.json
 out="$(PATH="$CASE/bin2" "$BASH" probe.sh 2>&1)"
-for l in '^ASK$' '^codex: missing' '^permissions: bypass mode disabled' '^runner: NOT FOUND'; do
+for l in '^ASK$' '^codex: missing' '^permissions: no project allowlist' '^runner: NOT FOUND'; do
   printf '%s\n' "$out" | grep -q "$l" || die "degraded probe lacks '$l' in: $out"
 done
+# Opt-in bypass (SKILLCHAIN_SKIP_PERMISSIONS=1) is checked against disableBypassPermissionsMode instead.
+out="$(SKILLCHAIN_SKIP_PERMISSIONS=1 PATH="$CASE/bin2" "$BASH" probe.sh 2>&1)"
+printf '%s\n' "$out" | grep -q '^permissions: bypass mode disabled' || die "opt-in bypass probe lacks the disabled-bypass line in: $out"
 rm -f .claude/settings.json
 
 # 5. Launch: returns before the runner finishes, detached (own session), stdin /dev/null, output in the log.

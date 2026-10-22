@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "_comment": "Project-level permissions for Skills 5/6/7. Merge into .claude/settings.json via scripts/merge-project-settings.sh. Deny list is authoritative — destructive ops stay blocked even under bypassPermissions. No hooks: workers read their compiled context file by the path in the spawn prompt. Ponytail uses its native all-subagent path; do not add PONYTAIL_SUBAGENT_MATCHER.",
+  "_comment": "Project-level permissions for Skills 5/6/7. Merge into .claude/settings.json via scripts/merge-project-settings.sh. defaultMode acceptEdits: edits and allowlisted commands run without prompts; anything else prompts (interactive) or is denied (headless runner lane). Full bypass is an explicit opt-in (setup.md §2), never the template default. Deny list is authoritative — destructive ops stay blocked. No hooks: workers read their compiled context file by the path in the spawn prompt. Ponytail uses its native all-subagent path; do not add PONYTAIL_SUBAGENT_MATCHER.",
   "permissions": {
-    "defaultMode": "bypassPermissions",
+    "defaultMode": "acceptEdits",
     "allow": [
       "Read",
       "Write",

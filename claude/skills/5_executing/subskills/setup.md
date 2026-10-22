@@ -200,11 +200,24 @@ continuing. Never use `--roles-dir` to bypass this gate.
 
 ### 2. Permission preflight (Claude host)
 
-Verify Claude Code was started with `--dangerously-skip-permissions`, or
-run `bash scripts/merge-project-settings.sh` once per project (copy from
-`~/.claude/skills/5_executing/scripts/merge-project-settings.sh` if
-missing) so the allowlist + `defaultMode: bypassPermissions` are in
-place. Without this, overnight runs die on the first permission prompt.
+**Default:** run `bash scripts/merge-project-settings.sh` once per project
+(copy from `~/.claude/skills/5_executing/scripts/merge-project-settings.sh`
+if missing) and commit `.claude/settings.json`. It adds the execution
+allowlist and deny list with `defaultMode: acceptEdits`: file edits and
+allowlisted commands run without prompts; any other command prompts in an
+interactive session and is denied in a headless runner lane, where the run
+then parks. Extend the project allowlist for project-specific commands
+instead of bypassing permissions. The merge never overwrites an explicit
+project `defaultMode`, so a project that merged an older template keeps
+`bypassPermissions` until it is changed by hand.
+
+**Optional, explicit opt-in only: full permission bypass.** Use it only when
+the user asks for it, ideally inside a sandbox (container or VM with a mount
+limited to the repo). Interactive: start Claude Code with
+`claude --dangerously-skip-permissions`. Runner: export
+`SKILLCHAIN_SKIP_PERMISSIONS=1` before the launch block, which adds
+`--dangerously-skip-permissions` to the claude writer lane. Setup never
+chooses it on the user's behalf.
 
 ### 3. CodeRabbit config preflight
 
