@@ -58,7 +58,7 @@ for answers in "" "n n"; do
   grep -q "^    $H/.claude/skills/4a_checkpoint$" "$TMP/err" || fail "retired folder not listed: $(cat "$TMP/err")"
   ! grep -q '/synced$\|/mine$' "$TMP/err" || fail "foreign skills listed for removal"
   for c in 'claude plugin uninstall ponytail@ponytail' 'claude plugin marketplace remove ponytail' \
-           'codex plugin remove ponytail@ponytail' 'codex plugin marketplace remove ponytail' "rm -f $H/.config/ponytail/config.json"; do
+           'codex plugin remove ponytail@ponytail' 'codex plugin marketplace remove ponytail'; do
     grep -qxF "    $c" "$TMP/err" || fail "plan line missing: $c"
   done
   [ ! -s "$LOG" ] && [ -f "$H/.config/ponytail/config.json" ] || fail "declined '$answers': Ponytail touched"
@@ -74,14 +74,14 @@ for p in claude codex; do [ "$(chain_count "$H/.$p/skills")" = 0 ] || fail "$p c
 grep -q "removed $((total * 2 + 1)) skill folders" "$TMP/out" || fail "removal count wrong: $(cat "$TMP/out")"
 [ ! -s "$LOG" ] && [ -f "$H/.config/ponytail/config.json" ] || fail "Ponytail touched when declined"
 
-# Ponytail only: plugin then marketplace per provider, shared config removed, skills stay.
+# Ponytail only: plugin then marketplace per provider; the shared config and the skills stay.
 farm; setup; run n y
 [ "$rc" = 0 ] || fail "Ponytail uninstall should exit 0, got $rc: $(cat "$TMP/err")"
 [ "$(cat "$LOG")" = "claude plugin uninstall ponytail@ponytail
 claude plugin marketplace remove ponytail
 codex plugin remove ponytail@ponytail
 codex plugin marketplace remove ponytail" ] || fail "Ponytail commands wrong: $(cat "$LOG")"
-[ ! -e "$H/.config/ponytail/config.json" ] || fail "Ponytail config left"
+[ -f "$H/.config/ponytail/config.json" ] || fail "shared Ponytail config removed (other Ponytail installs read it)"
 [ "$(chain_count "$H/.claude/skills")" = "$total" ] || fail "skills removed when declined"
 
 # A failing command is reported, the rest still run, exit 1.

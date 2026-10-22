@@ -184,10 +184,11 @@ It lists what it found and asks separately before removing each part:
   and the directories themselves stay.
 - **Ponytail**, where installed: `claude plugin uninstall ponytail@ponytail`,
   `claude plugin marketplace remove ponytail`, `codex plugin remove
-  ponytail@ponytail`, `codex plugin marketplace remove ponytail`, and the
-  shared `~/.config/ponytail/config.json`. A failed command is reported and the
-  rest still run (exit 1). If a provider's CLI is missing, its Ponytail is named
-  for manual removal.
+  ponytail@ponytail` and `codex plugin marketplace remove ponytail`. A failed
+  command is reported and the rest still run (exit 1). If a provider's CLI is
+  missing, its Ponytail is named for manual removal. The shared
+  `~/.config/ponytail/config.json` stays, since other Ponytail installs read it
+  too.
 
 Any answer but `y` (or a non-interactive stdin) keeps that part. Claude Code,
 Codex, the toolchain, and helper copies already synced into projects

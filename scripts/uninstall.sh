@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Undo install.sh: remove the chain's skill folders (by name, so other skills in the same
 # directories stay) and, where installed, the Ponytail plugin and marketplace on each
-# provider plus Ponytail's shared config. Everything is shown first and each part is
-# confirmed separately; anything but "y" (or a non-interactive stdin) keeps that part.
+# provider (Ponytail's shared config stays: other Ponytail installs read it too).
+# Everything is shown first and each part is confirmed separately; anything but "y"
+# (or a non-interactive stdin) keeps that part.
 # Claude Code, Codex, the toolchain and helper copies synced into projects stay.
 # Keep this file bash-3.2-safe, like install.sh.
 set -euo pipefail
@@ -21,8 +22,7 @@ for provider in claude codex; do
 done
 skills="${skills#"$NL"}"
 
-# Ponytail plugin and marketplace per provider, plus its shared config.
-pt_config="${PONYTAIL_CONFIG:-$HOME/.config/ponytail/config.json}"
+# Ponytail plugin and marketplace per provider.
 pt_plan="" pt_manual=""
 if ponytail_on claude; then
   if has claude; then
@@ -38,7 +38,6 @@ if ponytail_on codex; then
     pt_manual="$pt_manual codex"
   fi
 fi
-if [ -f "$pt_config" ]; then pt_plan="$pt_plan${NL}rm -f $(printf '%q' "$pt_config")"; fi
 pt_plan="${pt_plan#"$NL"}"
 
 if [ -z "$skills" ] && [ -z "$pt_plan" ] && [ -z "$pt_manual" ]; then
