@@ -13,29 +13,36 @@ PRD before downstream verbatim copying; a planner does not translate them.
 
 ```mermaid
 flowchart LR
-  S0[0 chain-guide] --> S0A[0a product-vision · new product]
+  S0[0 chain-guide · routes any PROJ state] --> S0A[0a product-vision · new product]
   S0 --> S0B[0b intake · existing codebase]
-  S0A --> S0C[0c bootstrap · stack + scaffold]
+  S0A -->|full chain| S0C[0c bootstrap · stack + scaffold]
+  S0A -.discovery track.-> S1
   S0C --> S1[1 concept]
   S0B --> S1
   S0 --> S1
   S0 -.optional.-> S1A[1a clarification · with stakeholder]
   S1A --> S1
-  S1 --> S1B[1b visual-companion]
-  S1 --> S2[2 requirements-engineer]
-  S1B --> S1C[1c frontend-design]
+  S1 -->|UI feature| S1B[1b visual-companion]
+  S1 -->|backend / API only| S2[2 requirements-engineer]
+  S1B -->|design system needed| S1C[1c frontend-design]
   S1C --> S1D[1d prototyping]
-  S1B --> S1D
-  S1D -->|iterated or candidates| S1E[1e concept-sync]
+  S1B -->|brownfield| S1D
+  S1D -->|concept affected or candidates open| S1E[1e concept-sync]
   S1D --> S2
   S1E --> S2
-  S2 -.discovery track.-> S2B[2b handoff-package]
-  S2 --> S3[3 architecture]
+  S2 -.on request, either track.-> S2B[2b handoff-package]
+  S2 -.discovery: Linear handoff.-> DEV([developer / external experts])
+  S2B -.-> DEV
+  DEV -.review returns gaps.-> S2C[2c review-reconcile]
+  S2C -.reconciled PRDs.-> S2
+  S2C -.new dated run.-> S2B
+  S2 -->|full chain| S3[3 architecture]
   S3 --> S4[4 writing-plans]
   S4 --> S5[5b executing-large-model: CP1 + P0 subskills, then waves]
   S5 --> S6[6 qa]
   S6 --> S7[7 documentation]
   S7 --> S8[8 delivery + CP2]
+  S8 -.open blocking findings.-> S6
 ```
 
 **Before the first PROJ, once.** A new product runs
