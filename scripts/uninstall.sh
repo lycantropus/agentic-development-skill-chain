@@ -8,9 +8,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NL='
-'
-has() { command -v "$1" >/dev/null 2>&1; }
+. "$ROOT/scripts/requirements.sh"
 ask() { # ask <question>: succeeds on y/yes
   local answer=""
   printf '%s [y/N] ' "$1" >&2
@@ -25,27 +23,24 @@ show() { printf '%s\n' "$1" | sed 's/^/    /' >&2; }
 skills=""
 for provider in claude codex; do
   if [ "$provider" = claude ]; then dest="${CLAUDE_HOME:-$HOME/.claude}/skills"; else dest="${CODEX_HOME:-$HOME/.codex}/skills"; fi
-  for skill in "$ROOT/$provider/skills"/* 4a_checkpoint 4b_setup; do
+  for skill in "$ROOT/$provider/skills"/* $RETIRED_SKILLS; do
     name="$(basename "$skill")"
     if [ -d "$dest/$name" ]; then skills="$skills$NL$dest/$name"; fi
   done
 done
 skills="${skills#"$NL"}"
 
-# Ponytail: detected the same way as chain check ponytail (same override variables).
-claude_reg="${PONYTAIL_CLAUDE_REGISTRY:-$HOME/.claude/plugins/installed_plugins.json}"
-codex_toml="${PONYTAIL_CODEX_CONFIG:-$HOME/.codex/config.toml}"
-codex_cache="${PONYTAIL_CODEX_CACHE:-$HOME/.codex/plugins/cache/ponytail/ponytail}"
+# Ponytail plugin and marketplace per provider, plus its shared config.
 pt_config="${PONYTAIL_CONFIG:-$HOME/.config/ponytail/config.json}"
 pt_plan="" pt_manual=""
-if grep -q '"ponytail@ponytail"' "$claude_reg" 2>/dev/null; then
+if ponytail_on claude; then
   if has claude; then
     pt_plan="$pt_plan${NL}claude plugin uninstall ponytail@ponytail${NL}claude plugin marketplace remove ponytail"
   else
     pt_manual="$pt_manual claude"
   fi
 fi
-if grep -q 'plugins\."ponytail@ponytail"' "$codex_toml" 2>/dev/null || [ -d "$codex_cache" ]; then
+if ponytail_on codex; then
   if has codex; then
     pt_plan="$pt_plan${NL}codex plugin remove ponytail@ponytail${NL}codex plugin marketplace remove ponytail"
   else

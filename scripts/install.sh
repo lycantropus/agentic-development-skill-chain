@@ -1,54 +1,23 @@
 #!/usr/bin/env bash
 # Full setup: verify both provider CLIs and the helper toolchain, install both skill
-# chains, then report Ponytail readiness. Every missing prerequisite is listed at once,
-# with an offer to install it (the exact commands are shown first; anything but "y"
-# declines, including a non-interactive stdin). Nothing is copied until all are present.
+# chains, then report Ponytail readiness. Every missing or outdated prerequisite
+# (minimums in requirements.sh) is listed at once, with an offer to install it (the
+# exact commands are shown first; anything but "y" declines, including a
+# non-interactive stdin). Nothing is copied until all are present.
 # The per-provider installers stay usable alone (update-chain runs them;
 # single-provider machines use them directly).
 # Keep this file bash-3.2-safe so stock macOS reaches the bash hint, not a syntax error.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-NL='
-'
-# Oldest maintained Node.js LTS (22: end of life April 2027) and the version CI runs.
-# Raise it when that line reaches end of life. Installs always take the current LTS.
-NODE_MIN=22
+# Tool minimums and the shared prerequisite check live in requirements.sh.
+. "$ROOT/scripts/requirements.sh"
 NVM_VERSION=v0.40.5
 # Where nvm lives, resolved the way nvm's own installer does.
 if [ -n "${NVM_DIR:-}" ]; then nvm_dir="$NVM_DIR"
 elif [ -n "${XDG_CONFIG_HOME:-}" ]; then nvm_dir="$XDG_CONFIG_HOME/nvm"
 else nvm_dir="$HOME/.nvm"
 fi
-
-gap() { # gap <name> <report line>: record a missing prerequisite
-  missing="$missing$NL  - $1: $2"
-  missing_cmds="$missing_cmds $1"
-}
-need() { # need <command> <manual install hint>
-  if ! has "$1"; then gap "$1" "$2"; fi
-}
-check_prereqs() { # sets $missing (report lines) and $missing_cmds (names)
-  missing="" missing_cmds=""
-  need claude "curl -fsSL https://claude.ai/install.sh | bash, then run claude once to sign in"
-  need codex "npm install -g @openai/codex, then run codex once to sign in"
-  need git "install it with your package manager"
-  need jq "install it with your package manager (macOS: brew install jq)"
-  if ! has node; then
-    gap node "install the current Node.js LTS (>= $NODE_MIN), e.g. with nvm: nvm install --lts"
-  elif [ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -lt "$NODE_MIN" ]; then
-    gap node "found $(node --version), need the current Node.js LTS (>= $NODE_MIN), e.g. with nvm: nvm install --lts"
-  fi
-  # perl only backs compat.sh's timeout fallback (stock macOS); Linux has timeout built in.
-  if ! has timeout && ! has gtimeout; then
-    need perl "needed because timeout is absent; install it with your package manager"
-  fi
-  if [ "${BASH_VERSINFO[0]}" -lt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 4 ]; }; then
-    gap bash "found $BASH_VERSION, need >= 4.4: macOS: brew install bash, and put it before /bin on PATH"
-  fi
-}
-lacks() { case "$missing_cmds " in *" $1 "*) return 0 ;; esac; return 1; }
-has() { command -v "$1" >/dev/null 2>&1; }
 
 plan_installs() { # sets $plan (one command per line, dependency order) and $manual (what it cannot install)
   plan="" manual=""
@@ -131,7 +100,7 @@ run_plan() { # runs $plan line by line, stopping at the first failure
 check_prereqs
 new_clis=""
 for t in claude codex; do
-  if lacks "$t"; then new_clis="$new_clis $t"; fi
+  if ! has "$t"; then new_clis="$new_clis $t"; fi # upgrades keep their sign-in
 done
 
 if [ -n "$missing" ]; then

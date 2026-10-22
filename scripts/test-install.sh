@@ -52,7 +52,7 @@ nvm() {
 EOF
 cat >"$FAKES/node-old" <<'EOF'
 #!/bin/sh
-case "$1" in -p) echo 18 ;; *) echo v18.20.0 ;; esac
+echo v18.20.0
 EOF
 cat >"$FAKES/npm" <<'EOF'
 #!/bin/sh
@@ -154,7 +154,7 @@ grep -qxF "    . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default
 
 # Node too old: reported with its version and replaced through nvm.
 farm codex; rm "$BIN/node"; cp "$FAKES/node-old" "$BIN/node"; run
-grep -q '^  - node: found v18.20.0, need the current Node.js LTS (>= 22)' "$TMP/err" || fail "old node not reported: $(cat "$TMP/err")"
+grep -q '^  - node: found 18.20.0, need >= 22: install the current Node.js LTS' "$TMP/err" || fail "old node not reported: $(cat "$TMP/err")"
 grep -qxF "    $nvm_line" "$TMP/err" || fail "old node not replaced through nvm"
 
 # Accepted with node missing: nvm installs the LTS, its node goes on PATH, Codex installs with it.

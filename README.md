@@ -155,6 +155,12 @@ default local skill directories as one unit (no per-skill install). Framework ru
 Ponytail plugin on both providers — install commands and the mode/scoping
 setup are in [docs/installation.md](docs/installation.md), together with the macOS (bash >= 4.4) and Windows (WSL2) notes.
 
+After pulling updates, run `./scripts/check-setup.sh`: it reports tools below
+the checkout's required versions and installed skills that no longer match it,
+and exits 1 when `./scripts/install.sh` is needed (it can also run from an
+optional local git hook)
+([details](docs/installation.md#after-pulling-updates)).
+
 To remove it again, run `./scripts/uninstall.sh`: it removes the chain's skill
 folders and Ponytail, asking before each, and leaves Claude Code, Codex and your
 other skills installed ([details](docs/installation.md#uninstall)).

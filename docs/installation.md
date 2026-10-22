@@ -111,6 +111,60 @@ matcher because it silently misses those fallbacks.
 `PONYTAIL_ENFORCE=0` is the loud escape hatch — the run continues without
 the ladder, recorded in state.json and flagged in the reports.
 
+## After pulling updates
+
+The installed skills are copies, so a pull does not reach them, and a pull may
+raise a tool's required version. From the repository root:
+
+```bash
+./scripts/check-setup.sh
+```
+
+It changes nothing and reports:
+
+- **Tools**: each prerequisite with its version, against the minimums in
+  [`scripts/requirements.sh`](../scripts/requirements.sh) (`REQ_NODE`,
+  `REQ_BASH`, ...; empty means any version).
+- **Installed skills**, per provider, compared with a fresh install of this
+  checkout: skills changed or added since the last install, retired folders
+  still installed, or no install at all. Other skills in those directories are
+  ignored.
+- **Ponytail** per provider, as a warning only (framework runs need it).
+
+It exits 1 when anything but Ponytail needs fixing; `./scripts/install.sh`
+fixes all of it (it treats a tool below its minimum like a missing one and
+offers the upgrade, then reinstalls the skills).
+
+### Optional: run it after every pull
+
+Nothing runs the check for you. If you want it after each pull, add local git
+hooks in your own clone (hooks are not versioned, so this affects only you).
+They only report, and never block or undo the pull:
+
+```bash
+hooks="$(git rev-parse --git-path hooks)"
+cat >"$hooks/post-merge" <<'EOF'
+#!/bin/sh
+# Local, optional: check the setup after each pull. Never blocks the pull.
+./scripts/check-setup.sh || true
+EOF
+cat >"$hooks/post-rewrite" <<'EOF'
+#!/bin/sh
+# Same for `git pull --rebase` (post-rewrite also runs on commit --amend: skip that).
+[ "$1" = rebase ] && ./scripts/check-setup.sh
+exit 0
+EOF
+chmod +x "$hooks/post-merge" "$hooks/post-rewrite"
+```
+
+`post-merge` covers `git pull` (merge or fast-forward), `post-rewrite` covers
+`git pull --rebase`. This overwrites existing hooks of the same name, so check
+`ls "$hooks"` first and merge by hand if you already have them. To stop, delete
+the two files.
+
+**Maintainers**: when a change needs a newer tool, raise its `REQ_*` minimum in
+`scripts/requirements.sh`. `install.sh` and `check-setup.sh` both read it.
+
 ## Uninstall
 
 From the repository root:
