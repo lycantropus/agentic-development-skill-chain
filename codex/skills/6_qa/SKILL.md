@@ -147,7 +147,7 @@ bash scripts/chain review qa <X> <theme> \
 The workers are Chen (security), Weber (architecture), Sharma (performance), Mueller (reliability), Rodriguez (cross-wave architecture), and Takahashi (minimalism). Claude is the opposite provider here. If it is missing or unauthenticated, the script prints a visible degraded-mode notice, records `degraded_fallback: true`, and runs the same six personas as six separate Codex workers; tell the user that independent-provider review was unavailable. Critical/High findings enter `findings.json` through `chain findings` and block the release decision. Rodriguez and Takahashi also emit one `low` finding with category `retrospective` (their retrospective); it is not a defect and does not keep the loop running. Fix/review orchestration stays with the P6 controller: follow `cross-review`'s automatic loop through round 3 while defect findings of any severity remain, stopping early when clean. QA reports findings; the controller delegates fixes and refreshes evidence before re-review. After round 3, escalate remaining Critical/High findings and report or defer Medium/Low.
 
 Quota/rate-limit exhaustion during inference also means provider unavailability,
-even when authentication passes. `cross-review` runs personas sequentially,
+even when authentication passes. `cross-review` runs the first persona alone as a probe, then the other five in parallel batches of `resources.max_parallel_commands` (default 2),
 records sanitized failed-attempt metadata in stderr, and may restart the entire
 panel once with a genuinely available alternative provider, marked degraded.
 A required provider pin fails closed. Retain the command log; failed partial
