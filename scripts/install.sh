@@ -10,10 +10,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Tool minimums and the shared prerequisite check live in requirements.sh.
+# Tool minimums, pinned download versions and the shared prerequisite check live in requirements.sh.
 . "$ROOT/scripts/requirements.sh"
-NVM_VERSION=v0.40.5
-SONAR_SCANNER_VERSION=8.2.0.6438
+START_PATH="$PATH" # the user's own PATH, before this script adds install folders to it
 # Where nvm lives, resolved the way nvm's own installer does.
 if [ -n "${NVM_DIR:-}" ]; then nvm_dir="$NVM_DIR"
 elif [ -n "${XDG_CONFIG_HOME:-}" ]; then nvm_dir="$XDG_CONFIG_HOME/nvm"
@@ -161,6 +160,10 @@ if ! (cd "$ROOT" && bash "${CLAUDE_HOME:-$HOME/.claude}/skills/5_executing/scrip
 fi
 # Sonar CLIs: only projects with sonar-project.properties need them (P0 preflight enforces
 # that per project), so they are optional here. Login and SONAR_TOKEN stay manual.
+# Their per-user folders count before a new shell picks them up, so a re-run does not
+# offer them again.
+PATH="$HOME/.local/share/sonarqube-cli/bin:$HOME/.local/bin:$PATH"
+hash -r
 sonar_plan=""
 if ! has sonar; then
   sonar_plan="curl -o- https://raw.githubusercontent.com/SonarSource/sonarqube-cli/refs/heads/master/user-scripts/install.sh | bash"
@@ -192,7 +195,6 @@ if [ -n "$sonar_plan" ]; then
   show "$sonar_plan"
   if ask "Install the Sonar CLIs now?"; then
     run_each "$sonar_plan"
-    PATH="$HOME/.local/share/sonarqube-cli/bin:$HOME/.local/bin:$PATH"
     hash -r
     if has sonar && has sonar-scanner; then
       echo "install: Sonar CLIs installed. By hand: run 'sonar auth login', and put SONAR_TOKEN=... (Sonar: My Account > Security) in your project's control-checkout .env.local" >&2
@@ -200,6 +202,16 @@ if [ -n "$sonar_plan" ]; then
       echo "install: the Sonar CLIs are not fully installed (see above); only projects with sonar-project.properties need them" >&2
     fi
   fi
+fi
+sonar_dirs=""
+for t in sonar sonar-scanner; do
+  if has "$t"; then
+    d="$(dirname "$(command -v "$t")")"
+    case ":$START_PATH:" in *":$d:"*) ;; *) sonar_dirs="$sonar_dirs $d" ;; esac
+  fi
+done
+if [ -n "$sonar_dirs" ]; then
+  echo "install: Sonar CLIs not on your PATH when this ran:$sonar_dirs; open a new terminal, and if they are still missing add export PATH=\"<folder>:\$PATH\" to your shell profile" >&2
 fi
 if [ -n "$new_clis" ]; then
   echo "install: newly installed:$new_clis; start each once to sign in" >&2

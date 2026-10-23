@@ -123,6 +123,10 @@ ponytail() { # ponytail healthy|absent|claude-only: plugin registries per provid
 run() { # run [answer]: install into a scratch home, answering the prompt (none: closed stdin);
         # exit code in $rc, output in $TMP/out, $TMP/err
   rm -rf "$TMP/home"; mkdir -p "$TMP/home"
+  if [ -n "${SEED_SONAR:-}" ]; then # both Sonar CLIs installed per user, folders not on PATH yet
+    mkdir -p "$TMP/home/.local/share/sonarqube-cli/bin" "$TMP/home/.local/bin"
+    for f in .local/share/sonarqube-cli/bin/sonar .local/bin/sonar-scanner; do printf '#!/bin/sh\nexit 0\n' >"$TMP/home/$f"; chmod +x "$TMP/home/$f"; done
+  fi
   if [ -n "${SEED_NVM:-}" ]; then mkdir -p "$TMP/home/.nvm"; cp "$FAKES/nvm.sh" "$TMP/home/.nvm/nvm.sh"; fi
   rc=0
   { if [ $# -gt 0 ]; then printf '%s\n' "$1"; fi; } | env -i PATH="$BIN" HOME="$TMP/home" \
@@ -178,7 +182,9 @@ grep -q 'missing prerequisites, nothing installed' "$TMP/err" || fail "remaining
 
 # Node missing: never a distro package; nvm (installed first if absent) takes the current LTS,
 # and Codex then installs into nvm's npm without sudo.
-nvm_line="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash && . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default 'lts/*'"
+pin() { sed -n "s/^$1=//p" "$ROOT/scripts/requirements.sh"; } # a pinned download version
+[ -n "$(pin NVM_VERSION)" ] && [ -n "$(pin SONAR_SCANNER_VERSION)" ] || fail "download pins not found in requirements.sh"
+nvm_line="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$(pin NVM_VERSION)/install.sh | bash && . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default 'lts/*'"
 farm codex node npm; run
 grep -qxF "    $nvm_line" "$TMP/err" || fail "nvm plan wrong: $(cat "$TMP/err")"
 ! grep -q 'nodejs\|apt-get' "$TMP/err" || fail "node offered as a distro package"
@@ -256,7 +262,7 @@ grep -qxF '    codex plugin add ponytail@ponytail' "$TMP/err" || fail "codex Pon
 farm; ponytail healthy; run
 [ "$rc" = 0 ] || fail "a declined Sonar offer must not fail the install, got $rc"
 grep -qxF '    curl -o- https://raw.githubusercontent.com/SonarSource/sonarqube-cli/refs/heads/master/user-scripts/install.sh | bash' "$TMP/err" || fail "sonar plan missing: $(cat "$TMP/err")"
-grep -q "^    t=.*binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-8.2.0.6438-" "$TMP/err" || fail "sonar-scanner plan missing"
+grep -qF "binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$(pin SONAR_SCANNER_VERSION)-" "$TMP/err" || fail "sonar-scanner plan missing"
 grep -q 'Install the Sonar CLIs now? \[y/N\]' "$TMP/err" || fail "Sonar not offered"
 ! grep -q 'sonar' "$LOG" || fail "Sonar commands ran without consent: $(cat "$LOG")"
 
@@ -266,10 +272,16 @@ farm; ponytail healthy; run y
 [ -x "$TMP/home/.local/share/sonarqube-cli/bin/sonar" ] || fail "sonar not installed: $(cat "$LOG")"
 [ -x "$TMP/home/.local/bin/sonar-scanner" ] || fail "sonar-scanner link missing: $(cat "$TMP/err")"
 grep -q "Sonar CLIs installed. By hand: run 'sonar auth login'" "$TMP/err" || fail "Sonar next steps missing: $(cat "$TMP/err")"
+grep -qF "Sonar CLIs not on your PATH when this ran: $TMP/home/.local/share/sonarqube-cli/bin $TMP/home/.local/bin;" "$TMP/err" || fail "PATH hint missing: $(cat "$TMP/err")"
+
+# Re-run before a new shell: the per-user installs are found, not offered again, PATH hint repeated.
+farm; ponytail healthy; SEED_SONAR=1 run
+! grep -q 'Install the Sonar CLIs now' "$TMP/err" || fail "Sonar offered again although installed per user"
+grep -qF "Sonar CLIs not on your PATH when this ran:" "$TMP/err" || fail "PATH hint missing on re-run"
 
 # Both Sonar CLIs present: not offered. Without unzip, the plan installs it first.
 farm; for t in sonar sonar-scanner; do printf '#!/bin/sh\nexit 0\n' >"$BIN/$t"; chmod +x "$BIN/$t"; done; ponytail healthy; run
-! grep -q 'Sonar' "$TMP/err" || fail "Sonar offered although installed"
+! grep -q 'Sonar' "$TMP/err" || fail "Sonar offered (or PATH hint shown) although installed on PATH"
 farm unzip; ponytail healthy; run
 grep -qE '^    (sudo )?apt-get update && (sudo )?apt-get install -y unzip$' "$TMP/err" || fail "unzip not planned: $(cat "$TMP/err")"
 

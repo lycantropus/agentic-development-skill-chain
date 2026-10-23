@@ -1,8 +1,10 @@
-# requirements.sh — the setup's tool requirements and shared helpers, sourced (not run)
-# by install.sh, check-setup.sh and uninstall.sh. When a change needs a newer tool, raise
-# its minimum here: check-setup.sh then flags machines still below it after a pull, and
-# install.sh offers the upgrade. Empty = any version. Keep this file bash-3.2-safe.
+# requirements.sh — the setup's tool requirements, pinned download versions and shared
+# helpers, sourced (not run) by install.sh, check-setup.sh and uninstall.sh. Keep this
+# file bash-3.2-safe.
 
+# Minimums. When a change needs a newer tool, raise it here: check-setup.sh then flags
+# machines still below it after a pull, and install.sh offers the upgrade.
+# Empty = any version.
 REQ_CLAUDE=
 REQ_CODEX=
 REQ_GIT=
@@ -11,6 +13,10 @@ REQ_JQ=
 # Raise it when that line reaches end of life. install.sh always installs the current LTS.
 REQ_NODE=22
 REQ_BASH=4.4
+
+# Versions install.sh downloads when a tool is missing (not checked by check-setup.sh).
+NVM_VERSION=v0.40.5
+SONAR_SCANNER_VERSION=8.2.0.6438
 
 # Skill folders folded into others; same list as the "retired" loop in install-*.sh.
 RETIRED_SKILLS="4a_checkpoint 4b_setup"

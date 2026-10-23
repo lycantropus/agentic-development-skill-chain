@@ -134,10 +134,15 @@ PROJ-end Quality Gate uses two separate tools with separate logins:
   into `~/.local/share/sonarqube-cli/bin` (it adds that to your shell profile).
   There is no Homebrew formula for it.
 - `sonar-scanner`: `brew install sonar-scanner` where Homebrew exists; otherwise
-  the official SonarScanner `8.2.0.6438` zip for your OS (it bundles Java),
+  the official SonarScanner zip for your OS (it bundles Java; version pinned as
+  `SONAR_SCANNER_VERSION` in `scripts/requirements.sh`),
   unpacked into `~/.local/share` and linked as `~/.local/bin/sonar-scanner`
   (`unzip` is installed first if missing). Do not use `npm i -g sonar-scanner`:
   that is an old unofficial wrapper.
+
+Both folders count as installed even before a new terminal has them on `PATH`,
+so a re-run does not offer the CLIs again; while they are not on your `PATH`,
+the installer names the folders to add to your shell profile.
 
 Login and the token stay manual:
 
@@ -202,7 +207,9 @@ chmod +x "$hooks/post-merge" "$hooks/post-rewrite"
 the two files.
 
 **Maintainers**: when a change needs a newer tool, raise its `REQ_*` minimum in
-`scripts/requirements.sh`. `install.sh` and `check-setup.sh` both read it.
+`scripts/requirements.sh`. `install.sh` and `check-setup.sh` both read it. The
+versions `install.sh` downloads (`NVM_VERSION`, `SONAR_SCANNER_VERSION`) are
+pinned in the same file, under their own heading.
 
 ## Uninstall
 
