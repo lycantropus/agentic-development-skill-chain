@@ -59,12 +59,15 @@ total="$(ls "$CO/claude/skills" | wc -l | tr -d ' ')"
 
 # Up to date, with a foreign skill next to the chain: passes, and changes nothing.
 install_all; ponytail on; mkdir -p "$H/.claude/skills/synced"
-before="$(cd "$TMP" && ls -laR home pt)"
+# -A, not -a: the ".." entry is $TMP itself, which run() writes to (its size changes on APFS).
+snapshot() { (cd "$TMP" && ls -lAR home pt); }
+before="$(snapshot)"
 run
 [ "$rc" = 0 ] || fail "up-to-date setup should exit 0, got $rc: $(cat "$TMP/out")"
 has_line "  ✓ codex 0.163.0"; has_line "  ✓ claude: $total skills match"; has_line "  ✓ codex: $total skills match"
 has_line "Setup is up to date with this checkout."
-[ "$(cd "$TMP" && ls -laR home pt)" = "$before" ] || fail "check-setup changed the machine"
+after="$(snapshot)"
+[ "$after" = "$before" ] || fail "check-setup changed the machine: $(diff <(echo "$before") <(echo "$after"))"
 
 # A pull raises a minimum: the tool is flagged with both versions.
 sed -i.bak 's/^REQ_CODEX=$/REQ_CODEX=0.200/' "$CO/scripts/requirements.sh"

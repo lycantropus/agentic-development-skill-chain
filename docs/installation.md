@@ -36,7 +36,9 @@ still without [Ponytail](#ponytail-required-for-framework-runs-stage-2), it show
 that provider's marketplace and plugin commands and asks `Install Ponytail now?`
 before running them, and finally runs `chain check ponytail`. Declining, or a
 failed check, only warns: Ponytail is needed for framework runs, not for
-installing skills. The per-provider installers stay
+installing skills. Last, if `sonar` or `sonar-scanner` is missing, it offers the
+optional [Sonar CLIs](#sonar-clis-optional-per-project) the same way. The
+per-provider installers stay
 available for single-provider machines and for `update-chain`.
 
 ## Codex
@@ -114,6 +116,45 @@ matcher because it silently misses those fallbacks.
 `PONYTAIL_ENFORCE=0` is the loud escape hatch — the run continues without
 the ladder, recorded in state.json and flagged in the reports.
 
+## Sonar CLIs (optional, per project)
+
+Only projects with a `sonar-project.properties` (or `sonar_required: true` in
+the wave-gate config) need them; P0 preflight checks that per project. The
+PROJ-end Quality Gate uses two separate tools with separate logins:
+
+| CLI | Binary | Used for |
+|---|---|---|
+| SonarQube CLI | `sonar` | Login, issues, API, quality-gate and measure data |
+| SonarScanner CLI | `sonar-scanner` | The analysis itself (uploads a report) |
+
+`./scripts/install.sh` offers both when missing, per user and without `sudo`:
+
+- `sonar`: SonarSource's install script
+  (`curl -o- https://raw.githubusercontent.com/SonarSource/sonarqube-cli/refs/heads/master/user-scripts/install.sh | bash`),
+  into `~/.local/share/sonarqube-cli/bin` (it adds that to your shell profile).
+  There is no Homebrew formula for it.
+- `sonar-scanner`: `brew install sonar-scanner` where Homebrew exists; otherwise
+  the official SonarScanner zip for your OS (it bundles Java; version pinned as
+  `SONAR_SCANNER_VERSION` in `scripts/requirements.sh`),
+  unpacked into `~/.local/share` and linked as `~/.local/bin/sonar-scanner`
+  (`unzip` is installed first if missing). Do not use `npm i -g sonar-scanner`:
+  that is an old unofficial wrapper.
+
+Both folders count as installed even before a new terminal has them on `PATH`,
+so a re-run does not offer the CLIs again; while they are not on your `PATH`,
+the installer names the folders to add to your shell profile.
+
+Login and the token stay manual:
+
+```bash
+sonar auth login     # browser; SonarQube Cloud US: --server https://sonarqube.us, self-hosted: --server https://<host>
+sonar auth status
+```
+
+The scanner needs `SONAR_TOKEN` (Sonar: My Account → Security; never commit it):
+exported in your environment, or as `SONAR_TOKEN=...` in the control checkout's
+`.env.local`, which `chain worktree` symlinks into every worktree.
+
 ## After pulling updates
 
 The installed skills are copies, so a pull does not reach them, and a pull may
@@ -166,7 +207,9 @@ chmod +x "$hooks/post-merge" "$hooks/post-rewrite"
 the two files.
 
 **Maintainers**: when a change needs a newer tool, raise its `REQ_*` minimum in
-`scripts/requirements.sh`. `install.sh` and `check-setup.sh` both read it.
+`scripts/requirements.sh`. `install.sh` and `check-setup.sh` both read it. The
+versions `install.sh` downloads (`NVM_VERSION`, `SONAR_SCANNER_VERSION`) are
+pinned in the same file, under their own heading.
 
 ## Uninstall
 
@@ -191,7 +234,7 @@ It lists what it found and asks separately before removing each part:
   too.
 
 Any answer but `y` (or a non-interactive stdin) keeps that part. Claude Code,
-Codex, the toolchain, and helper copies already synced into projects
+Codex, the toolchain, the Sonar CLIs, and helper copies already synced into projects
 (`chain sync`) are not touched.
 
 ## Notes

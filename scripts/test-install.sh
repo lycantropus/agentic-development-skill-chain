@@ -13,7 +13,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail() { echo "test-install: $*" >&2; exit 1; }
 
-TOOLS="bash env sh dirname basename mkdir rm cp ls cat grep sed awk cut sort tail head tr date id chmod ln jq git node perl"
+TOOLS="bash env sh dirname basename mkdir mktemp rm cp ls cat grep sed awk cut sort tail head tr date id uname chmod ln jq git node perl"
 REAL="$TMP/real" FAKES="$TMP/fakes" LOG="$TMP/installs.log"
 mkdir -p "$REAL" "$FAKES" "$TMP/npm-prefix"
 for tool in $TOOLS; do ln -s "$(command -v "$tool")" "$REAL/$tool"; done
@@ -50,6 +50,11 @@ cat >"$FAKES/curl" <<'EOF'
 echo "curl $*" >>"$FAKE_LOG"
 case "$*" in
   *nvm-sh/nvm*) echo 'mkdir -p "$HOME/.nvm" && cp "$FAKE_FAKES/nvm.sh" "$HOME/.nvm/nvm.sh"' ;;
+  *sonarqube-cli*) cat <<'SCRIPT'
+mkdir -p "$HOME/.local/share/sonarqube-cli/bin" && printf '#!/bin/sh\nexit 0\n' >"$HOME/.local/share/sonarqube-cli/bin/sonar" && chmod +x "$HOME/.local/share/sonarqube-cli/bin/sonar"
+SCRIPT
+  ;;
+  *sonar-scanner-cli*) prev=""; for a in "$@"; do [ "$prev" != -o ] || : >"$a"; prev="$a"; done ;;
   *) cat <<'SCRIPT'
 mkdir -p "$HOME/.local/bin" && printf '#!/bin/sh\nexit 0\n' >"$HOME/.local/bin/claude" && chmod +x "$HOME/.local/bin/claude"
 SCRIPT
@@ -66,6 +71,15 @@ nvm() {
     which) echo "$b/node" ;;
   esac
 }
+EOF
+# unzip stand-in: a scanner zip unpacks to sonar-scanner-<version>-<platform>/bin/sonar-scanner.
+cat >"$FAKES/unzip" <<'EOF'
+#!/bin/sh
+echo "unzip $*" >>"$FAKE_LOG"
+zip="" dest=""
+while [ $# -gt 0 ]; do case "$1" in -d) dest="$2"; shift ;; -*) ;; *) zip="$1" ;; esac; shift; done
+d="$dest/$(basename "$zip" .zip | sed 's/^sonar-scanner-cli-/sonar-scanner-/')/bin"
+mkdir -p "$d" && printf '#!/bin/sh\nexit 0\n' >"$d/sonar-scanner" && chmod +x "$d/sonar-scanner"
 EOF
 cat >"$FAKES/node-old" <<'EOF'
 #!/bin/sh
@@ -85,7 +99,7 @@ BIN="$TMP/bin"
 farm() { # farm <omitted tool>...: real TOOLS plus stubs and fake installers, minus the omitted ones
   local tool
   rm -rf "$BIN"; mkdir -p "$BIN"; : >"$LOG"
-  for tool in $TOOLS claude codex sudo apt-get curl npm; do
+  for tool in $TOOLS claude codex sudo apt-get curl npm unzip; do
     case " $* " in *" $tool "*) continue ;; esac
     if [ -e "$FAKES/$tool" ]; then cp "$FAKES/$tool" "$BIN/$tool"; else ln -s "$REAL/$tool" "$BIN/$tool"; fi
   done
@@ -109,6 +123,10 @@ ponytail() { # ponytail healthy|absent|claude-only: plugin registries per provid
 run() { # run [answer]: install into a scratch home, answering the prompt (none: closed stdin);
         # exit code in $rc, output in $TMP/out, $TMP/err
   rm -rf "$TMP/home"; mkdir -p "$TMP/home"
+  if [ -n "${SEED_SONAR:-}" ]; then # both Sonar CLIs installed per user, folders not on PATH yet
+    mkdir -p "$TMP/home/.local/share/sonarqube-cli/bin" "$TMP/home/.local/bin"
+    for f in .local/share/sonarqube-cli/bin/sonar .local/bin/sonar-scanner; do printf '#!/bin/sh\nexit 0\n' >"$TMP/home/$f"; chmod +x "$TMP/home/$f"; done
+  fi
   if [ -n "${SEED_NVM:-}" ]; then mkdir -p "$TMP/home/.nvm"; cp "$FAKES/nvm.sh" "$TMP/home/.nvm/nvm.sh"; fi
   rc=0
   { if [ $# -gt 0 ]; then printf '%s\n' "$1"; fi; } | env -i PATH="$BIN" HOME="$TMP/home" \
@@ -164,7 +182,9 @@ grep -q 'missing prerequisites, nothing installed' "$TMP/err" || fail "remaining
 
 # Node missing: never a distro package; nvm (installed first if absent) takes the current LTS,
 # and Codex then installs into nvm's npm without sudo.
-nvm_line="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash && . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default 'lts/*'"
+pin() { sed -n "s/^$1=//p" "$ROOT/scripts/requirements.sh"; } # a pinned download version
+[ -n "$(pin NVM_VERSION)" ] && [ -n "$(pin SONAR_SCANNER_VERSION)" ] || fail "download pins not found in requirements.sh"
+nvm_line="curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$(pin NVM_VERSION)/install.sh | bash && . $TMP/home/.nvm/nvm.sh && nvm install --lts && nvm alias default 'lts/*'"
 farm codex node npm; run
 grep -qxF "    $nvm_line" "$TMP/err" || fail "nvm plan wrong: $(cat "$TMP/err")"
 ! grep -q 'nodejs\|apt-get' "$TMP/err" || fail "node offered as a distro package"
@@ -237,5 +257,32 @@ grep -q 'ponytail parity ok' "$TMP/out" || fail "Ponytail not ready after instal
 farm; ponytail claude-only; run
 grep -qxF '    codex plugin add ponytail@ponytail' "$TMP/err" || fail "codex Ponytail not offered"
 ! grep -q '^    claude plugin' "$TMP/err" || fail "claude Ponytail offered although installed"
+
+# Sonar CLIs missing (the farm never has them), offer declined: plan shown, nothing run, exit 0.
+farm; ponytail healthy; run
+[ "$rc" = 0 ] || fail "a declined Sonar offer must not fail the install, got $rc"
+grep -qxF '    curl -o- https://raw.githubusercontent.com/SonarSource/sonarqube-cli/refs/heads/master/user-scripts/install.sh | bash' "$TMP/err" || fail "sonar plan missing: $(cat "$TMP/err")"
+grep -qF "binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$(pin SONAR_SCANNER_VERSION)-" "$TMP/err" || fail "sonar-scanner plan missing"
+grep -q 'Install the Sonar CLIs now? \[y/N\]' "$TMP/err" || fail "Sonar not offered"
+! grep -q 'sonar' "$LOG" || fail "Sonar commands ran without consent: $(cat "$LOG")"
+
+# Sonar offer accepted (the only question here): both CLIs land per user, then the manual next steps.
+farm; ponytail healthy; run y
+[ "$rc" = 0 ] || fail "Sonar install should exit 0, got $rc: $(cat "$TMP/err")"
+[ -x "$TMP/home/.local/share/sonarqube-cli/bin/sonar" ] || fail "sonar not installed: $(cat "$LOG")"
+[ -x "$TMP/home/.local/bin/sonar-scanner" ] || fail "sonar-scanner link missing: $(cat "$TMP/err")"
+grep -q "Sonar CLIs installed. By hand: run 'sonar auth login'" "$TMP/err" || fail "Sonar next steps missing: $(cat "$TMP/err")"
+grep -qF "Sonar CLIs not on your PATH when this ran: $TMP/home/.local/share/sonarqube-cli/bin $TMP/home/.local/bin;" "$TMP/err" || fail "PATH hint missing: $(cat "$TMP/err")"
+
+# Re-run before a new shell: the per-user installs are found, not offered again, PATH hint repeated.
+farm; ponytail healthy; SEED_SONAR=1 run
+! grep -q 'Install the Sonar CLIs now' "$TMP/err" || fail "Sonar offered again although installed per user"
+grep -qF "Sonar CLIs not on your PATH when this ran:" "$TMP/err" || fail "PATH hint missing on re-run"
+
+# Both Sonar CLIs present: not offered. Without unzip, the plan installs it first.
+farm; for t in sonar sonar-scanner; do printf '#!/bin/sh\nexit 0\n' >"$BIN/$t"; chmod +x "$BIN/$t"; done; ponytail healthy; run
+! grep -q 'Sonar' "$TMP/err" || fail "Sonar offered (or PATH hint shown) although installed on PATH"
+farm unzip; ponytail healthy; run
+grep -qE '^    (sudo )?apt-get update && (sudo )?apt-get install -y unzip$' "$TMP/err" || fail "unzip not planned: $(cat "$TMP/err")"
 
 echo "test-install: ok"
