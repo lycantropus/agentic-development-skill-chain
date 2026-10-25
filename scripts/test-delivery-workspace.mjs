@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { validateInventory, verifyInventory, probeAccess, remoteIdentity, inspectCheckout, discover, cloneOrReuse, ensureGithubRemote, nextBaselineStep } from '../codex/skills/2d_delivery-workspace/scripts/workspace.mjs';
+import { baselineApplicability, validateInventory, verifyInventory, probeAccess, remoteIdentity, inspectCheckout, discover, cloneOrReuse, ensureGithubRemote, nextBaselineStep } from '../codex/skills/2d_delivery-workspace/scripts/workspace.mjs';
 const root = mkdtempSync(join(tmpdir(), 'workspace-test-'));
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const inventory = { schemaVersion: 1, mode: 'team', coordinationRepo: 'specs', repositories: [
@@ -67,6 +67,25 @@ try {
   assert.equal(inspectCheckout(worktree).root, worktree);
   assert(inspectCheckout(worktree).intakeBranches.includes('intake-resume'));
 
+  // A non-ancestor seal can have equivalent docs; missing docs are a separate observation.
+  const baselineRepo = join(root, 'baseline'); mkdirSync(baselineRepo); git(baselineRepo, 'init', '-q');
+  git(baselineRepo, 'config', 'user.email', 'test@example.invalid'); git(baselineRepo, 'config', 'user.name', 'Test');
+  writeFileSync(join(baselineRepo, 'seed'), 'seed'); git(baselineRepo, 'add', '.'); git(baselineRepo, 'commit', '-m', 'Root');
+  const baselineRoot = git(baselineRepo, 'rev-parse', 'HEAD');
+  mkdirSync(join(baselineRepo, 'docs'));
+  for (const file of ['AGENTS.md', 'docs/PRODUCT.md', 'docs/ARCHITECTURE.md', 'docs/GUIDELINES.md', 'docs/security-baseline.md', 'docs/test-conventions.md']) writeFileSync(join(baselineRepo, file), 'Curated baseline');
+  git(baselineRepo, 'add', '.'); git(baselineRepo, 'commit', '-m', 'Seal');
+  const seal = git(baselineRepo, 'rev-parse', 'HEAD');
+  assert.equal(baselineApplicability(baselineRepo, seal).ancestor, true);
+  git(baselineRepo, 'reset', '--soft', baselineRoot); git(baselineRepo, 'commit', '-m', 'Equivalent divergent seal');
+  let applicability = baselineApplicability(baselineRepo, seal);
+  assert.deepEqual([applicability.ancestor, applicability.curatedFilesPresent, applicability.equivalent, applicability.remoteAcceptance.verified], [false, true, true, false]);
+  git(baselineRepo, 'rm', 'docs/PRODUCT.md'); git(baselineRepo, 'commit', '-m', 'Missing baseline');
+  applicability = baselineApplicability(baselineRepo, seal);
+  assert.deepEqual([applicability.ancestor, applicability.curatedFilesPresent, applicability.equivalent], [false, false, false]);
+  assert.equal(nextBaselineStep(inventory.repositories[1], inspectCheckout(baselineRepo), { applicability }), 'reconcile-baseline-applicability');
+  assert.equal(baselineApplicability(baselineRepo, 'f'.repeat(40)).sealAvailable, false);
+
   // Two developer edits require Git reconciliation; shared inventory never gains local bindings.
   writeFileSync(join(one, 'questions.md'), 'Q-1: pending\n'); git(one, 'add', 'questions.md'); git(one, 'commit', '-m', 'Question'); git(one, 'push', 'origin', 'HEAD');
   git(two, 'pull', '--ff-only');
@@ -78,21 +97,23 @@ try {
   const present = { status: 'present', intakeBranches: [], intakeDraft: false, productDocument: false };
   assert.equal(nextBaselineStep(inventory.repositories[0], present), 'not-applicable');
   assert.equal(nextBaselineStep(inventory.repositories[2], { status: 'missing' }), 'bootstrap');
-  assert.equal(nextBaselineStep(inventory.repositories[1], present, { acceptedRevisionVerified: true, sealVerified: true }), 'reuse-accepted');
-  for (const evidence of [{}, { acceptedRevisionVerified: true }, { sealVerified: true }]) {
+  const applicable = { sealAvailable: true, ancestor: true, curatedFilesPresent: true, equivalent: true };
+  assert.equal(nextBaselineStep(inventory.repositories[1], present), 'verify-baseline-applicability');
+  assert.equal(nextBaselineStep(inventory.repositories[1], present, { applicability: applicable, acceptedRevisionVerified: true, sealVerified: true }), 'reuse-accepted');
+  for (const evidence of [{ applicability: applicable }, { applicability: applicable, acceptedRevisionVerified: true }, { applicability: applicable, sealVerified: true }]) {
     assert.equal(nextBaselineStep(inventory.repositories[1], present, evidence), 'verify-accepted-baseline');
   }
   assert.equal(nextBaselineStep(inventory.repositories[1], present, { activeIntake: { owner: 'developer', pr: 3 } }), 'coordinate-existing-intake');
   const staleIntake = { ...present, intakeBranches: ['intake-already-merged'] };
-  assert.equal(nextBaselineStep(inventory.repositories[1], staleIntake), 'verify-accepted-baseline');
-  assert.equal(nextBaselineStep(inventory.repositories[1], staleIntake, { acceptedRevisionVerified: true, sealVerified: true }), 'reuse-accepted');
+  assert.equal(nextBaselineStep(inventory.repositories[1], staleIntake), 'verify-baseline-applicability');
+  assert.equal(nextBaselineStep(inventory.repositories[1], staleIntake, { applicability: applicable, acceptedRevisionVerified: true, sealVerified: true }), 'reuse-accepted');
   assert.equal(nextBaselineStep(inventory.repositories[1], present, { acceptedRevisionVerified: true, sealVerified: true, activeIntake: { owner: 'developer', pr: 3 } }), 'coordinate-existing-intake');
   assert.equal(nextBaselineStep({ role: 'implementation' }, staleIntake), 'coordinate-existing-intake');
   assert.equal(nextBaselineStep({ role: 'implementation' }, { ...present, productDocument: true }), 'resume-intake');
   assert.equal(nextBaselineStep({ role: 'implementation' }, present, { hasCode: true }), 'intake');
   for (const status of ['local-sealed', 'proposed']) {
     const repo = { role: 'implementation', baseline: { status } };
-    assert.equal(nextBaselineStep(repo, present), 'await-team-acceptance');
+    assert.equal(nextBaselineStep(repo, present, { applicability: applicable }), 'await-team-acceptance');
     assert.equal(nextBaselineStep(repo, present, { activeIntake: { owner: 'developer', pr: 3 } }), 'coordinate-existing-intake');
   }
   assert.equal(nextBaselineStep({ role: 'implementation' }, present, { drift: true }), 'propose-drift-audit');

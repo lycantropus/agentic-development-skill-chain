@@ -178,6 +178,26 @@ try {
     run(['render', 'context', 'compile', '1', 'demo'], false);
     const unownedBlockers = JSON.parse(run(['check', 'inputs', base, '--allow-blocked']).stdout).blockers;
     assert.deepEqual(unownedBlockers.slice(0, 2), [`ownership unresolved: ${id}`, 'selected repository has no resolved scope']);
+    const planned = structuredClone(unowned);
+    planned.repository = 'service';
+    planned.engineering = [{ ...manifest.engineering[0], repository: 'service', story: null }];
+    planned.prerequisites = ['checkout', 'state'].map(kind => ({ repository: 'service', kind, owner: 'Engineering owner', evidence: 'Service is planned; no checkout or local project exists.' }));
+    save(planned);
+    const inspected = JSON.parse(run(['check', 'inputs', base, '--allow-blocked']).stdout);
+    assert.equal(inspected.engineering[0].id, 'ENG-AC-1');
+    assert.ok(inspected.blockers.includes('engineering scope unbound: ENG-AC-1'));
+    assert.ok(inspected.blockers.includes('missing prerequisite: service:state'));
+    assert.equal(inspected.acs.length, 0);
+    run(['check', 'architecture', arch, base], false);
+    assert.equal(fs.existsSync(path.join(base, 'state.json')), false, 'inspection never initializes coordination state');
+    for (const mutate of [m => delete m.engineering[0].story, m => m.prerequisites[0].owner = '', m => m.prerequisites.push(m.prerequisites[0]), m => m.prerequisites = {}]) {
+      const bad = structuredClone(planned); mutate(bad); save(bad);
+      run(['check', 'inputs', base, '--allow-blocked'], false);
+    }
+    const missingState = structuredClone(manifest);
+    missingState.prerequisites = [{ repository: 'ui', kind: 'state', owner: 'Developer', evidence: 'Local state initialization still pending.' }]; save(missingState);
+    run(['check', 'inputs', base, '--allow-blocked']);
+    run(['check', 'architecture', arch, base], false);
     const forced = structuredClone(unowned); forced.mappings = [manifest.mappings[0]]; save(forced);
     run(['check', 'inputs', base, '--allow-blocked'], false);
     const notOwner = structuredClone(manifest); notOwner.requirements[0].repositories = ['service']; notOwner.mappings = [manifest.mappings[1]]; notOwner.engineering = []; save(notOwner);

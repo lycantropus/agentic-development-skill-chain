@@ -58,6 +58,28 @@ export function inspectCheckout(path) {
   const remotes = git(root, 'remote').split('\n').filter(Boolean).map(name => ({ name, identity: remoteIdentity(git(root, 'remote', 'get-url', name)) }));
   return { status: 'present', root: realpathSync(root), remotes, dirty: Boolean(git(root, 'status', '--porcelain')), intakeBranches: git(root, 'for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes').split('\n').filter(s => /intake/i.test(s)), intakeDraft: existsSync(resolve(root, 'specs/intake')), productDocument: existsSync(resolve(root, 'docs/PRODUCT.md')) };
 }
+// Inspect committed trees, never treat a seal's existence as applicability at HEAD.
+export function baselineApplicability(checkout, sealRevision, examinedRevision = 'HEAD', remoteAcceptance = null) {
+  required(/^[a-f0-9]{40}$/.test(sealRevision), 'Full seal commit required');
+  const examined = git(checkout, 'rev-parse', '--verify', `${examinedRevision}^{commit}`);
+  let sealAvailable = true, ancestor = null;
+  try { git(checkout, 'cat-file', '-e', `${sealRevision}^{commit}`); } catch { sealAvailable = false; }
+  if (sealAvailable) {
+    try { git(checkout, 'merge-base', '--is-ancestor', sealRevision, examined); ancestor = true; }
+    catch (error) { if (error.status !== 1) throw error; ancestor = false; }
+  }
+  const requiredFiles = ['AGENTS.md', 'docs/PRODUCT.md', 'docs/ARCHITECTURE.md', 'docs/GUIDELINES.md', 'docs/security-baseline.md', 'docs/test-conventions.md'];
+  const tree = revision => new Map(git(checkout, 'ls-tree', '-r', revision, '--', ...requiredFiles, 'docs/DESIGN-SYSTEM.md', 'docs/components.md', 'docs/architecture').split('\n').filter(Boolean).map(line => {
+    const [metadata, name] = line.split('\t'); return [name, metadata.split(' ')[2]];
+  }));
+  const sealed = sealAvailable ? tree(sealRevision) : new Map(), current = tree(examined);
+  const files = [...new Set([...requiredFiles, ...sealed.keys()])].sort().map(path => ({ path, sealPresent: sealed.has(path), examinedPresent: current.has(path), identical: sealed.has(path) && sealed.get(path) === current.get(path) }));
+  if (remoteAcceptance !== null) required(object(remoteAcceptance) && typeof remoteAcceptance.verified === 'boolean' && /^[a-f0-9]{40}$/.test(remoteAcceptance.revision) && typeof remoteAcceptance.evidence === 'string' && remoteAcceptance.evidence.trim(), 'Remote acceptance needs verified flag, revision and probe evidence');
+  return { sealRevision, examinedRevision: examined, sealAvailable, ancestor, files,
+    curatedFilesPresent: files.every(f => f.examinedPresent),
+    equivalent: sealAvailable && files.every(f => f.identical),
+    remoteAcceptance: remoteAcceptance ?? { verified: false, revision: null, evidence: 'Not checked against the team remote' } };
+}
 export function discover(paths, identity) {
   const candidates = paths.map(inspectCheckout).filter(x => x.status === 'present');
   const unique = [...new Map(candidates.map(x => [x.root, x])).values()];
@@ -188,8 +210,10 @@ export function nextBaselineStep(repo, checkout, evidence = {}) {
   if (repo.role === 'coordination') return 'not-applicable';
   if (repo.planned) return 'bootstrap';
   if (checkout.status !== 'present') return 'locate-checkout';
-  if (evidence.drift) return 'propose-drift-audit';
   if (evidence.activeIntake) return 'coordinate-existing-intake';
+  if (repo.baseline && ['accepted', 'local-sealed', 'proposed'].includes(repo.baseline.status) && !evidence.applicability) return 'verify-baseline-applicability';
+  if (evidence.applicability && (!evidence.applicability.curatedFilesPresent || !evidence.applicability.sealAvailable || (!evidence.applicability.ancestor && !evidence.applicability.equivalent))) return 'reconcile-baseline-applicability';
+  if (evidence.drift) return 'propose-drift-audit';
   if (repo.baseline?.status === 'accepted' && evidence.acceptedRevisionVerified && evidence.sealVerified) return 'reuse-accepted';
   if (repo.baseline?.status === 'accepted') return 'verify-accepted-baseline';
   if (checkout.intakeBranches?.length) return 'coordinate-existing-intake';
@@ -212,11 +236,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       for (const arg of args) { const [k, v] = arg.split('='); required(['remote', 'checkout', 'github'].includes(k.replace(/^--/, '')) && v, `Usage: access --remote=<url> [--checkout=<path>] [--github=<owner/name>]`); opts[k.replace(/^--/, '')] = v; }
       result = probeAccess(opts);
     }
+    else if (cmd === 'baseline' && args.length >= 2 && args.length <= 4) result = baselineApplicability(args[0], args[1], args[2] ?? 'HEAD', args[3] ? JSON.parse(readFileSync(args[3], 'utf8')) : null);
     else if (cmd === 'inspect' && args.length === 1) result = inspectCheckout(args[0]);
     else if (cmd === 'discover' && args.length) result = discover(args);
     else if (cmd === 'clone' && args.length === 2) result = cloneOrReuse(...args);
     else if (cmd === 'ensure-github' && args.length >= 2 && args.length <= 3 && (!args[2] || args[2] === '--authorized')) result = ensureGithubRemote(args[0], args[1], args[2] === '--authorized');
-    else throw new Error('Usage: workspace.mjs check inventory.json | verify inventory.json | access --remote=<url> [--checkout=<path>] [--github=<owner/name>] | inspect checkout | discover checkout... | clone remote destination | ensure-github owner/name visibility [--authorized]');
+    else throw new Error('Usage: workspace.mjs check inventory.json | verify inventory.json | access --remote=<url> [--checkout=<path>] [--github=<owner/name>] | baseline checkout seal-commit [examined-revision] [remote-evidence.json] | inspect checkout | discover checkout... | clone remote destination | ensure-github owner/name visibility [--authorized]');
     console.log(JSON.stringify(result, null, 2));
   } catch (error) { console.error(`workspace: ${error.message}`); process.exitCode = 1; }
 }

@@ -210,6 +210,11 @@ check_identical "$ROOT/codex/skills/2e_handoff-refinement/scripts/integration-st
   "$ROOT/codex/skills/5_executing/scripts/integration-status.mjs" \
   "$ROOT/claude/skills/5_executing/scripts/integration-status.mjs"
 
+check_identical "$ROOT/codex/skills/2d_delivery-workspace/scripts/workspace.mjs" \
+  "$ROOT/claude/skills/2d_delivery-workspace/scripts/workspace.mjs"
+check_identical "$ROOT/codex/skills/2e_handoff-refinement/scripts/package-tools.mjs" \
+  "$ROOT/claude/skills/2e_handoff-refinement/scripts/package-tools.mjs"
+
 # Schemas must parse; every shell script must be syntactically valid;
 # every node script must compile.
 for schema in "$ROOT/runner/schemas/state.schema.json" "$ROOT/runner/schemas/findings.schema.json" "$ROOT/runner/schemas/context-manifest.schema.json"; do
@@ -234,6 +239,7 @@ HARNESS_LOGS=$(mktemp -d); trap 'rm -rf "$HARNESS_LOGS"' EXIT
 HARNESS_NAMES=(); HARNESS_PIDS=()
 harness() { local name="$1"; shift; env SKILLCHAIN_RESOURCE_LOCK_DIR="$HARNESS_LOGS/$name.resources" "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
 harness external-inputs node "$ROOT/scripts/test-external-inputs.mjs"
+harness refinement-package node "$ROOT/scripts/test-refinement-package.mjs"
 harness delivery-workspace node "$ROOT/scripts/test-delivery-workspace.mjs"
 harness document-validators node "$ROOT/scripts/test-document-validators.mjs"
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"

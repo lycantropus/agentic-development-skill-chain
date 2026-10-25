@@ -79,6 +79,15 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
     need(!Object.hasOwn(s, 'dependsOn'), `${s.id}: use existing wave-plan ordering and pinned repository dependencies, not a second story graph`);
     technical.set(key, s);
   }
+  const prerequisites = m.prerequisites === undefined ? [] : m.prerequisites;
+  need(Array.isArray(prerequisites), 'prerequisites must be an array');
+  const prerequisiteKeys = new Set();
+  for (const p of prerequisites) {
+    need(p && m.repositories.includes(p.repository) && ['checkout', 'state', 'baseline', 'source-reconciliation'].includes(p.kind) && text(p.owner) && text(p.evidence), 'prerequisite needs repository, kind, owner and evidence');
+    const key = `${p.repository}:${p.kind}`;
+    need(!prerequisiteKeys.has(key), `duplicate prerequisite ${key}`); prerequisiteKeys.add(key);
+    if (p.repository === m.repository) blockers.push(`missing prerequisite: ${key}`);
+  }
   const acs = [], aliases = new Set(), coverage = new Set();
   for (const a of m.mappings) {
     const r = requirements.get(a.requirement);
@@ -92,13 +101,17 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
   for (const r of requirements.values()) for (const repo of r.repositories) need(coverage.has(`${repo}:${r.id}`), `unmapped requirement: ${repo}:${r.id}`);
   for (const e of m.engineering) {
     need(/^ENG-AC-[A-Za-z0-9._-]+$/.test(e.id ?? '') && text(e.text) && text(e.authority) && Array.isArray(e.requirements) && e.requirements.every(id => requirements.has(id)) && m.repositories.includes(e.repository), 'engineering requirement needs separate ENG-AC identity, text, authority and traceability');
-    need(technical.has(`${e.repository}:${e.story}`) || m.mappings.some(a => a.repository === e.repository && a.story === e.story), `${e.id}: engineering story is outside declared scope`);
+    need(e.story === null || technical.has(`${e.repository}:${e.story}`) || m.mappings.some(a => a.repository === e.repository && a.story === e.story), `${e.id}: engineering story is outside declared scope`);
     const key = `${e.repository}:${e.id}`;
     need(!aliases.has(key), `duplicate engineering identity ${key}`); aliases.add(key);
+    if (e.story === null) {
+      if (e.repository === m.repository) blockers.push(`engineering scope unbound: ${e.id}`);
+      continue;
+    }
     if (e.repository === m.repository) acs.push({ id: e.id, story: e.story, text: e.text, kind: 'engineering', source: e.requirements.join(', '), requirements: e.requirements, authority: e.authority });
   }
   for (const s of engineeringStories) need(m.engineering.some(e => e.repository === s.repository && e.story === s.id), `${s.id}: engineering story needs at least one testable ENG criterion`);
-  if (unowned.length && !acs.length) blockers.push('selected repository has no resolved scope'); else need(acs.length, 'selected repository has no scope');
+  if ((unowned.length || blockers.length) && !acs.length) blockers.push('selected repository has no resolved scope'); else need(acs.length, 'selected repository has no scope');
   for (const d of m.dependencies) need(m.repositories.includes(d.repository) && m.repositories.includes(d.requires) && d.repository !== d.requires && pin(d.revision) && excerpt(d.source, d.evidence), 'dependency needs repository, requires, pinned revision and pinned evidence');
   if (m.prototype?.kind === 'runnable') need(pin(m.prototype.revision), 'runnable prototype requires immutable revision');
   need(['runnable', 'static', 'none'].includes(m.prototype?.kind) && text(m.prototype?.reference) && Array.isArray(m.prototype?.simulated) && m.prototype.simulated.every(text), 'prototype kind/reference/simulated required');

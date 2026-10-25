@@ -4,7 +4,7 @@ Use this format for the human-facing exchange and readiness report; the machine-
 
 ## Portable product return package
 
-Create one round under `runs/<run-id>/refinement/product-feedback/<round>/` containing the questions and the minimum evidence needed to answer. Rounds are numbered per project, not per run, so IDs and round numbers never collide across runs. Include baseline identity/version/hash, source owner, receiver repo keys and source AC excerpts verbatim. Link only packaged evidence or accessible pinned team sources; strip credentials and machine-local paths. Retain earlier rounds. The round directory is the portable return unit: include the needed source excerpts and evidence inside it, or use accessible immutable team URLs. Relative links must resolve after copying only that directory elsewhere; links back into the receiver workspace do not make a standalone return package. Verify that copy before handoff.
+Create one round under `runs/<run-id>/refinement/product-feedback/<round>/` containing the questions and the minimum evidence needed to answer. Rounds are numbered per project, not per run, so IDs and round numbers never collide across runs. Include baseline identity/version/hash, source owner, receiver repo keys and source AC excerpts verbatim. Link only packaged evidence or accessible pinned team sources; strip credentials and machine-local paths. Retain earlier rounds. The round directory is the portable return unit: include the needed source excerpts and evidence inside it, or use accessible immutable team URLs. Relative links must resolve after copying only that directory elsewhere; links back into the receiver workspace do not make a standalone return package. Use [package-tools](package-tools.md) to copy the round to a detached directory and check its local links there before handoff. Inspect reported external links for immutable pins/access; mechanical checks do not prove those facts. Generate verbatim excerpts from selected complete ranges, including nested bullets and suffixed IDs; broad ownership questions reference every affected extracted identity, not a manually shortened sample.
 
 Lead with a concise decision summary, omitting empty groups:
 
@@ -39,7 +39,9 @@ The source-side session prompt names `review-reconcile`, the product source proj
 | Round reconciliation | Compared input revisions, semantic changes and affected requirements; disposition and evidence for prior findings/questions, with missing comparison evidence explicit |
 | Package consistency | Cross-PRD rules and transitions checked, shared issues linked to all affected requirements, and material non-applicability reasons |
 | Source preservation | Hash verification result and location of integrity metadata |
-| Repo baseline | Repo key, accepted intake commit or missing/resume/bootstrap action |
+| Repo baseline | Repo key, seal and examined commits, ancestor result, curated-file presence/equality, remote acceptance probe, and reconciliation/resume/bootstrap action |
+| Review | Link to the authoritative round record in the run README; no duplicated mutable review status |
+| Source context | Packaged source pin versus observed revision, known unexported changes or missing comparison evidence; frozen ACs retained |
 | Product blockers | Question IDs, owner and affected scope; no silent defaults |
 | Engineering requirements | Separate IDs, authority/source links and testable checks; optional standalone technical stories with rationale, ownership and dependencies |
 | Scope and ownership | Complete source AC inventory; investigated repositories; binding owners with evidence, or `ownership unresolved` with the question that settles it |
