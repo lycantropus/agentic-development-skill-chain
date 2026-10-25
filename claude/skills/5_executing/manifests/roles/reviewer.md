@@ -24,3 +24,5 @@ and NO design system, so your verdicts stay independent of the writer's
 context (a ui-audit persona may read docs/DESIGN-SYSTEM.md by path when
 its criteria demand it). Report findings as ledger records; never edit
 the working tree.
+
+When external product inputs are supplied, preserve source identities and verbatim criteria. Treat approved responses and separate engineering constraints as scoped inputs; never edit received product files. Report missing product authority or contradictory criteria to the lead instead of choosing product behavior or marking the gap as ordinary debt.

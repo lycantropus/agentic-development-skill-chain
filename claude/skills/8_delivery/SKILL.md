@@ -5,6 +5,12 @@ description: "Run P8 delivery for a finished PROJ: probe merge conflicts against
 
 # Delivery — P8: Conflict Probe, PR, CI, Checkpoint 2
 
+## External handoff inputs (conditional)
+
+For `external-handoff.json`, read [the receiving input contract](../2e_handoff-refinement/references/input-contract.md). Revalidate pinned inputs and applicable blockers before delivery. Record repository key, baseline/response revision, external dependencies, compatible implementation revisions, release order and integration evidence in the delivery evidence supplied to the existing renderer; PR bodies and reports still come only from template scripts.
+
+Keep this run's state and PR local to its owning repository. Report repo delivery separately from integrated feature acceptance. The coordination location must account for every source requirement and required integration check across repos before claiming whole-feature completion; one green PR is insufficient. New upstream answers or concurrent changes require reconciliation and affected checks, not a last-write-wins approval. No automatic cross-repo merge or deployment is implied.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts
@@ -19,6 +25,9 @@ verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
 verbatim; a newer language policy alone must not reopen approval. New records
 remain English. Change sealed canonical ACs only through an explicit user-
 authorized revision and the owning review; never silently translate them.
+External received ACs are quoted evidence: preserve their source language even
+before CP1; the local-authoring language revision rule above does not authorize
+translation or rewriting of an immutable package.
 
 
 Owns the P8 phase (CONCEPT.md §4): the last autonomous phase before the

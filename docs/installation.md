@@ -69,6 +69,19 @@ This copies the bundled chain into:
 ~/.claude/skills/
 ```
 
+The optional receiving skills and their references/helpers are included by both
+installers. Their presence does not activate external mode in existing projects.
+For a disposable installation check, use temporary destinations:
+
+```bash
+test_install_root="$(mktemp -d)"
+env CODEX_HOME="$test_install_root/codex" ./scripts/install-codex.sh
+env CLAUDE_HOME="$test_install_root/claude" ./scripts/install-claude.sh
+```
+
+These commands do not change the live installed skills. A normal installation
+still uses the explicit commands above and replaces matching installed folders.
+
 ## Platforms
 
 The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq` and Node.js >= 22 (an LTS line); where `timeout` is absent (stock macOS) also `perl`, which ships with macOS.
@@ -278,7 +291,7 @@ not a remote branch, and never silently discards project-specific adaptations.
   again; do not try to push from `~/.claude/skills/` or `~/.codex/skills/`.
 - Re-running the installers also refreshes the shared P0/P8 worktree helper,
   the plan-consistency validator, and the provider-specific Wave Gate.
-- The 0-to-8 core chain and its `cross-review` mechanism are installed, along with the documented optional skills: `bugfixing`, `refactor-dreamer`, `sonar-cli`, `supabase-local-dev`, `update-chain`, and `vibecoder`.
+- The 0-to-8 core chain and its `cross-review` mechanism are installed, along with the optional steps `2d_delivery-workspace` and `2e_handoff-refinement`, and the documented optional skills: `bugfixing`, `refactor-dreamer`, `sonar-cli`, `supabase-local-dev`, `update-chain`, and `vibecoder`.
 - `CLAUDE.md` is not installed as a skill. It is a repo-level pointer file only.
 
 ## Updating an existing PROJ for the optimized gates

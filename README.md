@@ -156,8 +156,8 @@ automatic cross-review calls, or stop-policy exits.
 | 2 | `requirements-engineer` | PRDs: user stories, acceptance criteria, edge cases, required opposite-provider review before handoff |
 | 2b | `handoff-package` (opt) | Standalone zippable package for external experts |
 | 2c | `review-reconcile` (opt) | Resolve PRD review gaps point by point |
-| 3 | `architecture` | PROJ-level tech design across all PRDs; flows straight into 4 when its cross-review is clean |
-| 4 | `writing-plans` | Wave-based implementation plans; flows straight into 5, whose CP1 is the single planning approval |
+| 3 | `architecture` | PROJ-level tech design across all requirements; hands off to a new Step 4 session after cross-review |
+| 4 | `writing-plans` | Wave-based implementation plans; hands off to a new Step 5 session, whose CP1 is the joint planning approval |
 | 5 | `executing` | Full-procedure Step 5 for weaker writer models; hosts the CP1 `checkpoint` and P0 `setup` subskills and the framework scripts that `5b` uses too |
 | 5b | `executing-large-model` | **Default Step 5**: CP1 + P0 through the `5_executing` subskills, then the waves with the same gates, state, and QA handoff as `executing`, procedure replaced by intent and invariants |
 | 6 | `qa` | End-to-end QA plus the required opposite-provider six-persona review; read-only finder in framework runs, findings into the ledger |
@@ -182,6 +182,35 @@ The same skills serve two delivery tracks: the full in-repo build and a
 wireframe, mockup, iterate with stakeholders, then hand a PRD to a
 developer via Linear at Step 2, no codebase required. See
 [docs/pm-chain.md](docs/pm-chain.md).
+
+## Receiving a product handoff
+
+The existing linear chain remains unchanged. External handoffs separate three
+responsibilities:
+
+- **Prototype repo — Product:** concepts, prototypes and PRDs, delivered as versioned packages.
+- **Refinement location — shared coordination:** shared package, decision, dependency and integration records, plus shared engineering analysis as agreed by the team. A separate refinement repo is optional; an agreed tracked location in an existing team repo also works.
+- **Production repos — Engineering:** scoped, pinned refinement inputs and readiness records alongside architecture, implementation plans, tests and PRs, with execution state owned by each repo.
+
+Start with optional `delivery-workspace` (2d) to find or onboard the coordination
+location and identify each code repository's baseline status.
+Then use `handoff-refinement` (2e) to inspect the immutable product package against
+code, record engineering constraints, and prepare questions for the product team.
+Each refinement is one run under `specs/PROJ-<id>-<theme>/runs/<date>-<nn>/`
+with the received files kept unchanged and every new result marked as proposal,
+question, checked or approved. Explicit product answers unblock the affected
+scope; model review cannot approve product changes.
+
+Architecture and plans consume the pinned product baseline, approved answers and
+separate engineering requirements. Independently verifiable technical work, such
+as a shared migration, can become an optional engineering story with its own
+rationale, criteria and tests. Smaller implementation tasks stay within their
+product story; received PRDs remain unchanged. Each implementation repository
+keeps its own checkout, state, tests and PR. Shared integration evidence establishes
+completion across repositories.
+
+See [the receiving workflow](docs/skill-chain.md#external-product-handoffs) for
+ownership, setup and the return path to product.
 
 ## The Agent Workflow Framework
 
@@ -224,6 +253,8 @@ the model rank the runner pins for review lanes is in
 ## Optional Skills
 
 ```text
+2d_delivery-workspace
+2e_handoff-refinement
 bugfixing
 refactor-dreamer
 sonar-cli

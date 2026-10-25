@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Execute the mechanical blocks of the in-session driver against real
-# state.sh / findings.mjs, and prove the QA persona panel uses six sequential
-# processes with six distinct personas and no overlap. No provider calls.
+# state.sh / findings.mjs, and prove the QA persona panel uses six separate
+# processes with six distinct personas (first alone, then at most 2 at once). No provider calls.
 set -euo pipefail
 export SKILLCHAIN_POLL_SECONDS=0.1
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -85,7 +85,7 @@ REASON='three failed repair attempts on BUG-7' bash "$CASE/stop2.sh" >/dev/null 
 $S get 2 demo2 .stop.reason | grep -q 'BUG-7' || die 'stop reason not recorded'
 $S transition 2 demo2 P6 running >/dev/null || die 'a parked run must be resumable'
 
-# 5. QA personas: six sequential processes, six distinct personas (not one prompt naming six).
+# 5. QA personas: six separate processes, six distinct personas (not one prompt naming six).
 cat >"$CASE/bin/codex" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-} ${2:-}" == "login status" ]]; then exit 0; fi
@@ -108,10 +108,10 @@ starts="$(grep -c '|start ' "$CASE/personas.log")"
 [ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f1 | sort -u | wc -l | tr -d " ")" = 6 ] || die 'persona workers must be six distinct processes'
 [ "$(grep '|start ' "$CASE/personas.log" | cut -d'|' -f2 | sort -u | wc -l | tr -d " ")" = 6 ] || die "six distinct personas expected: $(cut -d'|' -f2 "$CASE/personas.log" | sort -u | tr '\n' ',')"
 awk -F'|' '
-  $3 ~ /^start / { if (active != "") exit 1; active = $1; starts++ }
-  $3 ~ /^end / { if (active != $1) exit 1; active = ""; ends++ }
-  END { if (active != "" || starts != 6 || ends != 6) exit 1 }
-' "$CASE/personas.log" || die 'persona workers must finish before the next worker starts'
+  $3 ~ /^start / { starts++; active++; if (active > 2) exit 1; if (starts == 2 && first_done != 1) exit 1 }
+  $3 ~ /^end / { ends++; active--; if (ends == 1) first_done = 1 }
+  END { if (active != 0 || starts != 6 || ends != 6) exit 1 }
+' "$CASE/personas.log" || die 'first persona must finish alone, then at most 2 workers may overlap'
 
 # 6. Read-only snapshot (the runner's tree_snapshot; the driver's one-liner is the same pathspec): ledger/state
 #    writes are not a finder write, any other content change is, even in an already-dirty file.

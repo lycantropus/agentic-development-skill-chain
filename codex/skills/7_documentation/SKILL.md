@@ -5,6 +5,10 @@ description: "Create and curate human-readable project documentation after QA pa
 
 # Documentation
 
+## External handoff inputs (conditional)
+
+When `external-handoff.json` exists, use [the receiving input contract](../2e_handoff-refinement/references/input-contract.md) for requirement lookup instead of the local PRD paths below. Link the immutable baseline and explicit product responses with their version/hash provenance; keep engineering constraints and proposals distinguishable. Document implemented, verified behavior in this repository and name outstanding integration dependencies. Never edit received artifacts or present engineering assumptions, local seals, open PRs or unverified cross-repo behavior as accepted product truth.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts
@@ -19,6 +23,9 @@ verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
 verbatim; a newer language policy alone must not reopen approval. New records
 remain English. Change sealed canonical ACs only through an explicit user-
 authorized revision and the owning review; never silently translate them.
+External received ACs are quoted evidence: preserve their source language even
+before CP1; the local-authoring language revision rule above does not authorize
+translation or rewriting of an immutable package.
 
 
 Run after QA passes for a PROJ-X. The goal is not a short changelog; the goal is curated documentation a human can use to understand:

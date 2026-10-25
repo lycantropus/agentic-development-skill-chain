@@ -59,7 +59,7 @@ export function parseStoryTable(text) {
 }
 
 const PLAN_FORMAT = {
-  story: /^## (PROJ-[A-Za-z0-9-]+-PRD-\d+-US-\d+)(?::|\s|$)/,
+  story: /^## (PROJ-[A-Za-z0-9-]+-(?:PRD-\d+|ENG)-US-\d+)(?::|\s|$)/,
   ac: /^- \[.\] ([A-Za-z0-9][A-Za-z0-9._-]*AC-[A-Za-z0-9._-]+):\s*(.*)$/,
 };
 // PRDs (2_requirements-engineer template): `### US-<Z>: …` (or `## US-<Z> — …`), `- [ ] AC-<N>: …`.
@@ -68,20 +68,37 @@ export const PRD_FORMAT = {
   ac: /^- \[.\] (AC-[A-Za-z0-9._-]+):\s*(.*)$/,
 };
 
-// Story sections (default: `## PROJ-<X>-PRD-<Y>-US-<Z>`) with Scope/Agent, Split and ACs, raw and in
+// Product and declared external engineering story sections (default: `## PROJ-<X>-PRD-<Y>-US-<Z>`) with Scope/Agent, Split and ACs, raw and in
 // file order. A section ends at the next heading of the same or a higher level; an AC runs until the
 // next AC line, heading, `**Label:**` line, `---` rule or unindented code fence. A fence indented by
 // two or more spaces belongs to the list item and stays part of the AC text.
 export function parseStories(text, format = PLAN_FORMAT) {
-  const lines = text.split(/\r?\n/);
+  const rawLines = text.split("\n");
+  const lines = rawLines.map(line => line.replace(/\r$/, ""));
   const fenced = fenceMask(lines);
   const stories = [];
-  let story = null, ac = null;
+  let story = null, ac = null, literal = null;
   const closeAc = () => {
-    if (ac) ac.text = ac.text.replace(/\n+$/, "");
+    if (ac && !ac.externalLiteral) ac.text = ac.text.replace(/\n+$/, "");
     ac = null;
   };
   lines.forEach((line, i) => {
+    if (literal) {
+      const marker = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/)?.[1];
+      if (marker && marker[0] === literal.marker[0] && marker.length >= literal.marker.length) {
+        ac.text = rawLines.slice(literal.start, i).join("\n");
+        ac.literalEndLine = i + 1;
+        literal = null;
+        closeAc();
+      }
+      return;
+    }
+    const marker = format === PLAN_FORMAT && ac && i === ac.line && ac.text === "" && line.match(/^(`{3,}|~{3,})external-ac\s*$/)?.[1];
+    if (marker) {
+      ac.externalLiteral = true;
+      literal = { marker, start: i + 1 };
+      return;
+    }
     if (fenced[i]) {
       if (ac && fenced[i].indent >= 2) ac.text += `\n${line.replace(/\s+$/, "")}`;
       else closeAc();
@@ -115,6 +132,7 @@ export function parseStories(text, format = PLAN_FORMAT) {
     if (split && story.split === null) story.split = split[1];
     if (ac && !boundary) ac.text += `\n${line.replace(/\s+$/, "")}`;
   });
+  if (literal) throw new Error(`unterminated external-ac literal at line ${literal.start}`);
   closeAc();
   return stories;
 }

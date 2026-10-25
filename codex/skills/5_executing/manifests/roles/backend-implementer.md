@@ -32,3 +32,5 @@ ACs are in the `## Your Story` section of this file. A fix assignment
 with a finding arrives in the spawn prompt instead: then this file is
 the role file without a story, and your report starts with
 `Brief: <Finding-ID>`.
+
+When external product inputs are supplied, preserve source identities and verbatim criteria. Treat approved responses and separate engineering constraints as scoped inputs; never edit received product files. Report missing product authority or contradictory criteria to the lead instead of choosing product behavior or marking the gap as ordinary debt.

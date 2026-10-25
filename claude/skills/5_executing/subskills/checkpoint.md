@@ -81,6 +81,12 @@ itself.
 4. Open pre-mortem risks / plan self-review findings (if present)
 5. `specs/PROJ-<X>-<theme>/decisions.md` from earlier rounds (if present)
 
+## External handoff at CP1
+
+If the PROJ contains `external-handoff.json`, read [the receiving input contract](../../2e_handoff-refinement/references/input-contract.md) and run `chain check inputs <project-directory>` before the fast path or any seal. Verify the accepted team revision against the coordination remote and each affected repo baseline. The marker's resolved scope replaces local PRD lookup in the structure gates below; a malformed marker or unresolved applicable product question blocks CP1, including the automatic fast path.
+
+Checkpoint decisions can change engineering plans, not product approval. Product questions return through `handoff-refinement`; retain their owner, baseline and blocked scope rather than auto-deferring them as debt. Never edit immutable sources during the cascade. After explicit product responses or a superseding package, reconcile derived artifacts and repeat applicable review, input and context checks before sealing. Bind this seal to one repository's pinned scope; it does not approve other repo runs or integrated feature delivery.
+
 ## Workflow (CP1 — the main application)
 
 ### 0. Fast path — auto-approve when upstream was already clean
@@ -212,8 +218,14 @@ existing `6_plan/` directory for both architecture and plan paths instead.
 
 Only after the cascade is clean:
 
-1. Read the `state.json` created with the PROJ folder by concept (1).
-   If this is a legacy PROJ without one, recover once with
+1. Read the `state.json` created with the local PROJ folder by concept (1),
+   or by handoff-refinement for an external product baseline.
+   If an external-entry PROJ lacks state, stop and return a copyable prompt
+   for a new user-started handoff-refinement session in its owning repository;
+   that session must initialize state and recheck readiness before handing off.
+   Do not infer readiness or initialize external-entry state at CP1. Never reset
+   existing state. For a legacy PROJ without external inputs, recover once from
+   its owning repository root with
    `bash ~/.claude/skills/5_executing/scripts/chain state init <X> <theme>`;
    it must still be `CP1:pending` before this checkpoint approves it.
 2. `bash ~/.claude/skills/5_executing/scripts/chain state transition <X> <theme> CP1 running` (first

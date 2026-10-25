@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 import { fenceMask } from "./document-parser.mjs";
 import { parseArchitecture, validateArchitectureItems } from "./architecture-parser.mjs";
 
-export function validateArchitecture(text, file, prds) {
+import { resolveInputs, inputDirectory } from "./resolve-inputs.mjs";
+
+export function validateArchitecture(text, file, prds, engineeringStories = []) {
   const fail = (line, message) => { throw new Error(`${file}:${line}: ${message}`); };
   const lines = text.split(/\r?\n/), fenced = fenceMask(lines);
   const live = lines.map((line, i) => fenced[i] ? "" : line);
@@ -14,9 +16,10 @@ export function validateArchitecture(text, file, prds) {
   const declared = titles[0]?.text.match(/^# PROJ-(.+) Architecture(?:\s|$)/)?.[1];
   if (!proj || titles.length !== 1 || declared !== proj)
     fail(titles[0]?.line ?? 1, "filename and single architecture title must agree on PROJ ID");
-  if (!prds.length || prds.some(id => !id.startsWith(`PROJ-${proj}-PRD-`)) || new Set(prds).size !== prds.length) fail(1, "PRD set must be nonempty, unique and belong to this PROJ");
+  if ((!prds.length && !engineeringStories.length) || prds.some(id => !id.startsWith(`PROJ-${proj}-PRD-`)) || new Set(prds).size !== prds.length) fail(1, "PRD set must be nonempty, unique and belong to this PROJ");
+  if (engineeringStories.some(id => !id.startsWith(`PROJ-${proj}-ENG-US-`)) || new Set(engineeringStories).size !== engineeringStories.length) fail(1, "engineering stories must be unique and belong to this PROJ");
   const sections = validateArchitectureItems(parseArchitecture(text), file);
-  const required = ["Overview", "PRDs Covered", "Cross-Cutting Tech Decisions"];
+  const required = ["Overview", "PRDs Covered", "Cross-Cutting Tech Decisions", ...(engineeringStories.length ? ["Engineering Stories Covered"] : [])];
   const optional = ["System Boundaries", "Data Model", "Key Flows", "UI Implementation Constraints", "Cross-PROJ Dependencies", "Dependencies"];
   for (const name of [...required, ...optional]) {
     const matches = sections.filter(s => s.heading === name);
@@ -26,14 +29,19 @@ export function validateArchitecture(text, file, prds) {
   const coverage = sections.find(s => s.heading === "PRDs Covered");
   const covered = [...coverage.lines.join("\n").matchAll(/PROJ-[A-Za-z0-9-]+-PRD-\d+(?![\w-])/g)].map(m => m[0]);
   if ([...coverage.lines.join("\n").matchAll(/PRD-\d+/g)].length !== covered.length || covered.length !== prds.length || new Set(covered).size !== covered.length || covered.some(id => !prds.includes(id))) fail(coverage.line, "PRDs Covered must list every input PRD exactly once, using full local PROJ-X-PRD-Y IDs");
+  if (engineeringStories.length) {
+    const coverage = sections.find(s => s.heading === "Engineering Stories Covered");
+    const covered = [...coverage.lines.join("\n").matchAll(/PROJ-[A-Za-z0-9-]+-ENG-US-\d+(?![\w-])/g)].map(m => m[0]);
+    if ([...coverage.lines.join("\n").matchAll(/ENG-US-\d+/g)].length !== covered.length || covered.length !== engineeringStories.length || new Set(covered).size !== covered.length || covered.some(id => !engineeringStories.includes(id))) fail(coverage.line, "Engineering Stories Covered must list every declared local technical story exactly once");
+  }
   const ids = new Set();
   for (const section of sections) for (const item of section.items) {
     if (ids.has(item.id)) fail(item.line, `duplicate ${item.id}`);
     ids.add(item.id);
     if (!item.title) fail(item.line, `${item.id} needs a title`);
     if (item.affects === "all") continue;
-    if (!/^PRD-\d+(?:\s*,\s*PRD-\d+)*$/.test(item.affects)) fail(item.fields.affects, `${item.id} Affects must be PRD-Y IDs separated by commas, or all alone`);
-    for (const id of item.affects.split(/\s*,\s*/)) if (!prds.includes(`PROJ-${proj}-${id}`)) fail(item.fields.affects, `${item.id} Affects references unknown ${id}`);
+    if (!/^(?:PRD-\d+|ENG-US-\d+)(?:\s*,\s*(?:PRD-\d+|ENG-US-\d+))*$/.test(item.affects)) fail(item.fields.affects, `${item.id} Affects must be PRD-Y or declared ENG-US-N IDs separated by commas, or all alone`);
+    for (const id of item.affects.split(/\s*,\s*/)) if (![...prds, ...engineeringStories].includes(`PROJ-${proj}-${id}`)) fail(item.fields.affects, `${item.id} Affects references unknown ${id}`);
   }
 }
 
@@ -42,6 +50,8 @@ function main(args) {
   const [file, directory] = args; let text, entries;
   try {
     text = fs.readFileSync(file, "utf8");
+    const external = resolveInputs(inputDirectory(directory));
+    if (external) { validateArchitecture(text, file, external.prds, external.engineeringStories.filter(s => s.repository === external.repository).map(s => s.id)); console.log("External architecture structure passed"); return 0; }
     entries = fs.readdirSync(directory).filter(name => name.endsWith(".md") && !name.endsWith("-review-decisions.md")).map(name => ({ name, text: fs.readFileSync(path.join(directory, name), "utf8") }));
   } catch (error) { console.error(`${file}:1: cannot read input: ${error.message}`); return 2; }
   try {

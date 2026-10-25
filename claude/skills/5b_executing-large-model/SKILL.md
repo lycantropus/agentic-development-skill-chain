@@ -5,6 +5,12 @@ description: "Default Step 5 of the chain: run Checkpoint 1 and P0 setup through
 
 # Executing — large-model variant (default Step 5)
 
+## External handoff inputs (conditional)
+
+For `external-handoff.json`, follow [the receiving input contract](../2e_handoff-refinement/references/input-contract.md) and `5_executing`'s external-input rules before CP1/setup or resume. The resolved baseline, explicit approved responses and separately identified engineering criteria replace local PRD lookup below. Never supersede a worker slice by an assumed product decision: verify the pinned response, repair derived artifacts and recompile. Received files and source AC text remain immutable.
+
+Use one bound repo checkout/worktree and one state per run; verify its accepted baseline and external dependency revisions. A product gap returns to `handoff-refinement` and blocks affected tasks; do not auto-defer it as engineering debt. Passing this repo's gates or opening its PR does not establish shared integration acceptance.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts
@@ -19,6 +25,9 @@ verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
 verbatim; a newer language policy alone must not reopen approval. New records
 remain English. Change sealed canonical ACs only through an explicit user-
 authorized revision and the owning review; never silently translate them.
+External received ACs are quoted evidence: preserve their source language even
+before CP1; the local-authoring language revision rule above does not authorize
+translation or rewriting of an immutable package.
 
 
 The chain's default execution skill. Same gates as `5_executing`, less
@@ -161,7 +170,7 @@ from `5_executing` and the same scripts enforce them.
     `fix(PROJ-<X>-PRD-<Y>): address review findings for [US-N]`,
     `fix(PROJ-<X>): address quality gate findings`.
 
-12. **Scope.** The PRDs in `2_PRDs/` are the authoritative requirements. The
+12. **Scope (linear mode; external mode follows the input contract above).** The PRDs in `2_PRDs/` are the authoritative requirements. The
     plan cross-review and CP1 traced the plan's ACs against them and Skill 6
     tests them again, so the lead opens a PRD story only when a plan/PRD AC
     conflict is suspected.

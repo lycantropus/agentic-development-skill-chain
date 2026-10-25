@@ -11,6 +11,12 @@ only verdicts. `scripts/test-in-session-driver.sh` executes the mechanical block
 Entry is state-driven: read `bash scripts/chain state get <X> <theme> '.phase + ":" + .status'`
 and continue at the matching step, so a fresh session resumes anywhere.
 
+When the PROJ has `external-handoff.json`, apply handoff-refinement's
+`references/input-contract.md` before resuming. Invalid/stale pins or unresolved
+product questions are stop conditions for affected work, not auto-deferred debt.
+Keep source inputs immutable and report repo completion separately from shared
+integration readiness. A PR remains the local exit, never a whole-feature claim.
+
 1. **`P5:running` after the Quality Gate proof:** `bash scripts/chain state transition <X> <theme> P5 done`.
 2. **P6** (`P5:done` → `transition P6 running`; `P6:running` → continue):
    1. **Finder**, run on every entry to P6, resumes included (the ledger

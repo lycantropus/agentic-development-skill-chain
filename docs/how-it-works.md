@@ -16,7 +16,7 @@ Every dispatcher action belongs to exactly one kind. A script can implement acti
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
 | **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality.mjs |
-| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
+| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check inputs` → resolve-inputs.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
 | **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` → compile-context.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
@@ -29,9 +29,49 @@ Document structure is checked where it is produced: Step 2 runs `chain check prd
 
 The shared document and architecture readers do no I/O or process control. Their adjacent copies are byte-checked, and sync installs one copy of each into the project's flat scripts directory. Context compilation and story slicing use the same readers while keeping historical exit codes and legacy architecture fallbacks. Older artifacts passed back into Steps 3, 4 or CP1 must be corrected by the owning skill; already approved P5 runs gain no retrospective document gate.
 
+## External product inputs
+
+An explicit `external-handoff.json` in the PROJ directory selects the optional
+[receiving contract](../codex/skills/2e_handoff-refinement/references/input-contract.md).
+`chain check inputs <project-directory>` checks hashes, source identities, scope,
+response provenance and readiness. `--allow-blocked` bypasses readiness blockers
+only for read-only refinement of structurally valid inventories. A requirement
+with `repositories: []` is an explicit `ownership unresolved` blocker rather than
+a forced mapping. Missing mappings for owned requirements, invalid structure and
+integrity failures still fail; the flag never authorizes implementation. Existing linear PRD checks remain
+unchanged when no marker exists.
+
+PRD/architecture/plan gates, context compilation and story slicing use the same
+input resolver. Worker and reviewer contexts receive approved responses and
+separate engineering criteria with source provenance, plus relevant unresolved
+questions and unapproved answers clearly marked as non-authoritative. Complex
+source criteria can use the lossless `external-ac` literal described in the
+[receiving contract](../codex/skills/2e_handoff-refinement/references/input-contract.md#consumers-and-checks):
+Markdown boundaries, CRLF and significant whitespace remain intact, and exact
+source comparison still applies. Received product files are never normalized to
+fit the plan parser.
+
+After changing external inputs or product answers, rerun
+`chain render context compile <X> <theme>` before spawning workers. The companion
+`chain render context check <X> <theme>` validates freshly rendered content in
+memory; it does not compare existing worker files with that content or certify
+their freshness. Framework sync installs the shared reader with its consumers.
+QA evidence stays outside immutable source files. `chain render pr`
+includes repo scope, dependencies and shared integration evidence; an absent or
+stale shared report remains pending even if the current repo's tests pass.
+
+Optional `engineeringStories` declarations give standalone technical work IDs
+such as `PROJ-7-ENG-US-1`, with rationale, engineering authority and testable
+`ENG-AC-*` criteria. The same gates reject undeclared stories and missing criteria;
+architecture records their coverage, and worker contexts carry their technical
+constraints and applicable approved product answers. A repository can own only
+technical stories without synthetic product PRDs. Dependencies use the existing
+wave order and pinned repository prerequisites. Ordinary implementation details
+remain tasks within their product story.
+
 ## The phases at a glance
 
-The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder; it stays `CP1:pending` through steps 1–4 until Checkpoint 1 approves the plan. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
+The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder on the linear route; `handoff-refinement` initializes each implementation repo's local state on the external route. New state stays `CP1:pending` until Checkpoint 1 approves architecture and plans. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
 
 | Phase | Call | Reads | Writes |
 |---|---|---|---|

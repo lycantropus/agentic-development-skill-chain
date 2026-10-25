@@ -42,6 +42,12 @@ the same sync/transfer/test/adopt procedure; never adopt old copies blindly.
   **checkpoint** subskill at Checkpoint 1)
 - `specs/PROJ-<X>-<theme>/3-4_plan/` — wave plans + `wave-gate-config.json`
 
+## External handoff setup
+
+When `external-handoff.json` exists, read [the receiving input contract](../../2e_handoff-refinement/references/input-contract.md). Before state changes or worktree creation, run `chain check inputs <project-directory>` using the installed helper if necessary. Verify the pinned bundle is self-contained, accepted for this repository and consistent with CP1. Missing/tampered inputs, unresolved product scope or missing dependency evidence return a blocker; P0 cannot decide product answers or infer acceptance.
+
+Set up only this repo's checkout/worktree and state. Other repositories keep separate runs. Reuse the actual bound app workspace; do not launch a session in the coordination checkout with instructions merely to `cd` elsewhere. Preserve the pinned source bundle through setup and normal framework sync; never generate replacement PRDs to satisfy the local-format gate.
+
 ## Workflow
 
 ### 0. Gate on approval
@@ -287,7 +293,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 |---|---|
 | `2_requirements-engineer/scripts/validate-prds.mjs`; `3_architecture/scripts/validate-architecture.mjs` | `scripts/` |
 | `4_writing-plans/scripts/validate-wave-plan.mjs`, `document-parser.mjs`; `3_architecture/scripts/architecture-parser.mjs` | `scripts/` |
-| `5_executing/scripts/chain`, `render.mjs`, `compile-context.mjs`, `story-slice.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `resolve-inputs.mjs`, `render.mjs`, `compile-context.mjs`, `story-slice.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl`, `morning-report.md.tmpl`, `stop-report.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |

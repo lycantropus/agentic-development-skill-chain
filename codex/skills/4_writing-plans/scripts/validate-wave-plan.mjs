@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseStories, PRD_FORMAT, resolveStories } from "./document-parser.mjs";
+import { resolveInputs, checkExternalStories } from "./resolve-inputs.mjs";
 const isText = (value) => typeof value === "string" && value.trim() !== "";
 const clean = (value) => value.trim().replace(/^`|`$/g, "");
 const normalizeCommand = (value) => value.trim().replace(/\s+/g, " ");
@@ -20,6 +21,7 @@ function storiesMain(planFile) {
     process.exit(64);
   }
   try {
+    checkExternalStories(resolveInputs(path.dirname(path.dirname(path.resolve(planFile)))), parseStories(fs.readFileSync(planFile, "utf8")));
     console.log(JSON.stringify(resolveStories(fs.readFileSync(planFile, "utf8"), planFile), null, 2));
   } catch (error) {
     console.error(`stories: ${error.message}`);
@@ -79,8 +81,11 @@ function validateMain(args) {
     let inGateCommands = false;
 
     const planText = fs.readFileSync(path.join(planDir, file), "utf8");
-    for (const story of parseStories(planText)) wordedAcs.push(...story.acs.map((ac) => ({ ...ac, file: path.join(planDir, file) })));
-    for (const line of planText.split(/\r?\n/)) {
+    const planAcs = parseStories(planText).flatMap(story => story.acs);
+    wordedAcs.push(...planAcs.map(ac => ({ ...ac, file: path.join(planDir, file) })));
+    for (const [index, line] of planText.split(/\r?\n/).entries()) {
+      // External source examples are criterion data, never task or gate declarations.
+      if (planAcs.some(ac => ac.externalLiteral && index + 1 > ac.line && index + 1 <= ac.literalEndLine)) continue;
       const taskMatch = line.match(/^### Task ([^:]+):/);
       if (taskMatch) {
         const task = `Task ${taskMatch[1].trim()}`;
@@ -183,8 +188,14 @@ function validateMain(args) {
   // AC-N under US-Z in ../2_PRDs/PROJ-X-PRD-Y-*.md (first entry wins). Several such files (e.g. a
   // stray copy): the one whose first H1 is `# PROJ-X-PRD-Y` (or `# PROJ-X PRD-Y`) wins; 2c's
   // `<prd-stem>-review-decisions.md` never counts. No 2_PRDs/ directory: legacy, note only.
+  let external;
+  try {
+    external = resolveInputs(path.dirname(planDir));
+    checkExternalStories(external, planFiles.flatMap(file => parseStories(fs.readFileSync(path.join(planDir, file), "utf8"))), { complete: true });
+  } catch (error) { fail(error.message); external = true; }
   const prdDir = path.join(planDir, "..", "2_PRDs");
-  if (!fs.statSync(prdDir, { throwIfNoEntry: false })?.isDirectory()) {
+  if (external) { /* The receiving contract replaces only the local PRD-format input gate. */ }
+  else if (!fs.statSync(prdDir, { throwIfNoEntry: false })?.isDirectory()) {
     if (wordedAcs.length) console.error(`note: AC wording not compared against PRDs: ${prdDir} is not a directory (legacy project)`);
   } else {
     const prdNames = fs.readdirSync(prdDir).filter((name) => name.endsWith(".md") && !name.endsWith("-review-decisions.md"));

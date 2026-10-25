@@ -46,8 +46,8 @@ export function validateArchitectureItems(sections, file) {
       fail(section.line, `## ${heading} has content but no '### ${kind} N: <title>' items — implementers would get none of it`);
     for (const d of items) {
       if (!d.summary || !d.affects) fail(d.line, `${d.id} needs both an **Affects:** and a **Summary:** line`);
-      if (!/\ball\b/i.test(d.affects) && !/PRD-\d+/.test(d.affects))
-        fail(d.fields.affects, `${d.id} **Affects:** names no PRD-n and not 'all' — it would reach no wave`);
+      if (!/\ball\b/i.test(d.affects) && !/(?:PRD-\d+|ENG-US-\d+)/.test(d.affects))
+        fail(d.fields.affects, `${d.id} **Affects:** names no PRD-n or ENG-US-n and not 'all' — it would reach no wave`);
     }
     return { ...section, items };
   });

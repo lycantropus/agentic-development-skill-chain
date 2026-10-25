@@ -16,6 +16,8 @@ CORE_SKILLS=(
   1e_concept-sync
   2b_handoff-package
   2c_review-reconcile
+  2d_delivery-workspace
+  2e_handoff-refinement
   3_architecture
   4_writing-plans
   5_executing
@@ -125,6 +127,16 @@ while IFS= read -r bugfix_file; do
   bugfix_rel="${bugfix_file#"$ROOT/codex/skills/bugfixing/"}"
   check_identical "$bugfix_file" "$ROOT/claude/skills/bugfixing/$bugfix_rel"
 done < <(find "$ROOT/codex/skills/bugfixing" -type f | sort)
+# Optional receiving skills share the same contracts and behavior on both providers.
+for skill in 2d_delivery-workspace 2e_handoff-refinement; do
+  while IFS= read -r file; do
+    relative="${file#"$ROOT/codex/skills/$skill/"}"
+    check_identical "$file" "$ROOT/claude/skills/$skill/$relative"
+  done < <(find "$ROOT/codex/skills/$skill" -type f | sort)
+  diff -qr "$ROOT/codex/skills/$skill" "$ROOT/claude/skills/$skill" >/dev/null || \
+    fail "optional receiving skill copies differ: $skill"
+done
+
 check_identical "$ROOT/claude/skills/5b_executing-large-model/SKILL.md" \
   "$ROOT/codex/skills/5b_executing-large-model/SKILL.md"
 # 5b stays lean: shared rules live in 5_executing/references/, not in 5b
@@ -187,6 +199,22 @@ check_identical "$ROOT/codex/skills/3_architecture/scripts/architecture-parser.m
   "$ROOT/codex/skills/5_executing/scripts/architecture-parser.mjs" \
   "$ROOT/claude/skills/5_executing/scripts/architecture-parser.mjs"
 
+# One input resolver serves installed gates and synchronized project helpers.
+resolver="$ROOT/codex/skills/2e_handoff-refinement/scripts/resolve-inputs.mjs"
+while IFS= read -r copy; do
+  check_identical "$resolver" "$copy"
+done < <(find "$ROOT/codex/skills" "$ROOT/claude/skills" -name resolve-inputs.mjs -type f | sort)
+
+check_identical "$ROOT/codex/skills/2e_handoff-refinement/scripts/integration-status.mjs" \
+  "$ROOT/claude/skills/2e_handoff-refinement/scripts/integration-status.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/integration-status.mjs" \
+  "$ROOT/claude/skills/5_executing/scripts/integration-status.mjs"
+
+check_identical "$ROOT/codex/skills/2d_delivery-workspace/scripts/workspace.mjs" \
+  "$ROOT/claude/skills/2d_delivery-workspace/scripts/workspace.mjs"
+check_identical "$ROOT/codex/skills/2e_handoff-refinement/scripts/package-tools.mjs" \
+  "$ROOT/claude/skills/2e_handoff-refinement/scripts/package-tools.mjs"
+
 # Schemas must parse; every shell script must be syntactically valid;
 # every node script must compile.
 for schema in "$ROOT/runner/schemas/state.schema.json" "$ROOT/runner/schemas/findings.schema.json" "$ROOT/runner/schemas/context-manifest.schema.json"; do
@@ -210,6 +238,9 @@ fi
 HARNESS_LOGS=$(mktemp -d); trap 'rm -rf "$HARNESS_LOGS"' EXIT
 HARNESS_NAMES=(); HARNESS_PIDS=()
 harness() { local name="$1"; shift; env SKILLCHAIN_RESOURCE_LOCK_DIR="$HARNESS_LOGS/$name.resources" "$@" >"$HARNESS_LOGS/$name.log" 2>&1 & HARNESS_NAMES+=("$name"); HARNESS_PIDS+=($!); }
+harness external-inputs node "$ROOT/scripts/test-external-inputs.mjs"
+harness refinement-package node "$ROOT/scripts/test-refinement-package.mjs"
+harness delivery-workspace node "$ROOT/scripts/test-delivery-workspace.mjs"
 harness document-validators node "$ROOT/scripts/test-document-validators.mjs"
 harness wave-plan-validator bash "$ROOT/scripts/test-wave-plan-validator.sh"
 harness chain-dispatcher    bash "$ROOT/scripts/test-chain-dispatcher.sh"

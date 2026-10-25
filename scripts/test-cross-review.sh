@@ -193,6 +193,26 @@ quota_review qa 1 test --artifacts artifact.md --author-provider codex --persona
 [ "$(grep -c '^codex$' "$CASE/calls")" -eq 6 ]
 jq -e '.cross_review[-1] | .reviewer_provider == "codex" and .degraded_fallback == true' specs/PROJ-1-test/state.json >/dev/null
 grep -q '"classification":"provider-unavailable"' "$CASE/out"
+# Persona fan-out: persona 0 runs alone as a probe; the rest overlap up to resources.max_parallel_commands (default 2).
+mkdir -p "$CASE/par"
+cat >"$CASE/par/codex" <<'EOF6'
+#!/usr/bin/env bash
+if [[ "${1:-} ${2:-}" == "login status" ]]; then exit 0; fi
+cat >/dev/null
+printf 'start\n' >>"$CALLS"; sleep 1; printf 'end\n' >>"$CALLS"
+printf '%s\n' '{"severity":"low","category":"review-clean","summary":"clean"}'
+EOF6
+chmod +x "$CASE/par/codex"
+par_review() { : >"$CASE/calls"; PATH="$CASE/par:$PATH" CALLS="$CASE/calls" SKILLCHAIN_RESOURCE_LOCK_DIR="$CASE/locks" bash "$SCRIPT" qa 1 test --artifacts artifact.md --author-provider claude --personas >"$CASE/out" 2>&1 || { cat "$CASE/out" >&2; exit 1; }; }
+max_overlap() { awk '/^start$/{c++; if(c>m)m=c} /^end$/{c--} END{print m+0}' "$CASE/calls"; }
+par_review
+[ "$(grep -c '^start$' "$CASE/calls")" -eq 6 ]
+[ "$(head -2 "$CASE/calls" | tr '\n' ' ')" = "start end " ] || { echo "persona 0 must finish before the fan-out" >&2; exit 1; }
+[ "$(max_overlap)" -eq 2 ] || { echo "default fan-out must be capped at 2, got $(max_overlap)" >&2; exit 1; }
+echo '{"resources":{"max_parallel_commands":5}}' >specs/PROJ-1-test/3-4_plan/wave-gate-config.json
+par_review
+[ "$(max_overlap)" -eq 5 ] || { echo "max_parallel_commands=5 must run personas 1-5 together, got $(max_overlap)" >&2; exit 1; }
+rm -f specs/PROJ-1-test/3-4_plan/wave-gate-config.json
 # Required providers and non-QA truth gates never silently fall back.
 for mode in qa docs; do
   : >"$CASE/calls"; before="$(jq '.cross_review|length' specs/PROJ-1-test/state.json)"; rc=0

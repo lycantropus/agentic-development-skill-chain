@@ -149,6 +149,40 @@ When the work goes to people outside the repo — an external UI/UX expert (e.g.
 
 Use it for external/standalone handoffs.
 
+## Engineering receives the package
+
+The receiving team uses optional `delivery-workspace` for shared coordination
+and per-code-repo intake routing, then `handoff-refinement` to compare the pinned
+package with code. Source discovery completion does not prove implementation
+readiness. Engineering keeps original product files immutable and records
+technical constraints and product questions separately. Independently testable
+technical prerequisites may become engineering stories in the receiver's plans;
+they do not become rewritten product PRDs and cannot approve new product behavior.
+Smaller technical tasks remain inside their product story.
+
+Return questions identify the source baseline and the affected ACs, evidence,
+owner, the concrete decision requested, alternatives and blocked scope. They
+arrive as one portable round from the engineering side's refinement run; a
+question is never an approved answer, and an engineering proposal changes no
+product requirement. `review-reconcile` records explicit product
+answers with their authority and applicable baseline, updates product-owned
+sources, and hands off to `handoff-package` for a new dated run when needed.
+Neither side edits a prior generated package. Preparing feedback does not
+authorize sending it.
+
+Each return round leads with a [decision summary](../codex/skills/2e_handoff-refinement/references/feedback-and-readiness.md#portable-product-return-package):
+decisions needed now, known questions that now block work, items resolved since
+the previous round when applicable, and open non-blocking items with an owner
+and next decision point. Empty groups are omitted. Stable IDs connect these summaries to the evidence; engineering-only
+decisions remain in refinement artifacts. An earlier answer is reused only when
+its explicit approval still applies to the current baseline.
+
+When Product changes a shared rule, `review-reconcile` checks every affected PRD,
+including unchanged files, for old assumptions and inconsistent cross-PRD flows.
+The next handoff's delta explains changed meaning and affected requirements,
+not just edited files; unresolved impacts remain visible. See
+[the receiving workflow](skill-chain.md#external-product-handoffs).
+
 ## Detection
 
 `chain-guide` (0) recommends this track when the concept's `Handoff Readiness` is `discovery (Linear handoff)`, when a mockup iteration log exists in a repo with no application code, or when the user states they are doing discovery/PM only.

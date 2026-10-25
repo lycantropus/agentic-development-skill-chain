@@ -12,6 +12,15 @@ Ownership boundary — never blur it:
 - Skill 6 / peer lane: tests, reviews, EMITS findings as JSON lines (the runner writes them to the ledger). Read-only on the repository.
 - You (controller): dedupe, verify, dispatch fixes, re-verify, decide.
 
+For a PROJ with `external-handoff.json`, use the resolved product baseline,
+approved responses and engineering constraints described in handoff-refinement's
+`references/input-contract.md`. Keep received files immutable. A product decision
+is not a repair task or auto-deferred debt: record the question in the separate
+product-feedback exchange and stop its affected scope until an explicit product
+answer is available. Include the applicable resolved criteria and response
+provenance in each fixer brief; do not ask a fixer to redefine them. Repo-level
+QA completion does not certify shared integration across repositories.
+
 ## Loop
 
 1. **Script, no LLM:** findings arrive deduplicated in

@@ -37,6 +37,9 @@ DEV_PROCESS_GROUP=false
 OWNS_RALPH=false
 
 fail() { echo "❌ Wave ${WAVE} Gate FAILED: $1" >&2; exit 1; }
+if [[ -e "$BASE/external-handoff.json" || -L "$BASE/external-handoff.json" ]]; then
+  node "$SCRIPT_DIR/resolve-inputs.mjs" "$BASE" >/dev/null || fail "external handoff is not ready or its integrity check failed"
+fi
 infra_fail() {
   local message="$1" code="${2:-70}" tmp
   if [[ -f "$RALPH_STATE" ]]; then
@@ -690,7 +693,7 @@ fi
 assert_verified_head; assert_clean_worktree
 TS=$(now_iso)
 WAVE_PLAN="${BASE}/3-4_plan/PROJ-${PROJ}-wave-${WAVE}-plan.md"
-STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[0-9]+-PRD-[0-9]+-US-[0-9]+' | sort -u -t- -k2,2n -k4,4n -k6,6n | paste -sd, - | sed 's/,/, /g'; } || true)
+STORIES=$({ [[ -f "$WAVE_PLAN" ]] && awk '/^## /{p=($0=="## User Stories in this Wave")} p' "$WAVE_PLAN" | grep -oE 'PROJ-[A-Za-z0-9-]+-(PRD-[0-9]+|ENG)-US-[0-9]+' | sort -u -t- -k2,2n -k4,4n -k6,6n | paste -sd, - | sed 's/,/, /g'; } || true)
 cat >>"$PROGRESS" <<EOF
 
 ### Wave ${WAVE} Gate — PASSED ($TS)

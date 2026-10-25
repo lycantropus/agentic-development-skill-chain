@@ -5,6 +5,10 @@ description: "Create detailed feature PRDs with user stories, acceptance criteri
 
 # Requirements Engineer
 
+## External product ownership
+
+This skill authors product-owned sources. An incoming external package routes to `handoff-refinement`; do not copy it into `2_PRDs/` and revise it as a new canonical contract. Developer technical constraints belong in the receiving refinement, not product PRDs. Product-approved changes return through `review-reconcile` in the source project and, when needed, a new `handoff-package` run. Local authoring below is unchanged.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts

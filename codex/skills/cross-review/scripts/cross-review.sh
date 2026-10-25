@@ -219,17 +219,30 @@ if [ "$QA_PERSONAS" -eq 1 ]; then
     "Elena Rodriguez — Principal Architect|$RODRIGUEZ_FOCUS "'Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what should change for the next PROJ); it counts as a finding, so do not also emit review-clean.'
     "Ken Takahashi — Minimalism Engineer|$TAKAHASHI_FOCUS "'Also emit exactly one `low` finding with category `retrospective` whose summary is a 5-15 bullet retrospective (what to delete, inline, merge or avoid in the next PROJ); it counts as a finding, so do not also emit review-clean.'
   )
-  # Sequential workers stop immediately on quota exhaustion; never fan out retries.
+  run_persona() { # index -> runs one persona worker; rc is the adapter exit code
+    local i="$1" persona="${PERSONAS[$1]%%|*}" focus="${PERSONAS[$1]#*|}"
+    { cat "$PROMPT_FILE"; printf '\n## Assigned QA persona\nYou are %s. %s\nReview only this discipline; emit the strict machine-readable findings contract.\n' "$persona" "$focus"; } > "$QA_PERSONA_DIR/$i.prompt"
+    run_checked_adapter "${REVIEWERS[0]}" "$QA_PERSONA_DIR/$i.out" "$QA_PERSONA_DIR/$i.prompt"
+  }
   for panel_attempt in 1 2; do
     OUT_FILES=(); panel_rc=0
-    for i in "${!PERSONAS[@]}"; do
-      persona="${PERSONAS[$i]%%|*}"; focus="${PERSONAS[$i]#*|}"
-      persona_prompt="$QA_PERSONA_DIR/$i.prompt"; persona_out="$QA_PERSONA_DIR/$i.out"
-      { cat "$PROMPT_FILE"; printf '\n## Assigned QA persona\nYou are %s. %s\nReview only this discipline; emit the strict machine-readable findings contract.\n' "$persona" "$focus"; } > "$persona_prompt"
-      run_checked_adapter "${REVIEWERS[0]}" "$persona_out" "$persona_prompt" || panel_rc=$?
-      [ "$panel_rc" -eq 0 ] || break
-      OUT_FILES+=("$persona_out")
+    # The first persona runs alone as a probe: quota or auth exhaustion costs one call, never six.
+    # The rest run in batches of the host's max_parallel_commands (default 2): resource_run admits no more,
+    # and a queued worker would hit its wait_seconds deadline (exit 77) during a long review.
+    run_persona 0 || panel_rc=$?
+    cap="$(jq -r '.resources.max_parallel_commands // 2' "$RESOURCE_CONFIG" 2>/dev/null || echo 2)"
+    case "$cap" in ''|*[!0-9]*|0) cap=2 ;; esac
+    PERSONA_IDX=("${!PERSONAS[@]}")
+    for ((n=1; panel_rc == 0 && n < ${#PERSONA_IDX[@]}; n+=cap)); do
+      PERSONA_PIDS=()
+      for i in "${PERSONA_IDX[@]:n:cap}"; do run_persona "$i" & PERSONA_PIDS+=($!); done
+      for pid in "${PERSONA_PIDS[@]}"; do
+        rc=0; wait "$pid" || rc=$?
+        # Keep the first failure, but infrastructure failures (64/77) always win.
+        if [ "$rc" -ne 0 ] && { [ "$panel_rc" -eq 0 ] || [ "$rc" -eq 64 ] || [ "$rc" -eq 77 ]; }; then panel_rc=$rc; fi
+      done
     done
+    [ "$panel_rc" -ne 0 ] || for i in "${!PERSONAS[@]}"; do OUT_FILES+=("$QA_PERSONA_DIR/$i.out"); done
     [ "$panel_rc" -ne 0 ] || break
     if [ "$panel_rc" -eq 75 ] && [ "$panel_attempt" -eq 1 ] && [ -z "$REQUIRED_PROVIDER" ] && [ "$DEGRADED_FALLBACK" = false ]; then
       alternative=codex; [ "${REVIEWERS[0]%%:*}" != codex ] || alternative=claude

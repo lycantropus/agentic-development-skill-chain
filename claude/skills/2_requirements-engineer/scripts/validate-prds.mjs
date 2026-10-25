@@ -4,6 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fenceMask, parseStories, PRD_FORMAT } from "./document-parser.mjs";
 
+import { resolveInputs, inputDirectory } from "./resolve-inputs.mjs";
+
 export function validatePrd(text, file) {
   const fail = (line, message) => { throw new Error(`${file}:${line}: ${message}`); };
   const lines = text.split(/\r?\n/), fenced = fenceMask(lines);
@@ -60,6 +62,10 @@ export function validatePrd(text, file) {
 function main(args) {
   if (args.length !== 1) { console.error("usage: validate-prds.mjs <prd-directory>"); return 64; }
   const directory = args[0];
+  try {
+    const external = resolveInputs(inputDirectory(directory));
+    if (external) { console.log(`External requirements passed: ${external.acs.length} criteria for ${external.repository}`); return 0; }
+  } catch (error) { console.error(error.message); return 1; }
   let entries;
   try { entries = fs.readdirSync(directory).filter(name => name.endsWith(".md") && !name.endsWith("-review-decisions.md")).sort().map(name => ({ file: path.join(directory, name), text: fs.readFileSync(path.join(directory, name), "utf8") })); }
   catch (error) { console.error(`${directory}:1: cannot read input: ${error.message}`); return 2; }

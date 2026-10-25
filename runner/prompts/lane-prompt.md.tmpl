@@ -17,6 +17,17 @@ Work in the current repository. The PROJ artifacts live in
 `specs/{{PROJ}}-{{THEME}}/`. Machine state: `specs/{{PROJ}}-{{THEME}}/state.json`
 (read with `bash scripts/chain state get {{PROJ_NUMBER}} {{THEME}} <jq-path>`).
 
+## External product inputs (only when marked)
+
+If `specs/{{PROJ}}-{{THEME}}/external-handoff.json` exists, follow the installed
+handoff-refinement `references/input-contract.md` and verify the pinned resolved
+inputs before actionable work. Missing or invalid inputs stop the run; never
+fall back to local PRDs. Received files remain read-only through fixes, QA and
+documentation. Product questions go into the separate product-feedback exchange;
+model review, auto-deferred debt and phase seals do not approve product changes.
+An unresolved product decision parks its affected scope for an explicit answer.
+Each run owns one repository; a repo seal or PR proves no cross-repo integration.
+
 ## Role rules
 
 {{ROLE_RULES}}

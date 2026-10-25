@@ -5,6 +5,12 @@ description: "Route a concept, PRD set, architecture, implementation plan, QA ev
 
 # Cross-Review — Opposite-Provider Gate
 
+## External handoff ground truth (conditional)
+
+When reviewing a PROJ with `external-handoff.json`, read [the receiving input contract](../2e_handoff-refinement/references/input-contract.md). Supply the marker, complete scoped immutable baseline, explicit responses, engineering requirements and repository/dependency mapping through `--ground-truth`; local `2_PRDs/` globs below apply only to linear projects. Missing referenced external inputs fail validation and must not be omitted. Verify hashes and identify baseline version/revision in the review result.
+
+Classify product questions separately from engineering defects and missing evidence. A clean model review cannot approve a product change or clear its question. Inspect proposed refinement with `requirements` mode against the product baseline, without requiring that the received package adopt the local PRD layout. Keep all reviewed source artifacts read-only and preserve verbatim source language. Product questions go in the portable feedback exchange; existing stage ledgers continue to hold review defects through their helpers. The review result belongs to the refinement run whose inputs it reviewed (`runs/<run-id>/refinement/reviews/`); it does not carry over to a new run or a changed inventory.
+
 Same-model review is an echo chamber. This skill asks the other provider to
 try to break an artifact, with identical severity rules and normalized JSON
 Lines output for every mode. It never starts by itself: the producing skill
@@ -111,7 +117,7 @@ When the caller knows the author but must persist the review, pass both
 `--author-provider <claude|codex>` and `--persist`. `--require-provider codex`
 or `claude` makes an unavailable/opposite fallback fail rather than silently
 replacing the required reviewer. For Claude-authored QA, use `qa --personas`:
-it launches six separate Codex reviews sequentially. If Codex is unavailable,
+it launches six separate Codex reviews (the first alone as a quota probe, the other five in parallel batches of `resources.max_parallel_commands`, default 2). If Codex is unavailable,
 the script prints a degraded-mode warning, records `degraded_fallback: true`,
 and runs the same six personas on the strongest Claude model, even when that is
 the author model (`CLAUDE_MODEL_RANK`, default `fable opus sonnet`; override with
@@ -184,7 +190,7 @@ its own history.
   as a degraded persistent review. Any route that selects Claude verifies CLI
   availability and authentication before launching the review.
 - `qa --personas` starts six independent workers (security, principal
-  engineering, performance, reliability, architecture, and minimalism), sequentially, rather
+  engineering, performance, reliability, architecture, and minimalism), rather
   than asking one reviewer to impersonate a panel. The Claude-authored route
   prefers Codex and falls back loudly to six Claude workers only when Codex is
   unavailable.

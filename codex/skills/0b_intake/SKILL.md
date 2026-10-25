@@ -70,11 +70,19 @@ retires it (recorded in `decisions.md`); new content is appended with
 provenance markers like everything else. The drift-audit variant works
 the same way — deltas, not rewrites.
 
+## External workspace context (optional)
+
+When routed by `delivery-workspace`, use its [workspace contract](../2d_delivery-workspace/references/workspace-contract.md). This lifecycle is per code repository, independent of incoming features. Reuse a complete team-accepted baseline at its recorded commit; check visible intake branches/PRs and coordinate with their owner before starting another. Resume incomplete/interrupted intake even when `docs/PRODUCT.md` already exists, preserving the interview, merge and seal rules below. Missing documents alone do not authorize overwriting existing ones. A new handoff never triggers a fresh intake or drift audit; suspected drift requires an explicit audit request.
+
+Read external product requirements as proposed future context only. Never document unimplemented requirements as current code truth. The repo's `docs/PRODUCT.md` states its responsibility and may reference shared product context without rewriting product-owned feature requirements. Coordination-only repositories are exempt from application intake. Planned code repositories use bootstrap with approved scope.
+
+At handoff, report the local seal commit/check evidence separately from any accepted team revision and its review evidence. An unmerged PR or local seal is not team acceptance. Return those facts to workspace onboarding with a copyable next-session prompt; do not update feature state or auto-run intake in another repo. These team rules add no PR gate to standalone linear intake.
+
 ## Workflow
 
 ### 0. Precondition
 
-- No curated baseline yet (`docs/PRODUCT.md` missing), OR the user
+- No curated baseline yet (`docs/PRODUCT.md` missing), an existing incomplete/interrupted intake to resume, OR the user
   explicitly asked for a drift audit of the existing baseline.
 - Working space: `specs/intake/` (drafts + decision log). This is
   pre-PROJ — there is **NO state.json**; concept (1) creates one per PROJ.
