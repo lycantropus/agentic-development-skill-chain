@@ -66,9 +66,15 @@ developer via Linear at Step 2, no codebase required. See
 
 ## Receiving a product handoff
 
-The existing linear chain remains unchanged. For a package produced in another
-project, start with optional `delivery-workspace` to find or onboard the shared
-team coordination location and identify each code repository's baseline status.
+The existing linear chain remains unchanged. External handoffs separate three
+responsibilities:
+
+- **Prototype repo — Product:** concepts, prototypes and PRDs, delivered as versioned packages.
+- **Refinement location — shared coordination:** shared package, decision, dependency and integration records, plus shared engineering analysis as agreed by the team. A separate refinement repo is optional; an agreed tracked location in an existing team repo also works.
+- **Production repos — Engineering:** scoped, pinned refinement inputs and readiness records alongside architecture, implementation plans, tests and PRs, with execution state owned by each repo.
+
+Start with optional `delivery-workspace` to find or onboard the coordination
+location and identify each code repository's baseline status.
 Then use `handoff-refinement` to inspect the immutable product package against
 code, record engineering constraints, and prepare questions for the product team.
 Explicit product answers unblock the affected scope; model review cannot approve
@@ -79,9 +85,8 @@ separate engineering requirements. Independently verifiable technical work, such
 as a shared migration, can become an optional engineering story with its own
 rationale, criteria and tests. Smaller implementation tasks stay within their
 product story; received PRDs remain unchanged. Each implementation repository
-keeps its own checkout, state, tests and PR. Shared integration evidence establishes completion
-across repositories. A dedicated specification repository is optional; an agreed
-tracked location in an existing team repository also works.
+keeps its own checkout, state, tests and PR. Shared integration evidence establishes
+completion across repositories.
 
 See [the receiving workflow](docs/skill-chain.md#external-product-handoffs) for
 ownership, setup and the return path to product.

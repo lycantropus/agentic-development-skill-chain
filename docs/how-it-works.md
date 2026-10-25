@@ -34,14 +34,28 @@ The shared document and architecture readers do no I/O or process control. Their
 An explicit `external-handoff.json` in the PROJ directory selects the optional
 [receiving contract](../codex/skills/handoff-refinement/references/input-contract.md).
 `chain check inputs <project-directory>` checks hashes, source identities, scope,
-response provenance and readiness. `--allow-blocked` is for read-only refinement;
-it exposes questions without authorizing implementation. Invalid markers fail
-closed. Existing linear PRD checks remain unchanged when no marker exists.
+response provenance and readiness. `--allow-blocked` bypasses readiness blockers
+only for read-only refinement of structurally valid inventories. Missing mappings,
+empty selected-repo scope, invalid structure and integrity failures still fail;
+the flag never authorizes implementation. Existing linear PRD checks remain
+unchanged when no marker exists.
 
 PRD/architecture/plan gates, context compilation and story slicing use the same
-input resolver. Worker files receive approved responses and separate engineering
-criteria with source provenance. Framework sync installs the new reader with its
-consumers. QA evidence stays outside immutable source files. `chain render pr`
+input resolver. Worker and reviewer contexts receive approved responses and
+separate engineering criteria with source provenance, plus relevant unresolved
+questions and unapproved answers clearly marked as non-authoritative. Complex
+source criteria can use the lossless `external-ac` literal described in the
+[receiving contract](../codex/skills/handoff-refinement/references/input-contract.md#consumers-and-checks):
+Markdown boundaries, CRLF and significant whitespace remain intact, and exact
+source comparison still applies. Received product files are never normalized to
+fit the plan parser.
+
+After changing external inputs or product answers, rerun
+`chain render context compile <X> <theme>` before spawning workers. The companion
+`chain render context check <X> <theme>` validates freshly rendered content in
+memory; it does not compare existing worker files with that content or certify
+their freshness. Framework sync installs the shared reader with its consumers.
+QA evidence stays outside immutable source files. `chain render pr`
 includes repo scope, dependencies and shared integration evidence; an absent or
 stale shared report remains pending even if the current repo's tests pass.
 
@@ -56,7 +70,7 @@ remain tasks within their product story.
 
 ## The phases at a glance
 
-The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder; it stays `CP1:pending` through steps 1–4 until Checkpoint 1 approves the plan. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
+The state machine in `state.json` has the phases `CP1 → P0 → P5 → P6 → P7 → P8 → done`. Step 1 (concept) creates `state.json` with the PROJ folder on the linear route; `handoff-refinement` initializes each implementation repo's local state on the external route. New state stays `CP1:pending` until Checkpoint 1 approves architecture and plans. The phase numbers P5–P8 follow the step numbers 5–8, and P0 is the setup that precedes step 5's implementation work.
 
 | Phase | Call | Reads | Writes |
 |---|---|---|---|

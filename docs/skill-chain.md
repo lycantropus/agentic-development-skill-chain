@@ -86,6 +86,21 @@ a handoff and prepare questions before every repo has finished intake. Prototype
 references describe interactions and simulated behavior; static references can
 be sufficient and runnable prototypes do not establish production architecture.
 
+Before a repository's refinement review and architecture handoff,
+`handoff-refinement` initializes its local PROJ state through `chain state init`.
+New state remains `CP1:pending`; existing state is retained, and only the Step 5
+checkpoint can approve CP1. Execution state stays in the owning implementation
+repo, never in portable input bundles or shared coordination. A missing checkout
+is an onboarding prerequisite, not a reason to create its state elsewhere.
+
+Each repeat round assesses current requirements against current authoritative
+inputs before reconciling earlier findings. Prior items retain their IDs and
+are accounted for as open, resolved with evidence, superseded or needing
+reassessment. Changed rules, approved answers or engineering constraints trigger
+checks of affected requirements even when their PRD text is unchanged. No new
+findings does not mean earlier questions are answered; see the
+[repeat-round procedure](../codex/skills/handoff-refinement/SKILL.md#repeat-rounds-and-package-consistency).
+
 The [external input contract](../codex/skills/handoff-refinement/references/input-contract.md)
 is the common reference for validators and context generation. The explicit
 `external-handoff.json` marker selects external mode; a malformed marker fails
