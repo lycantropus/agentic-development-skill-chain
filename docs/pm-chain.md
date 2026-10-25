@@ -160,8 +160,11 @@ technical prerequisites may become engineering stories in the receiver's plans;
 they do not become rewritten product PRDs and cannot approve new product behavior.
 Smaller technical tasks remain inside their product story.
 
-Return questions identify the source baseline and ACs, evidence, owner,
-alternatives and blocked scope. `review-reconcile` records explicit product
+Return questions identify the source baseline and the affected ACs, evidence,
+owner, the concrete decision requested, alternatives and blocked scope. They
+arrive as one portable round from the engineering side's refinement run; a
+question is never an approved answer, and an engineering proposal changes no
+product requirement. `review-reconcile` records explicit product
 answers with their authority and applicable baseline, updates product-owned
 sources, and hands off to `handoff-package` for a new dated run when needed.
 Neither side edits a prior generated package. Preparing feedback does not

@@ -9,7 +9,7 @@ description: "Route a concept, PRD set, architecture, implementation plan, QA ev
 
 When reviewing a PROJ with `external-handoff.json`, read [the receiving input contract](../handoff-refinement/references/input-contract.md). Supply the marker, complete scoped immutable baseline, explicit responses, engineering requirements and repository/dependency mapping through `--ground-truth`; local `2_PRDs/` globs below apply only to linear projects. Missing referenced external inputs fail validation and must not be omitted. Verify hashes and identify baseline version/revision in the review result.
 
-Classify product questions separately from engineering defects and missing evidence. A clean model review cannot approve a product change or clear its question. Inspect proposed refinement with `requirements` mode against the product baseline, without requiring that the received package adopt the local PRD layout. Keep all reviewed source artifacts read-only and preserve verbatim source language. Product questions go in the portable feedback exchange; existing stage ledgers continue to hold review defects through their helpers.
+Classify product questions separately from engineering defects and missing evidence. A clean model review cannot approve a product change or clear its question. Inspect proposed refinement with `requirements` mode against the product baseline, without requiring that the received package adopt the local PRD layout. Keep all reviewed source artifacts read-only and preserve verbatim source language. Product questions go in the portable feedback exchange; existing stage ledgers continue to hold review defects through their helpers. The review result belongs to the refinement run whose inputs it reviewed (`runs/<run-id>/refinement/reviews/`); it does not carry over to a new run or a changed inventory.
 
 Same-model review is an echo chamber. This skill asks the other provider to
 try to break an artifact, with identical severity rules and normalized JSON
@@ -53,7 +53,7 @@ support.
 ## Run it
 
 If `scripts/chain review` has not been installed in the project yet, use
-`~/.codex/skills/5_executing/scripts/chain review` in the commands below.
+`~/.claude/skills/5_executing/scripts/chain review` in the commands below.
 Run from the project root so artifact paths resolve correctly.
 
 Before P0, pass the author explicitly. In an existing PROJ directory, findings

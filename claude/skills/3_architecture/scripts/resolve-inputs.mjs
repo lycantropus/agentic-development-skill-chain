@@ -26,6 +26,8 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
   need(m.repositories.length && m.repositories.every(v => typeof v === 'string' && /^[a-z][a-z0-9-]*$/.test(v)) && new Set(m.repositories).size === m.repositories.length, 'repositories must be unique keys');
   need(m.repositories.includes(m.repository), 'repository must select a listed key');
   const repos = values => Array.isArray(values) && values.length && values.every(r => m.repositories.includes(r)) && new Set(values).size === values.length;
+  // An empty owner list is an honest "ownership unresolved" state: it blocks, but is never auto-assigned to the inspected repo.
+  const blockers = [], unowned = [];
   const sources = new Map();
   for (const s of m.sources) {
     need(text(s.id) && !sources.has(s.id), 'duplicate or missing source identity');
@@ -48,7 +50,8 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
     const quote = lines.slice(range.startLine - 1, range.endLine).join('\n');
     const sourceIdentity = new RegExp(`(?<![A-Za-z0-9_.-])${r.sourceId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9_.-])`);
     need(text(r.text) && r.text === quote && sourceIdentity.test(quote), `${r.id}: text must be the complete verbatim sourceRange containing its criterion identity`);
-    need(repos(r.repositories), `${r.id}: invalid repository coverage`);
+    need(Array.isArray(r.repositories) && (r.repositories.length === 0 || repos(r.repositories)), `${r.id}: invalid repository coverage`);
+    if (!r.repositories.length) { unowned.push(r.id); blockers.push(`ownership unresolved: ${r.id}`); }
     requirements.set(r.id, r);
   }
   const refs = values => Array.isArray(values) && values.length && values.every(id => requirements.has(id));
@@ -95,11 +98,11 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
     if (e.repository === m.repository) acs.push({ id: e.id, story: e.story, text: e.text, kind: 'engineering', source: e.requirements.join(', '), requirements: e.requirements, authority: e.authority });
   }
   for (const s of engineeringStories) need(m.engineering.some(e => e.repository === s.repository && e.story === s.id), `${s.id}: engineering story needs at least one testable ENG criterion`);
-  need(acs.length, 'selected repository has no scope');
+  if (unowned.length && !acs.length) blockers.push('selected repository has no resolved scope'); else need(acs.length, 'selected repository has no scope');
   for (const d of m.dependencies) need(m.repositories.includes(d.repository) && m.repositories.includes(d.requires) && d.repository !== d.requires && pin(d.revision) && excerpt(d.source, d.evidence), 'dependency needs repository, requires, pinned revision and pinned evidence');
   if (m.prototype?.kind === 'runnable') need(pin(m.prototype.revision), 'runnable prototype requires immutable revision');
   need(['runnable', 'static', 'none'].includes(m.prototype?.kind) && text(m.prototype?.reference) && Array.isArray(m.prototype?.simulated) && m.prototype.simulated.every(text), 'prototype kind/reference/simulated required');
-  const blockers = [...questions.values()].filter(q => q.blockingRepositories.includes(m.repository) && !answered.has(q.id)).map(q => q.id);
+  blockers.push(...[...questions.values()].filter(q => q.blockingRepositories.includes(m.repository) && !answered.has(q.id)).map(q => q.id));
   if (!(m.team?.status === 'accepted' && pin(m.team.revision) && excerpt(m.team.source, m.team.evidence))) blockers.push('accepted team revision/evidence missing');
   if (m.derivedFrom !== baseline) blockers.push('baseline changed: reconcile derived inputs');
   if (!allowBlocked && blockers.length) fail(`not ready: ${blockers.join(', ')}`);

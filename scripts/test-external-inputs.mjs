@@ -163,6 +163,26 @@ try {
     assert.ok(fs.readFileSync(path.join(base, 'context/workers/wave-1', `${story}.md`), 'utf8').includes('Unresolved product questions (not approval)'));
     assert.ok(fs.readFileSync(path.join(base, 'context/roles/wave-1/reviewer.md'), 'utf8').includes('Unapproved response (not authority)'));
 
+    // Run-based storage: received bytes live under runs/<run-id>/handoff/<version>/.
+    for (const received of ['runs/2026-10-25-01/handoff/v1/source.txt']) {
+      fs.mkdirSync(path.join(base, path.dirname(received)), { recursive: true });
+      fs.writeFileSync(path.join(base, received), source);
+      const stored = structuredClone(manifest); stored.sources[0].path = received; save(stored);
+      run(['check', 'inputs', base]);
+      assert.equal(fs.readFileSync(path.join(base, received), 'utf8'), source, 'received bytes stay unchanged');
+    }
+    save();
+    // Unresolved ownership is an explicit blocker, never a synthetic mapping to the inspected repository.
+    const unowned = structuredClone(manifest); unowned.requirements[0].repositories = []; unowned.mappings = []; unowned.engineering = []; unowned.dependencies = []; save(unowned);
+    run(['check', 'inputs', base], false);
+    run(['render', 'context', 'compile', '1', 'demo'], false);
+    const unownedBlockers = JSON.parse(run(['check', 'inputs', base, '--allow-blocked']).stdout).blockers;
+    assert.deepEqual(unownedBlockers.slice(0, 2), [`ownership unresolved: ${id}`, 'selected repository has no resolved scope']);
+    const forced = structuredClone(unowned); forced.mappings = [manifest.mappings[0]]; save(forced);
+    run(['check', 'inputs', base, '--allow-blocked'], false);
+    const notOwner = structuredClone(manifest); notOwner.requirements[0].repositories = ['service']; notOwner.mappings = [manifest.mappings[1]]; notOwner.engineering = []; save(notOwner);
+    assert.throws(() => resolveInputs(base, { allowBlocked: true }), /no scope/);
+    save();
     const single = structuredClone(manifest); single.repositories = ['ui']; single.requirements[0].repositories = ['ui']; single.mappings = [single.mappings[0]]; single.dependencies = [];
     single.prototype = { kind: 'runnable', revision: 'c'.repeat(40), reference: 'Pinned runnable bundle', simulated: [] }; save(single);
     run(['check', 'inputs', base]); run(['check', 'plan', planDir]);

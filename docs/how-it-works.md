@@ -35,9 +35,10 @@ An explicit `external-handoff.json` in the PROJ directory selects the optional
 [receiving contract](../codex/skills/handoff-refinement/references/input-contract.md).
 `chain check inputs <project-directory>` checks hashes, source identities, scope,
 response provenance and readiness. `--allow-blocked` bypasses readiness blockers
-only for read-only refinement of structurally valid inventories. Missing mappings,
-empty selected-repo scope, invalid structure and integrity failures still fail;
-the flag never authorizes implementation. Existing linear PRD checks remain
+only for read-only refinement of structurally valid inventories. A requirement
+with `repositories: []` is an explicit `ownership unresolved` blocker rather than
+a forced mapping. Missing mappings for owned requirements, invalid structure and
+integrity failures still fail; the flag never authorizes implementation. Existing linear PRD checks remain
 unchanged when no marker exists.
 
 PRD/architecture/plan gates, context compilation and story slicing use the same

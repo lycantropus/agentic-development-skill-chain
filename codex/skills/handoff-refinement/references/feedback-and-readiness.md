@@ -4,7 +4,7 @@ Use this format for the human-facing exchange and readiness report; the machine-
 
 ## Portable product return package
 
-Create one round under `product-feedback/<round>/` containing the questions and the minimum evidence needed to answer. Include baseline identity/version/hash, source owner, receiver repo keys and source AC excerpts verbatim. Link only packaged evidence or accessible pinned team sources; strip credentials and machine-local paths. Retain earlier rounds. The round directory is the portable return unit: include the needed source excerpts and evidence inside it, or use accessible immutable team URLs. Relative links must resolve after copying only that directory elsewhere; links back into the receiver workspace do not make a standalone return package. Verify that copy before handoff.
+Create one round under `runs/<run-id>/refinement/product-feedback/<round>/` containing the questions and the minimum evidence needed to answer. Rounds are numbered per project, not per run, so IDs and round numbers never collide across runs. Include baseline identity/version/hash, source owner, receiver repo keys and source AC excerpts verbatim. Link only packaged evidence or accessible pinned team sources; strip credentials and machine-local paths. Retain earlier rounds. The round directory is the portable return unit: include the needed source excerpts and evidence inside it, or use accessible immutable team URLs. Relative links must resolve after copying only that directory elsewhere; links back into the receiver workspace do not make a standalone return package. Verify that copy before handoff.
 
 Lead with a concise decision summary, omitting empty groups:
 
@@ -19,8 +19,9 @@ Carry unresolved questions into this portable round with enough context to answe
 
 For each question record:
 
-- Stable question ID and classification.
-- Applicable baseline and source requirement/AC IDs.
+- Stable question ID and classification, including the kind of decision needed (product decision; technical investigation, architecture decision and operations/release decision stay with engineering and are not sent).
+- Applicable baseline and the source requirement/AC IDs actually affected; a whole-deliverable scope question lists every AC of that deliverable.
+- The concrete decision requested, the recommendation, and the exact work step that waits for the answer.
 - Observed code/integration evidence with repo revision and path.
 - The concrete question, plausible alternatives and their user/engineering impact.
 - Product decision owner and exactly which repo/tasks are blocked.
@@ -30,7 +31,7 @@ The source-side session prompt names `review-reconcile`, the product source proj
 
 ## Readiness report
 
-`refinement/readiness.md` links the resolver result and records:
+`runs/<run-id>/refinement/readiness.md` links the resolver result and records:
 
 | Item | Evidence |
 |---|---|
@@ -41,9 +42,12 @@ The source-side session prompt names `review-reconcile`, the product source proj
 | Repo baseline | Repo key, accepted intake commit or missing/resume/bootstrap action |
 | Product blockers | Question IDs, owner and affected scope; no silent defaults |
 | Engineering requirements | Separate IDs, authority/source links and testable checks; optional standalone technical stories with rationale, ownership and dependencies |
-| Coverage | Every source AC mapped to owning repo tasks and verification responsibility |
+| Scope and ownership | Complete source AC inventory; investigated repositories; binding owners with evidence, or `ownership unresolved` with the question that settles it |
+| Coverage | Every owned source AC mapped to owning repo tasks and verification responsibility; open ACs listed, never force-mapped |
 | Cross-repo dependencies | Pinned contracts/revisions, readiness and release order |
 | Integration acceptance | Required scenarios, compatible revisions and actual evidence or pending status |
+| Status per repository and artifact | `local draft`, `branch published`, `PR open`, `reviewed`, `approved by <owner>`, `merged` or `team accepted`, each with evidence or the next step that produces it |
+| Next decisions | At most five, prioritized, each with owner, blocked step and recommendation, plus one concrete follow-up assignment |
 | Next session | Owning skill and portable artifact paths, with blockers explicit |
 
 For example, a product interaction can require a task in `client` and another in `service`. Both bundles retain the same source identity and assign only their own work; the shared coverage record names both and an integration scenario against their compatible commits. Separate local project IDs and checkout paths do not change the product identity. If the service requirement awaits a product answer, neither the client's green tests nor its PR clears that dependency.

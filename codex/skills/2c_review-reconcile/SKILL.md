@@ -83,7 +83,7 @@ If the review references decision IDs, rules, or sections, resolve them in the s
 
 ## Structured feedback from engineering
 
-Accept the portable `product-feedback/<round>/` exchange from `handoff-refinement` as the review input. Read its baseline version/hash, stable question IDs, verbatim source AC references, repo evidence, alternatives and blocking scope. Match these to the product-owned source revision before deciding; a question against an older package needs explicit applicability reconciliation.
+Accept the portable `product-feedback/<round>/` exchange from `handoff-refinement` (stored under its refinement run, `runs/<run-id>/refinement/product-feedback/<round>/`) as the review input. Read its baseline version/hash, stable question IDs, verbatim source AC references, repo evidence, alternatives and blocking scope. Match these to the product-owned source revision before deciding; a question against an older package needs explicit applicability reconciliation.
 
 Preserve each question ID in the decision record. Record each response's product owner, date, applicable baseline, exact answer and whether it explicitly approves a change; suggestions and deferred questions stay unapproved. Model review and developer agreement cannot substitute for the product owner's answer. Return a portable response artifact with this provenance and the affected source IDs. The receiving contract at [handoff-refinement](../handoff-refinement/references/input-contract.md) defines the machine-readable exchange fields; do not invent a second response schema.
 

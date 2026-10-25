@@ -86,6 +86,18 @@ a handoff and prepare questions before every repo has finished intake. Prototype
 references describe interactions and simulated behavior; static references can
 be sufficient and runnable prototypes do not establish production architecture.
 
+Each refinement is stored as a run under `specs/PROJ-<id>-<theme>/runs/<YYYY-MM-DD-NN>/`
+with the received files byte-identical under `handoff/<version>/` and all new
+results under `refinement/`. The run README's provenance table states for every
+path whether it was received unchanged, extracted, newly written, generated or
+derived, and whether it is immutable, an observation, a proposal, a question, a
+checked result or an approval by a named owner. Review rounds and resumed
+sessions stay in their run; a new handoff version or a deliberately fresh
+assessment opens a new run and keeps the old one. Ownership that is still open
+stays `ownership unresolved` in the inventory instead of being assigned to the
+inspected repository. See the
+[run layout](../codex/skills/handoff-refinement/references/run-layout.md).
+
 Before a repository's refinement review and architecture handoff,
 `handoff-refinement` initializes its local PROJ state through `chain state init`.
 New state remains `CP1:pending`; existing state is retained, and only the Step 5

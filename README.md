@@ -77,8 +77,10 @@ Start with optional `delivery-workspace` to find or onboard the coordination
 location and identify each code repository's baseline status.
 Then use `handoff-refinement` to inspect the immutable product package against
 code, record engineering constraints, and prepare questions for the product team.
-Explicit product answers unblock the affected scope; model review cannot approve
-product changes.
+Each refinement is one run under `specs/PROJ-<id>-<theme>/runs/<date>-<nn>/`
+with the received files kept unchanged and every new result marked as proposal,
+question, checked or approved. Explicit product answers unblock the affected
+scope; model review cannot approve product changes.
 
 Architecture and plans consume the pinned product baseline, approved answers and
 separate engineering requirements. Independently verifiable technical work, such
