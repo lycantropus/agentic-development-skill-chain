@@ -62,12 +62,20 @@ export function discover(paths, identity) {
   const candidates = paths.map(inspectCheckout).filter(x => x.status === 'present');
   const unique = [...new Map(candidates.map(x => [x.root, x])).values()];
   const matches = identity ? unique.filter(x => x.remotes.some(r => r.identity === identity)) : unique.filter(x => existsSync(resolve(x.root, 'delivery-workspace.json')));
+  const registered = [], drafts = [];
   for (const match of matches) {
     const marker = resolve(match.root, 'delivery-workspace.json');
-    if (existsSync(marker)) validateInventory(JSON.parse(readFileSync(marker, 'utf8')));
+    if (!existsSync(marker)) { registered.push(match); continue; }
+    const inventory = validateInventory(JSON.parse(readFileSync(marker, 'utf8')));
+    const coordination = inventory.repositories.find(r => r.key === inventory.coordinationRepo);
+    // A team marker only counts where the checkout actually tracks the coordination remote; elsewhere it is a prepared draft.
+    const bound = inventory.mode !== 'team' || match.remotes.some(r => r.identity === coordination.remote);
+    (bound ? registered : drafts).push({ ...match, inventory, ...(bound ? {} : { status: 'draft' }) });
   }
-  required(matches.length <= 1, 'Ambiguous coordination checkouts; select the owning checkout explicitly');
-  return matches[0] ?? { status: 'unidentified', next: 'Request the team repository address or inspect the selected organization; local absence does not establish remote absence.' };
+  required(registered.length <= 1, 'Ambiguous coordination checkouts; select the owning checkout explicitly');
+  if (registered[0]) return registered[0];
+  if (drafts[0]) return { ...drafts[0], next: 'Prepared inventory without a checkout of its coordination remote: verify or create the remote, then register the marker through the team path.' };
+  return { status: 'unidentified', next: 'Request the team repository address or inspect the selected organization; local absence does not establish remote absence.' };
 }
 export function cloneOrReuse(remote, destination) {
   if (existsSync(destination)) {
@@ -83,6 +91,56 @@ export function cloneOrReuse(remote, destination) {
   // git clone refuses a concurrently populated target and preserves existing content.
   run('git', ['clone', '--', remote, destination]);
   return { ...inspectCheckout(destination), action: 'cloned' };
+}
+
+const attempt = (command, bin, args) => { try { return { ok: true, output: command(bin, args) }; } catch (error) { return { ok: false, reason: String(error.stderr || error.message).trim().split('\n').pop() }; } };
+
+// Schema validity, verified remote existence and team readiness are three separate statements.
+export function verifyInventory(data, command = run) {
+  validateInventory(data);
+  const remotes = data.repositories.filter(r => r.remote).map(r => ({ key: r.key, remote: r.remote, ...attempt(command, 'git', ['ls-remote', '--', r.remote]) })).map(({ output, ...r }) => r);
+  const coordination = remotes.find(r => r.key === data.coordinationRepo);
+  const remoteVerified = Boolean(coordination?.ok);
+  return { schemaValid: true, mode: data.mode, remotes, remoteVerified, teamReady: data.mode === 'team' && remoteVerified,
+    next: remoteVerified ? undefined : 'Coordination remote not verified: keep the inventory a draft; resolve access or create the remote before registering it.' };
+}
+
+// Read-only probes; each answer is evidence for the user-facing access report, not proof of authority.
+export function probeAccess({ remote, checkout, github }, command = run) {
+  const result = {};
+  if (remote) {
+    result.read = attempt(command, 'git', ['ls-remote', '--', remote]).ok;
+    if (checkout) {
+      const push = attempt(command, 'git', ['-C', checkout, 'push', '--dry-run', '--', remote, 'HEAD']);
+      result.write = push.ok ? true : /denied|403|not permitted|read.only|authentication/i.test(push.reason) ? false : 'unknown';
+    }
+  }
+  if (github) {
+    const repo = attempt(command, 'gh', ['api', `repos/${github}`]);
+    if (repo.ok) {
+      const info = JSON.parse(repo.output);
+      result.exists = true;
+      result.admin = Boolean(info.permissions?.admin);
+      result.write ??= Boolean(info.permissions?.push);
+      result.pullRequests = attempt(command, 'gh', ['pr', 'list', '--repo', github, '--limit', '1', '--json', 'number']).ok;
+    } else {
+      result.exists = /HTTP 404/.test(repo.reason) ? 'unknown' : false;
+      const [ownerLogin] = github.split('/');
+      const owner = attempt(command, 'gh', ['api', `users/${ownerLogin}`]);
+      const type = owner.ok ? JSON.parse(owner.output).type : undefined;
+      if (type === 'User') {
+        const me = attempt(command, 'gh', ['api', 'user']);
+        result.create = me.ok && JSON.parse(me.output).login?.toLowerCase() === ownerLogin.toLowerCase();
+      } else if (type === 'Organization') {
+        const membership = attempt(command, 'gh', ['api', `user/memberships/orgs/${ownerLogin}`]);
+        const org = attempt(command, 'gh', ['api', `orgs/${ownerLogin}`]);
+        const role = membership.ok ? JSON.parse(membership.output) : null;
+        result.create = Boolean(role && role.state === 'active' && (role.role === 'admin' || (org.ok && JSON.parse(org.output).members_can_create_repositories)));
+      } else result.create = false;
+    }
+  }
+  const missing = Object.entries(result).filter(([, v]) => v !== true).map(([k, v]) => `${k}: ${v}`);
+  return { ...result, missing, next: missing.length ? 'Name each missing permission to the user; request grants through the provider, never credentials in chat.' : undefined };
 }
 
 export function ensureGithubRemote(ownerName, visibility, authorized, command = run) {
@@ -144,12 +202,21 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const [cmd, ...args] = process.argv.slice(2);
     let result;
-    if (cmd === 'check' && args.length === 1) result = validateInventory(JSON.parse(readFileSync(args[0], 'utf8')));
+    if (cmd === 'check' && args.length === 1) {
+      validateInventory(JSON.parse(readFileSync(args[0], 'utf8')));
+      result = { schemaValid: true, remoteVerified: false, teamReady: false, next: 'Schema only. Run `verify` to confirm the remotes exist before treating this inventory as a registered workspace.' };
+    }
+    else if (cmd === 'verify' && args.length === 1) result = verifyInventory(JSON.parse(readFileSync(args[0], 'utf8')));
+    else if (cmd === 'access' && args.length) {
+      const opts = {};
+      for (const arg of args) { const [k, v] = arg.split('='); required(['remote', 'checkout', 'github'].includes(k.replace(/^--/, '')) && v, `Usage: access --remote=<url> [--checkout=<path>] [--github=<owner/name>]`); opts[k.replace(/^--/, '')] = v; }
+      result = probeAccess(opts);
+    }
     else if (cmd === 'inspect' && args.length === 1) result = inspectCheckout(args[0]);
     else if (cmd === 'discover' && args.length) result = discover(args);
     else if (cmd === 'clone' && args.length === 2) result = cloneOrReuse(...args);
     else if (cmd === 'ensure-github' && args.length >= 2 && args.length <= 3 && (!args[2] || args[2] === '--authorized')) result = ensureGithubRemote(args[0], args[1], args[2] === '--authorized');
-    else throw new Error('Usage: workspace.mjs check inventory.json | inspect checkout | discover checkout... | clone remote destination | ensure-github owner/name visibility [--authorized]');
+    else throw new Error('Usage: workspace.mjs check inventory.json | verify inventory.json | access --remote=<url> [--checkout=<path>] [--github=<owner/name>] | inspect checkout | discover checkout... | clone remote destination | ensure-github owner/name visibility [--authorized]');
     console.log(JSON.stringify(result, null, 2));
   } catch (error) { console.error(`workspace: ${error.message}`); process.exitCode = 1; }
 }
