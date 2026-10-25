@@ -107,7 +107,7 @@ The checkpoint commit in step 5 is an ordinary Git commit that gives the verifie
 
 P0 compiles all worker files once after the ground file exists. At each P5 wave start, the lead refreshes that wave's files from the current sources before dispatching workers. This refresh is separate from the single P0 compile.
 
-The permission setup (`merge-project-settings.sh`, Claude only) is a separate manual one-time step.
+The permission setup (`merge-project-settings.sh`, Claude only) is a separate manual one-time step. It installs an allowlist with `defaultMode: acceptEdits`; full bypass (`--dangerously-skip-permissions`, or `SKILLCHAIN_SKIP_PERMISSIONS=1` for the runner) is an explicit opt-in, never the default.
 
 ## What a worker file contains
 

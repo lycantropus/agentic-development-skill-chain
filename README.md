@@ -24,6 +24,123 @@ scaffold stood up, agent files written); an existing codebase goes through
 
 ## The Chain
 
+```mermaid
+flowchart TD
+  classDef human fill:#fde68a,stroke:#b45309,color:#000
+  classDef opt stroke-dasharray:5 5
+  classDef mech fill:#e0e7ff,stroke:#4338ca,color:#000
+
+  GUIDE["0 · chain-guide<br/>reads project and PROJ state,<br/>recommends the next step at any stage"]
+
+  subgraph ONCE["Once per product / repo"]
+    VISION["0a · product-vision<br/>defines what the product is and is not,<br/>cuts it into a numbered PROJ map"]
+    BOOT["0c · bootstrap<br/>decides the stack, stands up a green<br/>scaffold, writes AGENTS.md"]
+    INTAKE["0b · intake<br/>builds the curated docs baseline<br/>from a code scan + interview"]
+    VISION -->|full chain| BOOT
+  end
+
+  GUIDE -->|new build| VISION
+  GUIDE -->|existing codebase| INTAKE
+  GUIDE -->|baseline exists| CONCEPT
+  GUIDE -.->|stakeholder must explain the problem| CLAR
+
+  subgraph PLANNING["Steps 1–4 · one user-started session per skill, handed off by copyable prompt"]
+    CLAR["1a · clarification<br/>clarifies the problem live with<br/>the stakeholder into a brief"]:::opt
+    CONCEPT["1 · concept<br/>clarifies the problem, compares solution<br/>directions, allocates PROJ-X"]
+    subgraph UI["UI branch · required for UI features"]
+      VC["1b · visual-companion<br/>explores the UI shape as low-fi approaches,<br/>one per candidate direction;<br/>decides project mode and design system need"]
+      FD["1c · frontend-design<br/>design system: tokens,<br/>components, showcase"]:::opt
+      PROTO["1d · prototyping<br/>sitemap, component or HTML mockups,<br/>implementation handoff; stakeholder<br/>iteration narrows to one direction"]
+      SYNC["1e · concept-sync<br/>feeds iterated mockups and the<br/>chosen direction back into the concept"]:::opt
+    end
+    REQ["2 · requirements-engineer<br/>writes PRDs: user stories,<br/>acceptance criteria, edge cases"]
+    HP["2b · handoff-package<br/>immutable dated package for external<br/>UI/UX experts and developers"]:::opt
+    RR["2c · review-reconcile<br/>resolves review gaps point by point,<br/>updates PRDs, concept and mockups"]:::opt
+    ARCH["3 · architecture<br/>PROJ-level technical design<br/>across all PRDs"]
+    WP["4 · writing-plans<br/>splits stories into dependency-ordered<br/>waves + wave-gate config"]
+  end
+
+  VISION -.->|discovery track| CONCEPT
+  BOOT --> CONCEPT
+  INTAKE --> CONCEPT
+  CLAR -.->|confirmed brief| CONCEPT
+  CONCEPT -->|UI feature| VC
+  VC -->|design system needed| FD --> PROTO
+  VC -->|brownfield or skipped knowingly| PROTO
+  PROTO -->|concept affected or candidates open| SYNC --> REQ
+  PROTO --> REQ
+  CONCEPT -->|backend / API only| REQ
+  REQ -->|full chain| ARCH --> WP
+  REQ -.->|discovery: Linear handoff| DEV(["external experts / developer via Linear"])
+  REQ -.->|on request, either track| HP
+  HP -.-> DEV
+  DEV -.->|review returns gaps| RR
+  RR -.->|reconciled PRDs| REQ
+  RR -.->|new dated run| HP
+
+  subgraph STEP5["Step 5 · 5b executing-large-model (default) / 5 executing (full procedure)"]
+    CP1{{"CP1 · plan approval<br/>human reconciles architecture and plans<br/>point by point, or auto-approves<br/>when cross-reviews are clean"}}:::human
+    P0["P0 · setup (one subagent, no questions)<br/>worktree, helper sync, preflight,<br/>proves a gate rejects a planted defect,<br/>compiles worker files"]
+    MODE{"run mode?"}
+  end
+
+  WP -->|new session| CP1
+  CP1 -->|CP1:approved| P0 --> MODE
+  CP1 -.->|structural gaps go back to the owning skill| ARCH
+
+  subgraph RUN["P5–P8 · detached runner, in session under /goal, or one skill at a time · one writer per phase"]
+    P5["P5 · waves<br/>workers implement each wave; wave gate<br/>passes before the next; quality gate:<br/>build, coverage, Sonar, lint, integration review"]
+    P6["P6 · 6 qa<br/>read-only finder: E2E, security,<br/>six-persona review → findings;<br/>controller fixes Critical/High and re-verifies"]
+    P7["P7 · 7 documentation<br/>human docs + curated docs/ baseline,<br/>form (caps) and truth (cross-review) gates"]
+    P8["P8 · 8 delivery<br/>conflict probe, debt harvest, rendered PR,<br/>CI fix loop, final CI on the exact head"]
+  end
+
+  MODE -->|unattended: run-phase.sh auto| P5
+  MODE -->|/goal or interactive| P5
+  P5 -.->|Ralph recovery, next wave| P5
+  P5 --> P6 --> P7 --> P8
+  P8 -.->|open blocking findings| P6
+  P8 --> CP2{{"CP2 · human reviews the PR<br/>delivery reconciles each comment round<br/>(fix / debt / reject); human merges"}}:::human
+  CP2 --> DONE(["post-merge P8 rerun → worktree cleanup"])
+
+  LEDGER[("state.json · findings.json<br/>the only handoff between phases,<br/>written via chain state / chain findings")]:::mech
+  RUN -.-|every phase reads and writes| LEDGER
+
+  STOP(["park run: state blocked + stop report<br/>(rescue branch in runner mode)"])
+  P0 -.->|red gate / failure| STOP
+  RUN -.->|red gate / failure| STOP
+
+  XR["cross-review<br/>opposite provider (Claude ↔ Codex) tries to break<br/>the saved artifact; Critical/High block handoff;<br/>up to 3 rounds; degraded same-vendor fallback"]:::mech
+  CONCEPT -.-> XR
+  REQ -.-> XR
+  ARCH -.-> XR
+  WP -.-> XR
+  P6 -.-> XR
+  P7 -.-> XR
+  XR -.->|clean records enable the fast path| CP1
+
+  subgraph OPTIONAL["Optional skills · outside the main flow"]
+    VIBE["vibecoder<br/>exploratory spike with a live<br/>journal → concept seed"]
+    RD["refactor-dreamer<br/>deep architecture drift and<br/>refactor discovery run"]
+    BUG["bugfixing<br/>reproduce, fix and prove a<br/>reported bug with a regression test"]
+    SONAR["sonar-cli<br/>SonarQube setup, analysis<br/>runs, issue triage"]
+    SUPA["supabase-local-dev<br/>manual diagnosis of local Supabase<br/>drift, RLS and grant problems"]
+    UPD["update-chain<br/>updates the installed skills<br/>from the upstream repo"]
+  end
+
+  VIBE -.->|chain-input.md| CONCEPT
+  RD -.-> CONCEPT
+  RD -.-> ARCH
+  RD -.-> WP
+  RD -.-> P7
+  BUG -.->|framework-owned bug: ledger finding| P6
+  SONAR -.->|quality gate Sonar stream| P5
+```
+
+Dashed boxes are optional skills, yellow hexagons are the two human
+checkpoints, and dotted edges are optional or conditional paths, loops,
+automatic cross-review calls, or stop-policy exits.
+
 | Step | Skill | What it does |
 |------|-------|--------------|
 | 0 | `chain-guide` | Detect project state, route to the right next step |
@@ -32,7 +149,7 @@ scaffold stood up, agent files written); an existing codebase goes through
 | 0c | `bootstrap` | Once per project, new build: decide the stack into `docs/ARCHITECTURE.md` § Stack, run the real scaffold, verify build/test green, write root `AGENTS.md` + `CLAUDE.md` pointer |
 | 1a | `clarification` (opt) | PM and stakeholder clarify the problem live into a standalone stakeholder brief in `specs/_clarification/` |
 | 1 | `concept` | Clarify the problem (or use a supplied brief), then open the solution space, compare directions, allocate PROJ-X, and write the concept |
-| 1b | `visual-companion` (opt) | Interactive layout exploration, project mode detection; prototypes each open candidate direction |
+| 1b | `visual-companion` (UI req.) | Interactive layout exploration, project mode detection; prototypes each open candidate direction |
 | 1c | `frontend-design` (opt) | Design system — tokens, component catalog, showcase page |
 | 1d | `prototyping` (UI req.) | HTML sitemap + component-based or standalone HTML mockups + implementation handoff; narrows carried-forward candidates to one |
 | 1e | `concept-sync` (opt) | Reconcile iterated mockups and the chosen candidate direction back into the concept |
@@ -48,8 +165,10 @@ scaffold stood up, agent files written); an existing codebase goes through
 | 8 | `delivery` | Conflict probe, PR with rendered body, CI fix loop, CP2 comment reconcile |
 
 A bare number is a main-line step; a letter suffix is a variant at the same
-stage — `1b`–`1e` are a sequence inside the UI branch, `2b`/`2c` optional
-forks, `0a`/`0b`/`0c` alternative entry paths. Checkpoint 1 and P0 setup are
+stage — `1b`–`1e` are a sequence inside the UI branch, `2b`/`2c`
+optional forks after Step 2 (`2b` packages PRDs for external experts on
+either track; `2c` runs when a developer review returns gaps and
+reconciles them back into PRDs, concept and mockups), `0a`/`0b`/`0c` alternative entry paths. Checkpoint 1 and P0 setup are
 subskills in `5_executing/subskills/`, not steps of their own; `5b` is the
 default Step 5 and `5` its full-procedure fallback. Skills with no number are not steps (see below). Inside
 `specs/PROJ-<X>-<theme>/`, each subfolder carries the number of the skill
@@ -170,22 +289,32 @@ enforces it.
 
 ## Install
 
-Install the Codex skills:
-
 ```bash
-./scripts/install-codex.sh
+./scripts/install.sh
 ```
 
-Install the Claude skills:
+It checks the prerequisites ([Claude Code](https://code.claude.com/docs/en/setup),
+[Codex](https://github.com/openai/codex), bash >= 4.4, `git`, `jq`, Node.js LTS >= 22,
+and `perl` where `timeout` is absent), lists everything missing at once and offers to install it (showing the
+exact commands first), then installs both chains and offers to install Ponytail where it is missing,
+plus the optional Sonar CLIs.
+Start newly installed `claude` and `codex` once to sign in. On a single-provider
+machine run `./scripts/install-claude.sh` or `./scripts/install-codex.sh` alone.
 
-```bash
-./scripts/install-claude.sh
-```
-
-Both scripts copy the bundled core chain and optional skills into the
+The installers copy the bundled core chain and optional skills into the
 default local skill directories as one unit (no per-skill install). Framework runs additionally need the
 Ponytail plugin on both providers — install commands and the mode/scoping
 setup are in [docs/installation.md](docs/installation.md), together with the macOS (bash >= 4.4) and Windows (WSL2) notes.
+
+After pulling updates, run `./scripts/check-setup.sh`: it reports tools below
+the checkout's required versions and installed skills that no longer match it,
+and exits 1 when `./scripts/install.sh` is needed (it can also run from an
+optional local git hook)
+([details](docs/installation.md#after-pulling-updates)).
+
+To remove it again, run `./scripts/uninstall.sh`: it removes the chain's skill
+folders and Ponytail, asking before each, and leaves Claude Code, Codex and your
+other skills installed ([details](docs/installation.md#uninstall)).
 
 ## Validate
 

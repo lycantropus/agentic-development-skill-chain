@@ -106,8 +106,10 @@ Before doing ANYTHING else — before reading plans, before spawning any agent:
    - Then mark the phase if needed: if state shows `P0:done`, run `bash scripts/chain state transition <X> <theme> P5 running`.
 2. **Standalone fallback (no state.json — manual run without the framework):**
    run the legacy preflights inline before wave 1: (a) permission preflight —
-   `claude --dangerously-skip-permissions` or `bash scripts/merge-project-settings.sh`
-   (copy from `~/.claude/skills/5_executing/scripts/` if missing, commit);
+   `bash scripts/merge-project-settings.sh` (copy from
+   `~/.claude/skills/5_executing/scripts/` if missing, commit); full bypass
+   (`claude --dangerously-skip-permissions`) only as an explicit user opt-in
+   (`subskills/setup.md` §2);
    (b) `.coderabbit.yaml` at repo root (copy
    `~/.claude/skills/5_executing/references/coderabbit-template.yaml`, adjust
    `path_filters`); (c) tool checks — `jq`, `coderabbit`, browser automation
