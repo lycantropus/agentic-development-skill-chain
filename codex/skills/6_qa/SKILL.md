@@ -5,6 +5,14 @@ description: "Test features end-to-end against acceptance criteria, find bugs, p
 
 # QA Testing
 
+## External handoff inputs (conditional)
+
+In external mode, replace local PRD globs in cross-review command examples with the manifest and all referenced scoped baseline/response/engineering inputs; follow `cross-review`'s external-ground-truth rules. Do not execute an absent `2_PRDs/` glob as if it covered the external baseline.
+
+For `external-handoff.json`, read [the receiving input contract](../handoff-refinement/references/input-contract.md). Test the resolved product baseline and approved responses, plus separately identified engineering criteria, within this repository's scope. Preserve source IDs/text and version/hash provenance in evidence. Source references in the local PRD instructions below mean these immutable inputs; do not append QA results or fixes to received files, even in interactive mode.
+
+Write external-mode QA evidence in `6_qa/` and the existing local progress/report destination; use existing finding ledgers through their helpers. Product questions remain separate feedback artifacts for `handoff-refinement`, never approval flags in findings or automatically deferred engineering debt. Report repo acceptance separately from shared integration acceptance, including required compatible revisions, dependency evidence and unverified cross-repo outcomes. A green repo cannot mark the whole feature production-ready.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts
@@ -19,6 +27,9 @@ verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
 verbatim; a newer language policy alone must not reopen approval. New records
 remain English. Change sealed canonical ACs only through an explicit user-
 authorized revision and the owning review; never silently translate them.
+External received ACs are quoted evidence: preserve their source language even
+before CP1; the local-authoring language revision rule above does not authorize
+translation or rewriting of an immutable package.
 
 
 ## Agent Role
@@ -308,7 +319,7 @@ Critical/High simplicity findings gate production-readiness the same way functio
 
 **Framework run (state.json exists): do not edit PRDs or progress.md (read-only finder).** Print the QA summary (per-AC results, Simplicity Gate, Spec vs Standards, Sonar input, Mutation input, AGENTS.md candidates, and the `retrospective` findings from `findings.json` under `## PROJ Retrospective`) as your final output; the runner stores it as `5_progress/qa-finder-<ts>.md`.
 
-**Interactive run:** for each PRD tested, append a `## QA Test Results` section to that PRD file (`specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`) using `references/test-template.md` as the format. Write the same summary sections under `## QA Results` in `5_progress/PROJ-<X>-progress.md`, and append the persona `retrospective` findings verbatim under `## PROJ Retrospective`, each prefixed with the persona name.
+**Interactive linear run (no external-handoff marker):** for each PRD tested, append a `## QA Test Results` section to that PRD file (`specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`) using `references/test-template.md` as the format. Write the same summary sections under `## QA Results` in `5_progress/PROJ-<X>-progress.md`, and append the persona `retrospective` findings verbatim under `## PROJ Retrospective`, each prefixed with the persona name.
 
 Bug entries (progress.md or finder report) use stable IDs `BUG-PROJ<X>-QA-<NNN>` (zero-padded, sequential in this run) and an anchor — a symbol or regex, never a line number, because parallel fixers shift lines:
 

@@ -123,7 +123,9 @@ In the packaged sitemap and handoff, replace required localhost/repository links
 
 This is the first file in the reading order. It is a curated delta for repeat recipients, not a raw git diff and not the whole history.
 
-If a previous run exists, compare the current source artifacts against that run's `handoff-manifest.md` (it lists the included artifacts; do not open the run folder). Prefer git history when the workspace is a git repository; otherwise compare file presence, modified times, and manifest contents. Summarize only material handoff changes:
+If a previous run exists, compare the current source artifacts against that run's `handoff-manifest.md` (it lists the included artifacts; do not open the run folder). Prefer git history when the workspace is a git repository; otherwise compare file presence, modified times, and manifest contents. File presence and modification times alone do not establish semantic equivalence. Use pinned source history, manifest evidence and review decision records to identify changed shared rules and affected requirements, including unchanged PRDs whose meaning or applicability changed. Distinguish document edits from semantic impacts; cite source IDs and approved decisions. If the prior content cannot be established, state the comparison limitation rather than claiming no material changes. Packaging reports unresolved contradictions and routes them to `review-reconcile`; it does not decide or repair product rules.
+
+Summarize only material handoff changes:
 
 ```markdown
 # What Changed Since Last Handoff
@@ -141,6 +143,7 @@ Generated: YYYY-MM-DD
 ## Decision Changes
 - Resolved since last handoff: [IDs and outcomes]
 - Newly open or still open: [IDs, owner, impact, next decision point]
+- Shared-rule changes: [approved decision/source IDs, old-to-new meaning, affected requirement IDs including unchanged PRDs, and reconciliation status]
 
 ## Review Rounds Since Last Handoff
 - [review-changelog round labels and why they matter]
@@ -155,6 +158,14 @@ Generated: YYYY-MM-DD
 
 If there are no material changes since the previous run, say that clearly and still point to the current package as the complete source of truth. For a first handoff, write a short "Initial package" delta that tells readers this is the first shareable baseline.
 
+### Receiving ownership and prototype provenance
+
+Include the stable source/package identity and version, product decision owner, source revision when available, and exact SHA-256 values for packaged source artifacts in the manifest. Preserve source requirement IDs. Hash final payload files after package-relative links are finalized; do not attempt to hash the manifest inside itself. The receiver fingerprints every received file independently. Record whether the package is approved, proposed or blocked and cite its actual readiness evidence; product discovery completion is distinct from engineering implementation readiness.
+
+Prefer a pinned prototype source revision or an already available runnable bundle with start instructions and a list of simulated behavior. The static export rules above remain the default for component mockups: do not build or copy an application just to satisfy packaging. A supplied runnable bundle is an optional additional reference, with its exact revision/hash and prerequisites, never production architecture. Static-only references may be sufficient; label their interaction limits honestly.
+
+In the developer handoff, point receivers to `delivery-workspace` when setup is missing, then `handoff-refinement`. Explain that received files stay immutable; developers return stable question IDs, source AC references, code evidence, alternatives/impact and blocked scope. Product answers identify owner, date, baseline and explicit approval. Product-side `review-reconcile` updates source artifacts; only a new `handoff-package` run distributes those changes. This package does not require product authors to inspect implementation repositories or create a central handoff repository.
+
 ### 4. Write `handoff-manifest.md`
 
 Record enough metadata for the next run to build a reliable delta:
@@ -166,13 +177,16 @@ Run folder: `YYYY-MM-DD-handoff/`
 Generated: YYYY-MM-DD
 Previous handoff: `YYYY-MM-DD-handoff` (identifier only; not a link) or `none`
 Git commit: `<sha>` or `not available`
+Source/package identity and version: `<stable identity>@<version>`
+Product decision owner: `<owner>`
+Approval status and evidence: `<approved | proposed | blocked; source evidence>`
 Readiness basis: approved concept + PRDs; no unreconciled scope/behavior iterations (cite the checked log or state no iterations)
 Audiences: UI/UX expert | developers | both
 
 ## Included Artifacts
-| Package path | Source path | Notes |
-|--------------|-------------|-------|
-| `03-requirements/<file>` | `2_PRDs/<file>` | PRD |
+| Package path | Source path | SHA-256 of final payload | Notes |
+|--------------|-------------|-------------------------|-------|
+| `03-requirements/<file>` | `2_PRDs/<file>` | `<hash>` | PRD |
 
 ## Source Snapshot
 | Source path | Last modified / commit | Purpose |

@@ -6,8 +6,9 @@ import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
-import { slice, resolveStories } from "./document-parser.mjs";
+import { slice, resolveStories, parseStories } from "./document-parser.mjs";
 import { parseArchitecture, validateArchitectureItems, ITEM_SECTIONS } from "./architecture-parser.mjs";
+import { resolveInputs, checkExternalStories, externalStory } from "./resolve-inputs.mjs";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 function context(argv) {
 
@@ -39,6 +40,8 @@ if (cmd === "show" ? positional.length !== 1 : positional.length) usage();
 
 const BASE = `specs/PROJ-${projX}-${theme}`;
 const OUT_DIR = join(BASE, "context");
+let external;
+try { external = resolveInputs(BASE); } catch (error) { fail(error.message); }
 
 function fail(msg, code = 1) { console.error(`compile-context.mjs: ${msg}`); process.exit(code); }
 function sha256(s) { return createHash("sha256").update(s).digest("hex"); }
@@ -170,7 +173,7 @@ function apiContractsOwnWave(wave) {
 // that names no PRD fails instead of vanishing from the file. PROJs planned
 // before Summary lines existed fall back to architecture-delta.md, then to
 // the full document.
-const DROPPED_SECTIONS = ["PRDs Covered", "System Boundaries"];
+const DROPPED_SECTIONS = ["PRDs Covered", "Engineering Stories Covered", "System Boundaries"];
 const itemReached = new Map();   // item id -> listed in at least one compiled view (read by `check`)
 
 function wavePrds(text, plan) {
@@ -187,6 +190,10 @@ function wavePrds(text, plan) {
   const story = new RegExp(`^## PROJ-${projX}-PRD-(\\d+)-US-\\d+(?::|\\s|$)`);
   const missing = new Set(lines.map((line) => line.match(story)?.[1]).filter((id) => id && !ids.has(id)));
   if (missing.size) fail(`${plan}: **PRDs involved:** is missing ${[...missing].map((id) => `PRD-${id}`).join(", ")} from story sections`);
+  if (external) for (const s of parseStories(text)) {
+    const technical = s.id.match(/-(ENG-US-\d+)$/)?.[1];
+    if (technical) ids.add(technical);
+  }
   return ids.size ? ids : null;
 }
 
@@ -202,12 +209,12 @@ function implementerView(text, path, scope, wave, prds) {
       continue;
     }
     const kept = items.filter((d) => !prds || /\ball\b/i.test(d.affects) ||
-      [...d.affects.matchAll(/PRD-(\d+)/g)].some((m) => prds.has(m[1])));
+      [...d.affects.matchAll(/PRD-(\d+)|(ENG-US-\d+)/g)].some((m) => prds.has(m[1] ?? m[2])));
     for (const d of items) itemReached.set(d.id, itemReached.get(d.id) || kept.includes(d));
     out.push(`## ${heading}`, ...kept.map((d) => `- **${d.id}: ${d.title}** (Affects: ${d.affects}) — ${d.summary}` +
       (d.baseline ? ` _Overrides the baseline: ${d.baseline} — this ${kind.toLowerCase()} wins over the injected architecture overview._` : "")), "");
   }
-  const filter = prds ? ` Only items affecting ${[...prds].map((n) => `PRD-${n}`).join(", ")} (wave ${wave}) are listed.` : "";
+  const filter = prds ? ` Only items affecting ${[...prds].map((n) => n.startsWith("ENG-") ? n : `PRD-${n}`).join(", ")} (wave ${wave}) are listed.` : "";
   return `_Implementer view of \`${path}\`: diagrams dropped, each decision and key flow reduced to its Summary.${filter} Wave plans cite these Decision IDs; open the full file for the WHY._\n\n${out.join("\n").trim()}`;
 }
 
@@ -256,6 +263,9 @@ function roleContext(manifest, wave, prds) {
     const { title, text } = sourceContent(id, manifest, wave, prds);
     parts.push("", `## ${title}`, "", text);
   }
+  if (external) {
+    for (const story of parseStories(readFileSync(planPath(wave), "utf8"))) parts.push(externalStory(external, story.id));
+  }
   return parts.join("\n").trim() + "\n";
 }
 
@@ -269,7 +279,7 @@ function planStories(wave) {
   const path = planPath(wave);
   const text = readFileSync(path, "utf8");
   let stories;
-  try { stories = resolveStories(text, path); }
+  try { checkExternalStories(external, parseStories(text)); stories = resolveStories(text, path); }
   catch (error) { fail(error.message, 2); }
   if (stories.length === 0) fail(`${path}: no story — a wave plan needs at least one story section`, 2);
   return { path, text, stories };
@@ -287,6 +297,10 @@ function allStories() {
       seen.set(s.id, path);
     }
     byWave.set(w, stories);
+  }
+  if (external) {
+    try { checkExternalStories(external, PLAN_WAVES.flatMap(w => parseStories(readFileSync(planPath(w), "utf8"))), { complete: true }); }
+    catch (error) { fail(error.message); }
   }
   return byWave;
 }

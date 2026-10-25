@@ -5,6 +5,14 @@ description: "Create wave-based implementation plans from architecture + PRDs. O
 
 # Writing Plans
 
+## External handoff inputs (conditional)
+
+In external mode, replace local PRD globs in cross-review command examples with the manifest and all referenced scoped baseline/response/engineering inputs; follow `cross-review`'s external-ground-truth rules. Do not execute an absent `2_PRDs/` glob as if it covered the external baseline.
+
+For `external-handoff.json`, read [the receiving input contract](../handoff-refinement/references/input-contract.md) before extracting stories. Use its resolved inventory in the existing gates instead of requiring locally authored PRDs. The local-only extraction/repair directions below do not authorize rewriting received files: route product gaps to `handoff-refinement`, and product-owned revisions to `review-reconcile`.
+
+Preserve source IDs and AC text verbatim; use explicit local story/AC aliases from the inventory and keep engineering criteria separately identified. Plan only the selected repository's assigned scope. Record pinned external dependencies, ownership, integration tests and release ordering; check aggregate source coverage in the coordination location instead of duplicating every product requirement into every repo. Carry approved responses and engineering constraints into worker context. Optional declared engineering stories use `PROJ-<X>-ENG-US-<N>` with `ENG-AC-*` criteria and normal task/test/gate mappings; include their prerequisites in the same wave graph. Keep a technical task inside its product story when it has no independently verifiable outcome. Route missing or incorrectly split engineering stories back to `handoff-refinement`, not product PRD authoring. New or changed inputs invalidate affected plans/reviews and compiled contexts; reconcile and rerun gates before handoff. Existing linear plans need no new manifest or approval.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts
@@ -19,6 +27,9 @@ verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
 verbatim; a newer language policy alone must not reopen approval. New records
 remain English. Change sealed canonical ACs only through an explicit user-
 authorized revision and the owning review; never silently translate them.
+External received ACs are quoted evidence: preserve their source language even
+before CP1; the local-authoring language revision rule above does not authorize
+translation or rewriting of an immutable package.
 
 
 ## Session Boundary

@@ -6,8 +6,9 @@ From Requirements Engineer (Step 2) onward, all newly authored artifacts are
 English, including PRDs, review findings, plans, handoffs, worker/QA reports,
 documentation and PR descriptions. Conversation may use the user's language.
 Identifiers, verbatim source evidence and required product localization are
-preserved. Non-English canonical ACs are revised and approved in their owning
-PRD before downstream verbatim copying; a planner does not translate them.
+preserved. In the local authoring path, non-English canonical ACs are revised and approved
+in their owning PRD before downstream verbatim copying; a planner does not
+translate them. Received product ACs remain verbatim in their original language.
 
 ## Flow
 
@@ -52,6 +53,68 @@ PRD structure is checked before Step 2 review; Step 3 checks PRD inputs and arch
 Through Step 4, each producing skill has its own user-started session, including the optional discovery skills. Finish the current skill's checks, automatic cross-review, reconciliation and required user review before handing off. End with a copyable prompt containing the next skill, workspace, PROJ, actual artifact paths and blockers; the next session reloads these inputs. Internal helpers and cross-review stay in the current session. `/compact` does not satisfy this boundary. Architecture hands off to writing-plans in a new session, and writing-plans hands off to Step 5 in another new session. Checkpoint 1 remains the joint approval of architecture and plans; no additional approval gate is introduced. Blocked artifacts return to their owning skill through the same session boundary.
 
 `cross-review`, `bugfixing`, `refactor-dreamer`, `sonar-cli`, `update-chain` and `vibecoder` intentionally sit outside this flow. Step 5 has two skills with identical gates and state contracts: `5b_executing-large-model` is the default, with procedure reduced to invariants; `5_executing` is the full-procedure alternative for weaker writer models and hosts the shared subskills, scripts and the references both skills point to — shared rules live there once, and `validate.sh` caps 5b at 350 lines. `cross-review` is a mechanism, not a step — it is invoked by producing skills and never routed to directly, which is why it carries no chain number. Concept, requirements, architecture, and plan reviews start automatically as soon as their outputs are saved and applicable structure/cap checks pass, before user approval or handoff. Concept and requirements repeat the review automatically after user-requested changes. P6 QA and P7 documentation also require it. Use `bugfixing` for a reported defect that needs reproduction, a narrow repair, regression-test proof, and test-escape analysis without starting a feature PROJ. Launch `refactor-dreamer` separately for a long-form architecture drift/refactor discovery run, then feed its `chain-input.md` into the appropriate chain step. Use `sonar-cli` separately for SonarScanner/SonarQube CLI setup, analysis runs, and issue triage. Use `vibecoder` for a freeform exploratory coding session on a scratch branch: it keeps a live journal while you experiment, then distills it into a `chain-input.md` that feeds `1_concept` as raw input.
+
+## External product handoffs
+
+This optional receiving route joins the existing chain at architecture:
+`delivery-workspace` → `handoff-refinement` → architecture → plans → per-repo
+execution, QA and delivery → shared integration verification. Each producing
+skill hands off through a copyable prompt to a new user-started session.
+The linear route requires no workspace inventory, external marker, additional
+approval or migration.
+
+[`delivery-workspace`](../codex/skills/delivery-workspace/SKILL.md) discovers the
+team coordination remote and reuses its checkout, safely clones it, or creates a
+missing remote within the user's authorization. An existing team repository can
+own the tracked coordination location; a separate repository is optional.
+Access denial is an access problem, and local-only staging is explicitly chosen
+and remains unpublished. A plain common parent directory is convenient, never
+required. Portable repository identities belong in version control; each
+developer's checkout paths and credentials do not.
+
+Workspace onboarding reports each implementation repository separately: reuse an
+accepted baseline revision, resume an interrupted intake, offer `intake` for
+existing code without a baseline, or route genuinely new code to bootstrap.
+Check for active team intake work before starting another. A local seal or open
+PR does not prove team acceptance. Coordination-only repositories need no app
+intake. These distinctions do not add team PR gates to standalone linear use.
+
+[`handoff-refinement`](../codex/skills/handoff-refinement/SKILL.md) fingerprints
+the received package and records source identities, code evidence, technical
+constraints, repo ownership, dependencies and product questions. It can inspect
+a handoff and prepare questions before every repo has finished intake. Prototype
+references describe interactions and simulated behavior; static references can
+be sufficient and runnable prototypes do not establish production architecture.
+
+The [external input contract](../codex/skills/handoff-refinement/references/input-contract.md)
+is the common reference for validators and context generation. The explicit
+`external-handoff.json` marker selects external mode; a malformed marker fails
+rather than falling back to local PRDs. Product files stay immutable. Local
+story aliases map to namespaced source criteria; technical checks remain
+separate. Technical work normally remains a task within its product story. An
+independently verifiable prerequisite, such as a shared migration, can instead
+be an optional engineering story (`PROJ-<X>-ENG-US-<N>`), with its own rationale,
+authority, `ENG-AC-*` criteria and dependencies. It uses the same architecture,
+wave planning, worker and test gates without creating a replacement product PRD.
+Explicit product responses carry owner, date and baseline provenance.
+New upstream baselines or answers require impact reconciliation and renewed
+readiness checks for affected work. Team acceptance follows existing review
+policies; a locally drafted revision or open PR is not an accepted baseline.
+
+Questions return as a portable package to product-side `review-reconcile`;
+preparing it does not send or publish it. Product owns the source revisions and
+`handoff-package` produces a new dated run when appropriate. Engineering never
+rewrites the received PRDs to make the local-format validator pass. Unresolved
+product decisions block only their applicable scope, and a reviewer cannot
+supply product authority.
+
+Each repo consumes a pinned self-contained bundle or reproducible input source,
+with its own local PROJ, execution state and tests. Plans allocate owned work and
+external dependencies without duplicating all requirements into every repo.
+QA writes evidence outside product inputs. The coordination location tracks
+aggregate requirement coverage, compatible revisions, integration evidence and
+release order; one green repo or open PR cannot establish whole-feature delivery.
+No cross-repo scheduler, automatic merge or deployment is introduced.
 
 ## Legacy PROJ Folders
 
@@ -212,6 +275,8 @@ For a detailed explanation of Step 5 loops, gates, proof files, and QA handoff, 
 
 | Skill | Purpose |
 |---|---|
+| delivery-workspace | Discover/reuse shared team coordination, safely onboard checkouts and route baseline intake per implementation repo |
+| handoff-refinement | Refine immutable external product inputs against code, return product questions and prepare pinned per-repo implementation scope |
 | bugfixing | Reproduce and diagnose one reported defect, prove a regression test red before the fix, dispatch a narrow repair, run at most three Ralph repair attempts, and explain why prior tests missed it; standalone evidence lives in `specs/_bugfixing/BUGFIX-YYYYMMDD-HHMM-<slug>/bugfix-report.md` |
 | refactor-dreamer | Run an overnight/deep codebase scan for architecture drift, larger refactor opportunities, ADR candidates, fitness functions, and chain-ready input |
 | vibecoder | Freeform exploratory coding on a scratch branch with a live-appended journal, distilled at wrap-up into a `chain-input.md` feature seed for `1_concept` |

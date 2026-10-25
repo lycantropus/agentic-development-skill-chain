@@ -16,7 +16,7 @@ Every dispatcher action belongs to exactly one kind. A script can implement acti
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
 | **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality.mjs |
-| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
+| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check inputs` → resolve-inputs.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
 | **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` → compile-context.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
@@ -28,6 +28,31 @@ Not behind `chain`: `env-local.sh` and `compat.sh` (libraries the gates `source`
 Document structure is checked where it is produced: Step 2 runs `chain check prds <prd-directory>` before user/provider review and after edits. Step 3 validates its PRD inputs, then runs `chain check architecture <architecture-file> <prd-directory>` before architecture review. Step 4 checks both inputs before planning and checks its plan/config output. CP1 repeats all three gates before approval. These gates do not judge completeness or technical sense. New validators exit 0 for valid structure, 1 for invalid documents, 2 for unreadable input and 64 for wrong invocation; they write nothing.
 
 The shared document and architecture readers do no I/O or process control. Their adjacent copies are byte-checked, and sync installs one copy of each into the project's flat scripts directory. Context compilation and story slicing use the same readers while keeping historical exit codes and legacy architecture fallbacks. Older artifacts passed back into Steps 3, 4 or CP1 must be corrected by the owning skill; already approved P5 runs gain no retrospective document gate.
+
+## External product inputs
+
+An explicit `external-handoff.json` in the PROJ directory selects the optional
+[receiving contract](../codex/skills/handoff-refinement/references/input-contract.md).
+`chain check inputs <project-directory>` checks hashes, source identities, scope,
+response provenance and readiness. `--allow-blocked` is for read-only refinement;
+it exposes questions without authorizing implementation. Invalid markers fail
+closed. Existing linear PRD checks remain unchanged when no marker exists.
+
+PRD/architecture/plan gates, context compilation and story slicing use the same
+input resolver. Worker files receive approved responses and separate engineering
+criteria with source provenance. Framework sync installs the new reader with its
+consumers. QA evidence stays outside immutable source files. `chain render pr`
+includes repo scope, dependencies and shared integration evidence; an absent or
+stale shared report remains pending even if the current repo's tests pass.
+
+Optional `engineeringStories` declarations give standalone technical work IDs
+such as `PROJ-7-ENG-US-1`, with rationale, engineering authority and testable
+`ENG-AC-*` criteria. The same gates reject undeclared stories and missing criteria;
+architecture records their coverage, and worker contexts carry their technical
+constraints and applicable approved product answers. A repository can own only
+technical stories without synthetic product PRDs. Dependencies use the existing
+wave order and pinned repository prerequisites. Ordinary implementation details
+remain tasks within their product story.
 
 ## The phases at a glance
 

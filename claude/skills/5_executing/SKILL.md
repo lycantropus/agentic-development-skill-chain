@@ -5,6 +5,12 @@ description: "Execute implementation plans user-story by user-story using agent 
 
 # Executing
 
+## External handoff inputs (conditional)
+
+For `external-handoff.json`, read [the receiving input contract](../handoff-refinement/references/input-contract.md). Verify input hashes, accepted team revision, repository scope and applicable readiness before CP1, setup and resumed work. References below to authoritative PRDs mean the resolved product baseline plus explicit approved responses in this mode; engineering constraints remain separately traceable. Never edit received PRDs, translate source ACs, or use a model review/CP1 decision as product approval. Send newly found product gaps through `handoff-refinement`; block affected tasks pending an explicit response and revalidate affected artifacts. Unresolved product questions cannot be auto-deferred as engineering debt.
+
+Execute one repository per run: its own bound checkout/worktree, state, tests and PR. A prompt that merely says `cd` does not bind a new app session. Verify pinned dependency revisions before dependent waves; preserve integration evidence and outstanding cross-repo work in the coordination location. Repo gates are repo-level results, not whole-feature acceptance. Worker briefs must include applicable approved responses and engineering constraints from the resolved context.
+
 ## Artifact Language
 
 From Requirements Engineer (Step 2) onward, write all newly authored artifacts
@@ -19,6 +25,9 @@ verbatim copying. On resume after CP1 is sealed, preserve approved PRD/plan ACs
 verbatim; a newer language policy alone must not reopen approval. New records
 remain English. Change sealed canonical ACs only through an explicit user-
 authorized revision and the owning review; never silently translate them.
+External received ACs are quoted evidence: preserve their source language even
+before CP1; the local-authoring language revision rule above does not authorize
+translation or rewriting of an immutable package.
 
 
 > The chain's default Step 5 is `5b_executing-large-model`: same gates, state and
@@ -304,7 +313,7 @@ for p in specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-*-plan.md; do bash script
 
 **At each wave start** — only that wave's plan, `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-wave-<N>-plan.md`. Its lead-facing header (`## User Stories in this Wave`, `## Execution`) drives dispatch. Each `## <US-ID>` section is that worker's slice — ACs, smoke test, UI Implementation Notes, tasks with TDD cycles and file paths, UI handoff constraints, gotchas — and is compiled verbatim into the worker's file under `## Your Story` (Step 2). Never re-read earlier waves' plans: what previous waves implemented comes from the wave shape plus `5_progress/PROJ-<X>-progress.md`.
 
-**PRDs** — `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` stay the authoritative requirements source. The plan's ACs were traced against them by the plan cross-review and CP1, and Skill 6 tests the PRD ACs again, so open the matching PRD story only when a plan/PRD AC conflict is suspected (an AC in the slice reads paraphrased or incomplete, or a worker or the Outer Ralph pass questions one). If plan and PRD disagree on AC text, the PRD wins: add the PRD wording to the spawn prompt, marked as superseding the file's slice, and log the drift in `progress.md`.
+**Linear-mode PRDs** — `specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-*.md` stay the authoritative requirements source. The plan's ACs were traced against them by the plan cross-review and CP1, and Skill 6 tests the PRD ACs again, so open the matching PRD story only when a plan/PRD AC conflict is suspected (an AC in the slice reads paraphrased or incomplete, or a worker or the Outer Ralph pass questions one). If plan and PRD disagree on AC text, the PRD wins: add the PRD wording to the spawn prompt, marked as superseding the file's slice, and log the drift in `progress.md`.
 
 **Architecture** — workers get the implementer view of `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md` (their wave's decision Summaries, compiled) through their worker file. The lead opens the full file only for a cross-PRD design question that the slice and the wave shape do not settle.
 

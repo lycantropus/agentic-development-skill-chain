@@ -62,8 +62,10 @@ This skill is aligned with the Claude variant. In Codex:
 
 ## Input
 
+- Optional external-workspace route: a genuinely new repository may use the approved scope and shared decisions pinned by `delivery-workspace`/`handoff-refinement` as product input. Read the [workspace contract](../delivery-workspace/references/workspace-contract.md). Establish this repo's responsibility and product/roadmap baseline from that approved scope without repeating product discovery or presenting future features as implemented. Resolve actual missing product decisions with their owner. Bind the session to the selected new repo, never initialize its parent or a coordination-only repo. The scaffold approval/build checks still apply. Ordinary greenfield starts require no workspace manifest.
+
 - `docs/PRODUCT.md` and `specs/product-roadmap.md` from `product-vision` (0a).
-  Without them, ask for the one-sentence product description before deciding
+  Without them or the approved external scope above, ask for the one-sentence product description before deciding
   anything — the stack follows from what is being built.
 - Any constraint the user already stated: a hosting requirement, a language
   the team knows, an existing account, a customer's platform.

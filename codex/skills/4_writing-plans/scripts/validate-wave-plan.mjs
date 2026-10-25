@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseStories, PRD_FORMAT, resolveStories } from "./document-parser.mjs";
+import { resolveInputs, checkExternalStories } from "./resolve-inputs.mjs";
 const isText = (value) => typeof value === "string" && value.trim() !== "";
 const clean = (value) => value.trim().replace(/^`|`$/g, "");
 const normalizeCommand = (value) => value.trim().replace(/\s+/g, " ");
@@ -20,6 +21,7 @@ function storiesMain(planFile) {
     process.exit(64);
   }
   try {
+    checkExternalStories(resolveInputs(path.dirname(path.dirname(planFile))), parseStories(fs.readFileSync(planFile, "utf8")));
     console.log(JSON.stringify(resolveStories(fs.readFileSync(planFile, "utf8"), planFile), null, 2));
   } catch (error) {
     console.error(`stories: ${error.message}`);
@@ -183,8 +185,14 @@ function validateMain(args) {
   // AC-N under US-Z in ../2_PRDs/PROJ-X-PRD-Y-*.md (first entry wins). Several such files (e.g. a
   // stray copy): the one whose first H1 is `# PROJ-X-PRD-Y` (or `# PROJ-X PRD-Y`) wins; 2c's
   // `<prd-stem>-review-decisions.md` never counts. No 2_PRDs/ directory: legacy, note only.
+  let external;
+  try {
+    external = resolveInputs(path.dirname(planDir));
+    checkExternalStories(external, planFiles.flatMap(file => parseStories(fs.readFileSync(path.join(planDir, file), "utf8"))), { complete: true });
+  } catch (error) { fail(error.message); external = true; }
   const prdDir = path.join(planDir, "..", "2_PRDs");
-  if (!fs.statSync(prdDir, { throwIfNoEntry: false })?.isDirectory()) {
+  if (external) { /* The receiving contract replaces only the local PRD-format input gate. */ }
+  else if (!fs.statSync(prdDir, { throwIfNoEntry: false })?.isDirectory()) {
     if (wordedAcs.length) console.error(`note: AC wording not compared against PRDs: ${prdDir} is not a directory (legacy project)`);
   } else {
     const prdNames = fs.readdirSync(prdDir).filter((name) => name.endsWith(".md") && !name.endsWith("-review-decisions.md"));

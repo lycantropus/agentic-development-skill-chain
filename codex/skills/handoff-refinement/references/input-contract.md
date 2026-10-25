@@ -1,0 +1,73 @@
+# External handoff input contract (version 1)
+
+Read this only when consuming an external product package. Ordinary linear projects keep their existing inputs, gates and approvals. This contract belongs to handoff-refinement; consumers link here instead of maintaining another specification.
+
+## Storage and ownership
+
+Place `external-handoff.json` at `specs/PROJ-<local-id>-<slug>/`. Absence selects linear mode; a malformed marker blocks, never falls back. Keep received bytes in `handoff-inputs/<version>/`, refinement/evidence in `refinement/`, questions and answers in `product-feedback/`, and portable repository bundles in `repo-handoffs/<repo-key>/`. Create directories only when writing actual content. Never alter a generated `2b_handoff/` run. Source package layouts need not follow the local numbered layout.
+
+Reuse delivery-workspace's portable repository inventory and machine-local bindings. A single code repository may own the agreed tracked coordination location. For multiple repos, share a versioned team coordination remote; copy the complete pinned inventory and referenced sources into each repo bundle, changing only `repository` to select its scope. The same baseline and shared mappings must be retained. No absolute paths or credentials belong in shared files. Each repo owns its execution state, checkout, plans, tests and PR.
+
+The product baseline remains immutable. Product responses clarify or amend its effective requirements only with explicit approval by the named product owner; the original source text and identity remain immutable. Engineering requirements express testable constraints, never authority to weaken product ACs. Architecture/plans are derived work. Contradictions block their affected scope and have an owner; neither model review nor an engineering decision resolves a product question. A superseding package creates a new baseline identity; reconcile affected questions, mappings, architecture and plans before setting `derivedFrom` to that identity. Never transfer approval automatically from an earlier version.
+
+## Inventory
+
+The marker is JSON with these required fields (empty arrays are explicit):
+
+- `schemaVersion`: `1`.
+- `baseline`: `{ "id": "product", "version": "v1" }`. Identity is `id@version`.
+- `derivedFrom`: that identity, set only after impact reconciliation.
+- `repository`: selected stable repo key; `repositories`: unique keys for the complete delivery scope.
+- `sources`: `{id,path,sha256}` entries for every received package file and every evidence/answer file used below. `path` is relative to the project directory. SHA-256 covers exact bytes; missing files, path escapes and tampering fail. Do not omit package files from the intake fingerprint inventory.
+- `team`: `{status,revision,source,evidence}`. Only `status: "accepted"` permits actionable use. `revision` is a full immutable Git commit or SHA-256; `source` identifies a hashed source containing the exact `evidence` text of acceptance. Record the owning remote, normal PR/review outcome and accepted revision there. A local commit or open PR is not acceptance. This helper checks provenance consistency, not hosting-provider authorization: verify acceptance against the team's remote before authoring this record and recheck upstream before starting/resuming work. Reconcile concurrent changes; do not overwrite them or invent a second approval system. Draft/proposed inputs remain inspectable with `--allow-blocked`.
+- `requirements`: `{id,source,sourceId,sourceRange,text,repositories}`. `id` preserves source requirement identity prefixed with the baseline, for example `product@v1:checkout:AC-1`. `sourceId` is the original criterion ID present in the source, and `id` must equal `baseline:source:sourceId`. `sourceRange: {startLine,endLine}` uses 1-based inclusive complete line boundaries in the hashed source. `text` equals those exact complete lines joined by newline and contains `sourceId` in that same span; include the original criterion ID/label when it shares a line with the wording. Never select a partial multiline criterion: refinement review checks that the range covers the complete AC. A substring elsewhere in the source is not traceability. `repositories` names every repo responsible for implementing/verifying it. Inventory the complete approved scope; omission from the inventory is a refinement defect, not an exemption.
+- `mappings`: `{requirement,repository,story,ac}`. `requirement` is a source identity above. Local implementation aliases use `story: "PROJ-7-PRD-1-US-1"`, `ac: "PROJ-7-PRD-1-US-1-AC-1"`. These aliases are explicit traceability, never renumbering source documents or creating synthetic product PRDs. Every requirement/repo pair has exactly one mapping. Several requirements may map to one story with different AC aliases. Each repo can have a different local PROJ ID.
+- `engineering`: `{id,text,authority,requirements,repository,story}`. Separate identities use `ENG-AC-1` etc.; `requirements` links source identities (or is empty for an independently authorized engineering constraint), `authority` records the explicit engineering authority/evidence, and `story` selects an owned mapped product story or a declared engineering story. These criteria appear separately in plans, tests and worker contexts. Do not put them in source PRDs.
+- `engineeringStories` (optional): `{id,repository,rationale,authority}` declarations for independently verifiable technical work. IDs use `PROJ-7-ENG-US-1`, distinct from product story aliases; `repository` selects its owner, `rationale` explains why a separate story is needed, and `authority` records the engineering decision/evidence. Each declaration must have at least one testable criterion in `engineering`. Express story prerequisites and execution order through the existing wave plans; cross-repo prerequisites remain in `dependencies`. There is no second dependency graph or `dependsOn` field in these declarations. Omitting this array preserves existing inputs. A schema/API/UI task that only serves one product story normally stays inside that story. Shared migrations, infrastructure or other independently testable prerequisites can be separate technical stories. They cannot approve product behavior, replace source criteria or count as product-coverage mappings.
+- `questions`: `{id,requirements,owner,evidence,alternatives,blockingRepositories}`. Stable question IDs, source references, concrete code/integration evidence, alternatives with impact and named product owner make the return package answerable outside this workspace. Empty blocking scope means non-blocking. Classify other findings as engineering decision, code/integration gap or missing evidence in refinement evidence; product questions are not findings approval flags.
+- `responses`: `{question,baseline,owner,date,approved,answer,source}`. `baseline` is the exact baseline identity, `owner` matches the question owner, `date` is YYYY-MM-DD, `approved` is a boolean, and complete `answer` is a verbatim excerpt of a hashed source. Only explicit `approved: true` resolves a blocker; informal suggestions remain proposals. One current answer per question per inventory; retain previous exchanges as source files/history. An explicitly approved change amends the effective requirements named by the question, with the answer retained alongside the original AC text and provenance. Preserve both in plans and tests: assess the source criterion as explicitly amended, never silently erase its original wording. An ambiguous or conflicting answer returns to product for clarification or a superseding baseline; a suggestion cannot be treated as an amendment. Return packages include questions, referenced ACs, evidence, alternatives and response provenance; preparing them never authorizes sending/publishing.
+- `dependencies`: `{repository,requires,revision,source,evidence}`. Cross-repo prerequisites record a full pinned compatible revision and exact evidence in a hashed source. Record shared interfaces, release order and required integration verification centrally; a green repo is not delivery-wide success.
+- `prototype`: `{kind,reference,simulated}` with an additional full commit/hash `revision` for runnable prototypes and kind `runnable`, `static` or `none`; reference names the pinned revision/bundle or honest availability explanation; simulated is a list of simulated behavior. Static-only references may be sufficient; prototypes do not establish production architecture.
+
+## Consumers and checks
+
+Run `chain check inputs <project-directory>`. It verifies integrity, identities, mapping coverage, provenance and selected-repo blockers, and emits the resolved inventory. `--allow-blocked` permits read-only refinement/question preparation and reports blockers; it never grants readiness.
+
+`chain check prds <project-directory>` or its existing `<project-directory>/2_PRDs` argument detects the marker before reading local PRDs. `chain check architecture <architecture-file> <project-directory-or-2_PRDs>` uses mapped local PRD aliases for architecture coverage. This is an input adapter, not a second PRD authoring path. Architecture retains the existing format and records shared repo/interface boundaries. When engineering stories are declared for the selected repo, add `## Engineering Stories Covered` with each technical story ID exactly once. `Affects` may name `ENG-US-1` alongside `PRD-1` or `all`. A repo with technical scope only records `None` under `PRDs Covered`; do not invent product PRDs.
+
+Wave plans keep their existing format. Declared technical stories use headings such as `## PROJ-7-ENG-US-1: Migrate existing records`, with their `ENG-AC-*` criteria, tasks, tests and gate commands. Include technical story dependencies in the existing wave order, and keep their rationale/authority in the worker context. Technical architecture scope is derived from story headings; no extra wave header is needed. Technical-only waves may omit `PRDs involved` or say `None`; mixed waves still list their product PRDs. Copy product AC text verbatim using mapped local aliases, add technical checks under `ENG-AC-*`, and give every selected-repo criterion exactly one task/test/gate command. The production plan validator checks exact wording and complete local coverage against the resolver; it never applies local product-format checks to the external source documents. Aggregate mapping coverage across repositories is checked separately by the resolver.
+
+Context compilation and story slicing enforce readiness/scope and inject pinned source identities, product answers, engineering requirements, dependencies and prototype limitations. The per-wave external supplement is included in every injected role context (including reviewers/fixers) and counts toward its token budget; workers inherit that context. Changing the inventory makes compiled contexts stale. Use `chain sync` so the input resolver accompanies every helper consumer. New actionable work requires current accepted inputs; old linear sealed runs gain no new marker or gate.
+
+QA records evidence in existing QA/findings artifacts, never checkboxes appended to immutable product files. Maintain shared integration evidence listing required product outcomes, repository revisions/PRs, compatible interfaces, test results and release order. A repo passing QA or opening its PR does not complete shared integration. Delivery documentation must state remaining integration work. No automatic merge/deploy or cross-repo scheduler is introduced.
+
+
+## Shared integration report
+
+After integrated verification, record `refinement/integration.json` in the
+coordination location and distribute it with the same pinned inputs. It is
+separate from all per-repository execution state. Its fields are:
+
+- `schemaVersion: 1`, `baseline`: the baseline identity.
+- `inputFingerprint`: SHA-256 of `JSON.stringify` of the parsed marker with only
+  `repository` removed (preserve field/array order). This pins shared mappings,
+  answers and evidence while allowing each bundle to select its own repository.
+- `repositories`: unique `{key,revision}` records for every tested repo, using
+  full immutable commits/content hashes. Record PR URLs in the evidence.
+- `releaseOrder`: each repo key once, prerequisites before dependants.
+- `outcomes`: one `{requirement,repositories,status,source,evidence}` per source
+  requirement. `status` is `passed`, `failed` or `pending`; repositories cover
+  every owner of that criterion. `source` names an inventory-hashed test report;
+  `evidence` quotes its integrated test result. That report must name the exact
+  tested revision for each participating repo, test command and observed result.
+
+The shared checker reports pending for absent/stale reports, missing coverage,
+unresolved product questions, incompatible revisions or incomplete release order.
+It reports verified only when all recorded outcomes pass with pinned evidence;
+it checks evidence consistency, not the truth of arbitrary prose. QA must run
+and inspect the integration tests. Add test evidence to the inventory before
+computing the report fingerprint; the integration report itself is not an input
+source, avoiding a circular hash. Updated inputs require fresh verification.
+`chain render pr` includes scope, dependency and integration status automatically,
+including for older PR templates. Repo-level delivery may finish with shared
+integration pending, but must report that limit instead of claiming completion.

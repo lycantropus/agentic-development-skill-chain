@@ -31,7 +31,7 @@ run_preflight() {
     bash "$PREFLIGHT" 1 biome >/dev/null)
 }
 
-ignored='[".claude/settings.json","scripts/compile-context.mjs","scripts/story-slice.mjs","scripts/validate-wave-plan.mjs","scripts/validate-prds.mjs","scripts/validate-architecture.mjs","scripts/document-parser.mjs","scripts/architecture-parser.mjs","scripts/gen-component-registry.mjs","scripts/findings.mjs","scripts/findings-store.mjs","scripts/render.mjs", "scripts/sync-framework.mjs", "scripts/quality.mjs", ".skillchain-helpers.json"]'
+ignored='[".claude/settings.json","scripts/compile-context.mjs","scripts/story-slice.mjs","scripts/validate-wave-plan.mjs","scripts/validate-prds.mjs","scripts/validate-architecture.mjs","scripts/document-parser.mjs","scripts/resolve-inputs.mjs","scripts/integration-status.mjs","scripts/architecture-parser.mjs","scripts/gen-component-registry.mjs","scripts/findings.mjs","scripts/findings-store.mjs","scripts/render.mjs", "scripts/sync-framework.mjs", "scripts/quality.mjs", ".skillchain-helpers.json"]'
 
 biome1="$TMP/biome1"
 mkdir -p "$biome1"
@@ -138,6 +138,8 @@ mkdir -p "$installed/scripts" "$sonar/scripts"
 cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$sonar/scripts/"
 cp "$ROOT/codex/skills/5_executing/scripts/ponytail-check.sh" \
   "$ROOT/codex/skills/5_executing/scripts/compat.sh" \
+  "$ROOT/codex/skills/5_executing/scripts/resolve-inputs.mjs" \
+  "$ROOT/codex/skills/5_executing/scripts/integration-status.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/compile-context.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/document-parser.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/architecture-parser.mjs" "$installed/scripts/"

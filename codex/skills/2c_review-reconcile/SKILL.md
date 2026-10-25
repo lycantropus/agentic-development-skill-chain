@@ -81,6 +81,14 @@ Read these inputs:
 
 If the review references decision IDs, rules, or sections, resolve them in the source documents before interpreting the gap — an answer that violates a canonical rule is wrong even if it closes the gap.
 
+## Structured feedback from engineering
+
+Accept the portable `product-feedback/<round>/` exchange from `handoff-refinement` as the review input. Read its baseline version/hash, stable question IDs, verbatim source AC references, repo evidence, alternatives and blocking scope. Match these to the product-owned source revision before deciding; a question against an older package needs explicit applicability reconciliation.
+
+Preserve each question ID in the decision record. Record each response's product owner, date, applicable baseline, exact answer and whether it explicitly approves a change; suggestions and deferred questions stay unapproved. Model review and developer agreement cannot substitute for the product owner's answer. Return a portable response artifact with this provenance and the affected source IDs. The receiving contract at [handoff-refinement](../handoff-refinement/references/input-contract.md) defines the machine-readable exchange fields; do not invent a second response schema.
+
+Apply approved changes only to this product project's owned source artifacts using the workflow below. Never edit a receiver's copy or an existing generated package. Hand off to a new `handoff-package` session when a superseding package is required, and identify which prior baseline it supersedes. Preparing a return artifact does not authorize sending messages or publishing it.
+
 ## Workflow
 
 ### 1. Create The Decision Record First
@@ -116,6 +124,8 @@ For every decided item, identify which layers must change, and note it in the re
 | Mockup | the screen + wording/mechanism, or "n/a" / "already correct" |
 
 This makes the blast radius explicit before editing and often reveals that a mockup is already correct or that no concept exists yet.
+
+When an approved decision changes a shared rule, check every affected PRD, including unchanged files, for assumptions based on the old rule. Check shared states, roles and terms plus preconditions and outcomes at cross-PRD transitions. Record affected requirement IDs and required edits in this decision record; one shared issue keeps one identity with multiple references. Record a short reason for material suspected impacts that do not apply. Route sibling-PROJ impacts to their owners as dependencies rather than editing their scope. If this exposes a new product choice, return it to the decision step before editing.
 
 ### 4. Apply The Edits, Layer By Layer
 
@@ -168,7 +178,7 @@ Confirm before finalizing. Update each decided entry's status to `Decided and ap
 - [ ] Decision record created before any binding edit
 - [ ] Every gap walked point by point: explained, framed, and decided or deferred
 - [ ] Deferred items captured on the `Developer Meeting Agenda`, not force-decided
-- [ ] Each decided item mapped across PRD / concept / mockup layers
+- [ ] Each decided item mapped across PRD / concept / mockup layers, including unchanged PRDs affected by shared-rule changes
 - [ ] PRD edits applied; contradicting canonical lines aligned in the same pass
 - [ ] Mockup changes limited to real contradictions; logged in `iteration-log.md`
 - [ ] `review-changelog.md` updated for this round (handoff-facing)

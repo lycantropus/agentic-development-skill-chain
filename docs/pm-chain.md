@@ -149,6 +149,24 @@ When the work goes to people outside the repo — an external UI/UX expert (e.g.
 
 Use it for external/standalone handoffs.
 
+## Engineering receives the package
+
+The receiving team uses optional `delivery-workspace` for shared coordination
+and per-code-repo intake routing, then `handoff-refinement` to compare the pinned
+package with code. Source discovery completion does not prove implementation
+readiness. Engineering keeps original product files immutable and records
+technical constraints and product questions separately. Independently testable
+technical prerequisites may become engineering stories in the receiver's plans;
+they do not become rewritten product PRDs and cannot approve new product behavior.
+Smaller technical tasks remain inside their product story.
+
+Return questions identify the source baseline and ACs, evidence, owner,
+alternatives and blocked scope. `review-reconcile` records explicit product
+answers with their authority and applicable baseline, updates product-owned
+sources, and hands off to `handoff-package` for a new dated run when needed.
+Neither side edits a prior generated package. Preparing feedback does not
+authorize sending it. See [the receiving workflow](skill-chain.md#external-product-handoffs).
+
 ## Detection
 
 `chain-guide` (0) recommends this track when the concept's `Handoff Readiness` is `discovery (Linear handoff)`, when a mockup iteration log exists in a repo with no application code, or when the user states they are doing discovery/PM only.

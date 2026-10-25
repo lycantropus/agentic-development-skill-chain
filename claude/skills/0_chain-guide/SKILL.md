@@ -65,6 +65,9 @@ Notes: the folder structure is identical to the full chain (`concept` bootstraps
 
 ## Detect Current State
 
+**External receiver routing (before Rule 0):** An incoming product handoff or a `delivery-workspace.json` marker takes the optional receiving path. Missing/uncertain team workspace → **delivery-workspace**; reuse its [workspace contract](../delivery-workspace/references/workspace-contract.md), including per-code-repo baseline evidence. A coordination-only repo never routes to product-vision or application intake. With a valid inventory, incoming handoff → **handoff-refinement** before generic missing-PRD detection; read-only evidence/questions need not wait for all intake baselines. Malformed markers are errors, not linear fallback. Source discovery completion does not establish receiving implementation readiness. No marker and no external request preserves the ordinary routing below.
+
+
 **Rule 0 (baseline):** `docs/PRODUCT.md` missing → the curated baseline is missing; this comes before any other chain step (framework runs need it for the P0 context bundles). Code exists → **intake** (0b). No code → **product-vision** (0a), then **bootstrap** (0c) (skipped on the discovery track). Discovery for a single feature in an existing product → **concept**, which captures the existing state into `0_context/`. Run one baseline path, not both.
 
 **Legacy layout rule:** PROJ folders with pre-rename subfolder names are detected as their current equivalents and never reported as "step missing". Mention the old layout once and offer the rename as an option, never a precondition: `references/legacy-layout.md`.

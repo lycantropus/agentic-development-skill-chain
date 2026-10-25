@@ -21,6 +21,8 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFindings } from "./findings-store.mjs";
+import { resolveInputs } from "./resolve-inputs.mjs";
+import { integrationStatus } from "./integration-status.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const [kind, ...args] = process.argv.slice(2);
@@ -98,7 +100,7 @@ function pr([projX, theme, templateArg]) {
     ? stories.map(([us, metadata]) => `- ${us}: ${storySummary(metadata)}`).join("\n")
     : "_no per-story status recorded_";
 
-  const gateSummary = [
+  let gateSummary = [
     `- Waves: ${state.waves?.current ?? "?"}/${state.waves?.total ?? "?"} complete`,
     `- Findings: ${findings.length} total — ` +
       `${count((f) => f.status === "fixed")} fixed, ` +
@@ -107,6 +109,20 @@ function pr([projX, theme, templateArg]) {
       `${count((f) => f.status === "open")} open`,
     `- Open blocking (critical/high): ${count((f) => f.status === "open" && (f.severity === "critical" || f.severity === "high"))}`,
   ].join("\n");
+
+  const inputs = resolveInputs(base, { allowBlocked: true });
+  if (inputs) {
+    const integration = integrationStatus(inputs, base);
+    gateSummary += `\n\n### External product scope\n\n` +
+      `- Baseline: ${inputs.baselineIdentity}; accepted team revision: ${inputs.team?.revision ?? "missing"}\n` +
+      `- Repository: ${inputs.repository}; delivery scope: ${inputs.repositories.join(", ")}\n` +
+      `- Input readiness: ${inputs.blockers.length ? inputs.blockers.join("; ") : "ready for this repository"}\n` +
+      `- Dependencies: ${inputs.dependencies.filter(d => d.repository === inputs.repository).map(d => `${d.requires}@${d.revision}: ${d.evidence}`).join("; ") || "none declared"}\n` +
+      `- Shared integration: ${integration.status}${integration.reasons.length ? " — " + integration.reasons.join("; ") : " — pinned combined test evidence recorded"}\n` +
+      `- Tested revisions: ${integration.repositories?.map(r => `${r.key}@${r.revision}`).join(", ") || "not recorded"}\n` +
+      `- Release order: ${integration.releaseOrder?.join(" → ") || "not recorded"}\n` +
+      `- This PR and its local gates do not establish whole-feature completion.`;
+  }
 
   const gaps = externalPrerequisites(base);
   const knownGaps = gaps.length ? gaps.join("\n") : "none";

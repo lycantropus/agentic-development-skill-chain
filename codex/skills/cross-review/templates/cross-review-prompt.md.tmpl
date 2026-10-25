@@ -15,6 +15,17 @@ use in findings.
 ## Review focus
 {{REVIEW_FOCUS}}
 
+When the supplied material includes an external-handoff inventory, review the
+refinement against its pinned source baseline, explicit product responses and
+separate engineering requirements. Check source identities/hashes, complete
+scoped coverage, repo ownership and unresolved questions. Engineering supplements
+may contain code constraints and technical proposals; do not treat their mere
+presence as product-PRD architecture leakage. They must not silently replace or
+weaken product criteria. A missing source/response or unresolved product decision
+is a gap in the affected refinement, never permission to invent approval. A clean
+review grants no product authority. Cite baseline/source identity in relevant
+findings; return the strict clean result unchanged when there are no findings.
+
 ## Review material
 {{REVIEW_MATERIAL}}
 
@@ -22,7 +33,8 @@ use in findings.
 
 For modes requirements, architecture, plan, qa and docs, write finding summaries
 and review records in English, even when the supplied material is in another
-language. Flag newly authored non-English artifact prose from Step 2 onward.
+language. Flag newly authored non-English artifact prose from Step 2 onward; received
+product criteria and quoted evidence retain their original language.
 Preserve already CP1-sealed PRD/plan ACs verbatim on resume; do not demand a
 new approval solely because artifact-language policy changed. Keep new records
 English. Keep identifiers, file paths, verbatim evidence and intended product localization

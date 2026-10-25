@@ -29,7 +29,9 @@ assert.ok(file && file.startsWith('/'), 'missing absolute file-list path');
 assert.equal(process.env.CHANGED_FILES, undefined, 'legacy scope leaked');
 const bytes = fs.readFileSync(file);
 assert.ok(bytes.length > 0 && bytes.at(-1) === 0, 'missing NUL terminator');
-fs.writeFileSync(${JSON.stringify(capture)}, JSON.stringify({file, base: process.env.BASE_SHA, files: bytes.toString('utf8').split('\\0').slice(0, -1)}));
+// Publish the signal-readiness marker only after its JSON is complete.
+fs.writeFileSync(${JSON.stringify(capture + '.tmp')}, JSON.stringify({file, base: process.env.BASE_SHA, files: bytes.toString('utf8').split('\\0').slice(0, -1)}));
+fs.renameSync(${JSON.stringify(capture + '.tmp')}, ${JSON.stringify(capture)});
 console.log('Mutants: 5'); console.log('Survivors: 0');
 `);
     const config = { mutation_cmd: 'node wrapper.mjs', timeouts: { mutation_seconds: 10 } };
