@@ -65,6 +65,11 @@ try {
     assert.equal(nextBaselineStep(inventory.repositories[1], present, evidence), 'verify-accepted-baseline');
   }
   assert.equal(nextBaselineStep(inventory.repositories[1], present, { activeIntake: { owner: 'developer', pr: 3 } }), 'coordinate-existing-intake');
+  const staleIntake = { ...present, intakeBranches: ['intake-already-merged'] };
+  assert.equal(nextBaselineStep(inventory.repositories[1], staleIntake), 'verify-accepted-baseline');
+  assert.equal(nextBaselineStep(inventory.repositories[1], staleIntake, { acceptedRevisionVerified: true, sealVerified: true }), 'reuse-accepted');
+  assert.equal(nextBaselineStep(inventory.repositories[1], present, { acceptedRevisionVerified: true, sealVerified: true, activeIntake: { owner: 'developer', pr: 3 } }), 'coordinate-existing-intake');
+  assert.equal(nextBaselineStep({ role: 'implementation' }, staleIntake), 'coordinate-existing-intake');
   assert.equal(nextBaselineStep({ role: 'implementation' }, { ...present, productDocument: true }), 'resume-intake');
   assert.equal(nextBaselineStep({ role: 'implementation' }, present, { hasCode: true }), 'intake');
   for (const status of ['local-sealed', 'proposed']) {

@@ -131,9 +131,10 @@ export function nextBaselineStep(repo, checkout, evidence = {}) {
   if (repo.planned) return 'bootstrap';
   if (checkout.status !== 'present') return 'locate-checkout';
   if (evidence.drift) return 'propose-drift-audit';
+  if (evidence.activeIntake) return 'coordinate-existing-intake';
   if (repo.baseline?.status === 'accepted' && evidence.acceptedRevisionVerified && evidence.sealVerified) return 'reuse-accepted';
-  if (evidence.activeIntake || checkout.intakeBranches?.length) return 'coordinate-existing-intake';
   if (repo.baseline?.status === 'accepted') return 'verify-accepted-baseline';
+  if (checkout.intakeBranches?.length) return 'coordinate-existing-intake';
   if (repo.baseline?.status === 'local-sealed' || repo.baseline?.status === 'proposed') return 'await-team-acceptance';
   if (checkout.intakeDraft || checkout.productDocument || repo.baseline?.status === 'partial') return 'resume-intake';
   return evidence.hasCode === false ? 'bootstrap' : 'intake';

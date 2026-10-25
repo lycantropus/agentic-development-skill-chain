@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { resolveInputs, checkExternalStories, externalStory } from "./resolve-inputs.mjs";
 import { slice, parseStories } from "./document-parser.mjs";
 function sliceMain([planPath, id]) {
@@ -11,7 +11,7 @@ function sliceMain([planPath, id]) {
   }
   try {
     const text = readFileSync(planPath, "utf8");
-    const inputs = resolveInputs(dirname(dirname(planPath)));
+    const inputs = resolveInputs(dirname(dirname(resolve(planPath))));
     checkExternalStories(inputs, parseStories(text));
     process.stdout.write(slice(text, id) + externalStory(inputs, id));
   } catch (error) {

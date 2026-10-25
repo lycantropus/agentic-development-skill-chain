@@ -23,7 +23,7 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
   const baseline = `${m.baseline.id}@${m.baseline.version}`;
   for (const key of ['repositories', 'sources', 'requirements', 'mappings', 'engineering', 'questions', 'responses', 'dependencies']) need(Array.isArray(m[key]), `${key} must be an array`);
   for (const key of ['sources', 'requirements', 'mappings', 'engineering', 'questions', 'responses', 'dependencies']) need(m[key].every(v => v && typeof v === 'object' && !Array.isArray(v)), `${key} entries must be objects`);
-  need(m.repositories.length && m.repositories.every(v => typeof v === 'string' && /^[a-z0-9][a-z0-9._-]*$/.test(v)) && new Set(m.repositories).size === m.repositories.length, 'repositories must be unique keys');
+  need(m.repositories.length && m.repositories.every(v => typeof v === 'string' && /^[a-z][a-z0-9-]*$/.test(v)) && new Set(m.repositories).size === m.repositories.length, 'repositories must be unique keys');
   need(m.repositories.includes(m.repository), 'repository must select a listed key');
   const repos = values => Array.isArray(values) && values.length && values.every(r => m.repositories.includes(r)) && new Set(values).size === values.length;
   const sources = new Map();
@@ -116,15 +116,22 @@ export function externalStory(inputs, id) {
   if (!acs.length) throw new Error(`external inputs: story ${id} is outside repository scope`);
   const sourceIds = new Set(acs.flatMap(a => a.kind === 'product' ? [a.source] : a.requirements));
   const declaration = inputs.engineeringStories.find(s => s.repository === inputs.repository && s.id === id);
-  const responses = inputs.responses.filter(r => r.approved && inputs.questions.find(q => q.id === r.question).requirements.some(id => sourceIds.has(id)));
+  const questions = inputs.questions.filter(q => q.requirements.some(id => sourceIds.has(id)));
+  const responses = inputs.responses.filter(r => r.approved && questions.some(q => q.id === r.question));
+  const unresolved = questions.filter(q => !responses.some(r => r.question === q.id)).map(q => {
+    const proposal = inputs.responses.find(r => r.question === q.id);
+    return `${q.id} (owner: ${q.owner}; blocking repositories: ${q.blockingRepositories.join(', ') || 'none'}): ${q.evidence}\nAlternatives: ${q.alternatives}` +
+      (proposal ? `\nUnapproved response (not authority): ${proposal.answer} (source=${proposal.source}, ${proposal.date})` : '');
+  });
   return `\n## Pinned external requirements\n\nBaseline: ${inputs.baselineIdentity}; team revision: ${inputs.team.revision}; inventory SHA-256: ${inputs.fingerprint}; repository: ${inputs.repository}\n\n` +
     (declaration ? `Engineering story: ${declaration.id}; rationale: ${declaration.rationale}; authority: ${declaration.authority}\n\n` : '') +
     acs.map(a => `- ${a.id} [${a.kind}; ${a.source}${a.authority ? `; authority: ${a.authority}` : ''}]: ${a.text}`).join('\n') +
-    `\n\nExplicitly approved product responses (apply approved amendments to the named requirements; preserve original source AC text):\n${responses.map(r => `${r.question} (${r.owner}, ${r.date}, approved=${r.approved}, source=${r.source}): ${r.answer}`).join('\n') || 'None'}\n\nDependencies: ${JSON.stringify(inputs.dependencies.filter(d => d.repository === inputs.repository))}\nPrototype: ${JSON.stringify(inputs.prototype)}\n`;
+    `\n\nExplicitly approved product responses (apply approved amendments to the named requirements; preserve original source AC text):\n${responses.map(r => `${r.question} (${r.owner}, ${r.date}, approved=${r.approved}, source=${r.source}): ${r.answer}`).join('\n') || 'None'}\n\nUnresolved product questions (not approval):\n${unresolved.join('\n\n') || 'None'}\n\nDo not invent product decisions for unresolved questions; keep affected choices open and report missing authority.\n\nDependencies: ${JSON.stringify(inputs.dependencies.filter(d => d.repository === inputs.repository))}\nPrototype: ${JSON.stringify(inputs.prototype)}\n`;
 }
 
 export function checkExternalStories(inputs, stories, { complete = false } = {}) {
   if (!inputs) {
+    if (stories.some(s => s.acs.some(ac => ac.externalLiteral))) throw new Error('external-ac literals require an external handoff marker');
     if (stories.some(s => /-ENG-US-\d+$/.test(s.id))) throw new Error('engineering stories require registration in an external handoff marker');
     return;
   }

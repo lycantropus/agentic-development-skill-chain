@@ -145,6 +145,36 @@ try {
       assert.doesNotMatch(source, /node:(?:fs|child_process)|process\.|console\./);
       const module = await import(pathToFileURL(path.join(skills, relative)));
       assert.ok(Object.values(module).some(value => typeof value === "function"));
+      if (module.parseStories) {
+        const id = 'PROJ-1-PRD-1-US-1', ac = `${id}-AC-1`;
+        for (const payload of ['AC-1: Exact text.  \r', 'AC-1: First\r\n**Details:**\r\n## Heading\r\n```js\r\nvalue\r\n```\r\n---\r', 'AC-1: Trailing blank lines.\n\n']) {
+          const text = `## ${id}: Example\n- [ ] ${ac}:\n~~~~external-ac\n${payload}\n~~~~\n\n### Task\nDone.\n`;
+          assert.equal(module.parseStories(text)[0].acs[0].text, payload);
+          assert.ok(module.slice(text, id).includes(payload));
+        }
+        const nextId = 'PROJ-1-PRD-1-US-2';
+        for (const indent of [' ', '  ', '   ']) {
+          const text = `## ${id}: Example\n- [ ] ${ac}:\n~~~~external-ac\nAC-1: Exact text.\n${indent}~~~~\n\n## ${nextId}: Next\n- [ ] ${nextId}-AC-1: Second criterion.\n`;
+          const parsed = module.parseStories(text);
+          assert.deepEqual(parsed.map(story => story.id), [id, nextId]);
+          assert.equal(parsed[0].acs[0].text, 'AC-1: Exact text.');
+          assert.ok(module.slice(text, nextId).includes('Second criterion.'));
+        }
+        // A source line capable of closing the fence requires a longer delimiter.
+        const embeddedCloser = 'AC-1: First\n  ~~~~\nRemaining source.';
+        const collision = `## ${id}: Example\n- [ ] ${ac}:\n~~~~external-ac\n${embeddedCloser}\n~~~~\n\n## ${nextId}: Next\n- [ ] ${nextId}-AC-1: Second criterion.\n`;
+        assert.notEqual(module.parseStories(collision)[0].acs[0].text, embeddedCloser);
+        const { checkExternalStories } = await import(pathToFileURL(path.join(skills, 'handoff-refinement/scripts/resolve-inputs.mjs')));
+        const pinned = { acs: [{ id: ac, story: id, text: embeddedCloser, kind: 'product', source: 'source' }], questions: [], responses: [], engineeringStories: [], team: {}, dependencies: [], prototype: {}, repository: 'ui' };
+        assert.throws(() => checkExternalStories(pinned, module.parseStories(collision)), /differs from pinned wording/);
+        const safe = collision.replace('~~~~external-ac', '~~~~~external-ac').replace('\n~~~~\n\n##', '\n~~~~~\n\n##');
+        assert.equal(module.parseStories(safe)[0].acs[0].text, embeddedCloser);
+        assert.deepEqual(module.parseStories(safe).map(story => story.id), [id, nextId]);
+        const ordinary = `## ${id}: Example\n- [ ] ${ac}: Ordinary inline text.\n\n~~~text\n- [ ] ${ac}:\n\`\`\`external-ac\nExample only\n\`\`\`\n~~~\n`;
+        assert.equal(module.parseStories(ordinary)[0].acs.length, 1);
+        assert.equal(module.parseStories(ordinary)[0].acs[0].externalLiteral, undefined);
+        assert.throws(() => module.parseStories(`## ${id}: Example\n- [ ] ${ac}:\n~~~external-ac\nmissing close`), /unterminated external-ac/);
+      }
     }
     console.log(`${provider}: document validation, exit codes, pure imports and all distribution layouts passed`);
   }

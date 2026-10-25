@@ -225,8 +225,14 @@ existing `6_plan/` directory for both architecture and plan paths instead.
 
 Only after the cascade is clean:
 
-1. Read the `state.json` created with the PROJ folder by concept (1).
-   If this is a legacy PROJ without one, recover once with
+1. Read the `state.json` created with the local PROJ folder by concept (1),
+   or by handoff-refinement for an external product baseline.
+   If an external-entry PROJ lacks state, stop and return a copyable prompt
+   for a new user-started handoff-refinement session in its owning repository;
+   that session must initialize state and recheck readiness before handing off.
+   Do not infer readiness or initialize external-entry state at CP1. Never reset
+   existing state. For a legacy PROJ without external inputs, recover once from
+   its owning repository root with
    `bash ~/.codex/skills/5_executing/scripts/chain state init <X> <theme>`;
    it must still be `CP1:pending` before this checkpoint approves it.
 2. `bash ~/.codex/skills/5_executing/scripts/chain state transition <X> <theme> CP1 running` (first

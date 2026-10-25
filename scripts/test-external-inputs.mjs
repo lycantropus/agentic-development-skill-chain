@@ -38,10 +38,15 @@ try {
     const marker = path.join(base, 'external-handoff.json');
     const save = (m = manifest) => fs.writeFileSync(marker, JSON.stringify(m, null, 2));
     save();
+    for (const invalidKey of ['ui.extra', 'ui_extra', '1ui']) {
+      save(JSON.parse(JSON.stringify(manifest).replaceAll('"ui"', JSON.stringify(invalidKey))));
+      assert.throws(() => resolveInputs(base), /repositories must be unique keys/);
+    }
+    save();
     const skills = path.join(root, provider, 'skills');
     const chain = path.join(skills, '5_executing/scripts/chain');
-    const run = (args, ok = true) => {
-      const result = spawnSync('bash', [chain, ...args], { cwd: repo, encoding: 'utf8' });
+    const run = (args, ok = true, cwd = repo) => {
+      const result = spawnSync('bash', [chain, ...args], { cwd, encoding: 'utf8' });
       assert.equal(result.status === 0, ok, `${args.join(' ')}\n${result.stdout}\n${result.stderr}`);
       return result;
     };
@@ -64,7 +69,37 @@ try {
     const reviewerContext = fs.readFileSync(path.join(base, 'context/roles/wave-1/reviewer.md'), 'utf8');
     for (const expected of [id, 'ENG-AC-1', 'Approved answer: Validate before writing.']) assert.ok(reviewerContext.includes(expected));
     assert.ok(run(['render', 'slice', planPath, story]).stdout.includes(id));
+    const relativePlan = path.basename(planPath);
+    assert.ok(run(['render', 'slice', relativePlan, story], true, planDir).stdout.includes(id), 'relative slice must retain external context');
+    run(['check', 'plan', '--stories', relativePlan], true, planDir);
+    fs.writeFileSync(marker, '{}');
+    for (const file of [planPath, relativePlan]) {
+      run(['render', 'slice', file, story], false, planDir);
+      run(['check', 'plan', '--stories', file], false, planDir);
+    }
+    save();
     run(['render', 'context', 'check', '1', 'demo']);
+    // Literal external ACs retain source bytes even when Markdown is also plan syntax.
+    const literalText = 'Criterion A1: The plan is validated.  \r\n**Details:**\r\n## Source heading\r\n### Task fake: Must stay source\r\n- [ ] PROJ-1-PRD-1-US-1-AC-99: Source example\r\n```js\r\nconst value = 1;\r\n```\r\n---\r\nFinal line.\r';
+    const literalSource = `Arbitrary external document\r\n${literalText}\n`;
+    const literalManifest = structuredClone(manifest);
+    literalManifest.sources[0].sha256 = sha(literalSource);
+    literalManifest.requirements[0].text = literalText;
+    literalManifest.requirements[0].sourceRange = { startLine: 2, endLine: 11 };
+    const literalPlan = plan.replace(`- [ ] ${ac}: Criterion A1: The plan is validated.`, `- [ ] ${ac}:\n~~~~external-ac\n${literalText}\n~~~~`);
+    fs.writeFileSync(path.join(base, 'source.txt'), literalSource); save(literalManifest);
+    fs.writeFileSync(planPath, literalPlan);
+    run(['check', 'plan', planDir]);
+    assert.ok(run(['render', 'slice', planPath, story]).stdout.includes(literalText));
+    run(['render', 'context', 'compile', '1', 'demo']);
+    assert.ok(fs.readFileSync(path.join(base, 'context/workers/wave-1', `${story}.md`), 'utf8').includes(literalText));
+    fs.writeFileSync(planPath, literalPlan.replace('Final line.', 'Different rule.'));
+    run(['check', 'plan', planDir], false);
+    run(['render', 'context', 'compile', '1', 'demo'], false);
+    fs.rmSync(marker); fs.writeFileSync(planPath, literalPlan);
+    run(['render', 'slice', planPath, story], false);
+    fs.writeFileSync(path.join(base, 'source.txt'), source); save(); fs.writeFileSync(planPath, plan);
+
     const invalid = [
       m => m.mappings.pop(),
       m => m.mappings[0].ac = story + '-AC-',
@@ -82,6 +117,9 @@ try {
       m => m.requirements[0].sourceRange = { startLine: 1, endLine: 1 },
       m => m.requirements[0].sourceRange.endLine = 99,
       m => m.responses[0].approved = false,
+      m => m.responses[0].owner = 'Another owner',
+      m => m.engineering.push({ ...m.engineering[0] }),
+      m => m.engineering[0].story = 'PROJ-1-PRD-99-US-1',
       m => m.responses[0].baseline = 'product@v0',
       m => m.responses[0].answer = 'Invented answer',
       m => m.responses.push({ ...m.responses[0] }),
@@ -118,7 +156,13 @@ try {
     run(['render', 'context', 'compile', '1', 'demo'], false);
     fs.writeFileSync(planPath, plan);
     const proposal = structuredClone(manifest); proposal.questions[0].blockingRepositories = []; proposal.responses[0].approved = false; save(proposal);
-    assert.ok(!run(['render', 'slice', planPath, story]).stdout.includes('Approved answer: Validate before writing.'));
+    const proposedSlice = run(['render', 'slice', planPath, story]).stdout;
+    for (const expected of ['Unresolved product questions (not approval)', 'Q1', 'Product owner', 'Validate first; reject invalid records.', 'Unapproved response (not authority): Approved answer: Validate before writing.']) assert.ok(proposedSlice.includes(expected), expected);
+    assert.ok(!proposedSlice.includes('Q1 (Product owner, 2026-10-25, approved=true'));
+    run(['render', 'context', 'compile', '1', 'demo']);
+    assert.ok(fs.readFileSync(path.join(base, 'context/workers/wave-1', `${story}.md`), 'utf8').includes('Unresolved product questions (not approval)'));
+    assert.ok(fs.readFileSync(path.join(base, 'context/roles/wave-1/reviewer.md'), 'utf8').includes('Unapproved response (not authority)'));
+
     const single = structuredClone(manifest); single.repositories = ['ui']; single.requirements[0].repositories = ['ui']; single.mappings = [single.mappings[0]]; single.dependencies = [];
     single.prototype = { kind: 'runnable', revision: 'c'.repeat(40), reference: 'Pinned runnable bundle', simulated: [] }; save(single);
     run(['check', 'inputs', base]); run(['check', 'plan', planDir]);

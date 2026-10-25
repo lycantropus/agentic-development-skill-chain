@@ -324,7 +324,10 @@ function stop(rest) {
   console.log(`stop report: ${outPath}`);
 }
 
-if (kind === "pr") pr(args);
+if (kind === "pr") {
+  try { pr(args); }
+  catch (error) { console.error(`render.mjs: ${error.message}`); process.exitCode = 1; }
+}
 else if (kind === "report" && args[0] === "morning") morning(args.slice(1));
 else if (kind === "report" && args[0] === "stop") stop(args.slice(1));
 else usage();

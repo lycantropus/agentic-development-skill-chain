@@ -21,7 +21,7 @@ function storiesMain(planFile) {
     process.exit(64);
   }
   try {
-    checkExternalStories(resolveInputs(path.dirname(path.dirname(planFile))), parseStories(fs.readFileSync(planFile, "utf8")));
+    checkExternalStories(resolveInputs(path.dirname(path.dirname(path.resolve(planFile)))), parseStories(fs.readFileSync(planFile, "utf8")));
     console.log(JSON.stringify(resolveStories(fs.readFileSync(planFile, "utf8"), planFile), null, 2));
   } catch (error) {
     console.error(`stories: ${error.message}`);
@@ -81,8 +81,11 @@ function validateMain(args) {
     let inGateCommands = false;
 
     const planText = fs.readFileSync(path.join(planDir, file), "utf8");
-    for (const story of parseStories(planText)) wordedAcs.push(...story.acs.map((ac) => ({ ...ac, file: path.join(planDir, file) })));
-    for (const line of planText.split(/\r?\n/)) {
+    const planAcs = parseStories(planText).flatMap(story => story.acs);
+    wordedAcs.push(...planAcs.map(ac => ({ ...ac, file: path.join(planDir, file) })));
+    for (const [index, line] of planText.split(/\r?\n/).entries()) {
+      // External source examples are criterion data, never task or gate declarations.
+      if (planAcs.some(ac => ac.externalLiteral && index + 1 > ac.line && index + 1 <= ac.literalEndLine)) continue;
       const taskMatch = line.match(/^### Task ([^:]+):/);
       if (taskMatch) {
         const task = `Task ${taskMatch[1].trim()}`;
