@@ -44,7 +44,7 @@ the same sync/transfer/test/adopt procedure; never adopt old copies blindly.
 
 ## External handoff setup
 
-When `external-handoff.json` exists, read [the receiving input contract](../../handoff-refinement/references/input-contract.md). Before state changes or worktree creation, run `chain check inputs <project-directory>` using the installed helper if necessary. Verify the pinned bundle is self-contained, accepted for this repository and consistent with CP1. Missing/tampered inputs, unresolved product scope or missing dependency evidence return a blocker; P0 cannot decide product answers or infer acceptance.
+When `external-handoff.json` exists, read [the receiving input contract](../../2e_handoff-refinement/references/input-contract.md). Before state changes or worktree creation, run `chain check inputs <project-directory>` using the installed helper if necessary. Verify the pinned bundle is self-contained, accepted for this repository and consistent with CP1. Missing/tampered inputs, unresolved product scope or missing dependency evidence return a blocker; P0 cannot decide product answers or infer acceptance.
 
 Set up only this repo's checkout/worktree and state. Other repositories keep separate runs. Reuse the actual bound app workspace; do not launch a session in the coordination checkout with instructions merely to `cd` elsewhere. Preserve the pinned source bundle through setup and normal framework sync; never generate replacement PRDs to satisfy the local-format gate.
 

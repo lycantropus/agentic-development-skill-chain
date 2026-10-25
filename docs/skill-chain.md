@@ -56,14 +56,17 @@ Through Step 4, each producing skill has its own user-started session, including
 
 ## External product handoffs
 
-This optional receiving route joins the existing chain at architecture:
-`delivery-workspace` → `handoff-refinement` → architecture → plans → per-repo
-execution, QA and delivery → shared integration verification. Each producing
+This optional receiving route is numbered `2d`/`2e` because it sits on the
+engineering side of Stage 2 and joins the existing chain at architecture:
+`delivery-workspace` (2d) → `handoff-refinement` (2e) → architecture (3) → plans
+(4) → per-repo execution, QA and delivery → shared integration verification.
+From Step 3 on, the receiving route runs in the production repository like the
+linear chain. Each producing
 skill hands off through a copyable prompt to a new user-started session.
 The linear route requires no workspace inventory, external marker, additional
 approval or migration.
 
-[`delivery-workspace`](../codex/skills/delivery-workspace/SKILL.md) discovers the
+[`delivery-workspace`](../codex/skills/2d_delivery-workspace/SKILL.md) discovers the
 team coordination remote and reuses its checkout, safely clones it, or creates a
 missing remote within the user's authorization. An existing team repository can
 own the tracked coordination location; a separate repository is optional.
@@ -79,7 +82,7 @@ Check for active team intake work before starting another. A local seal or open
 PR does not prove team acceptance. Coordination-only repositories need no app
 intake. These distinctions do not add team PR gates to standalone linear use.
 
-[`handoff-refinement`](../codex/skills/handoff-refinement/SKILL.md) fingerprints
+[`handoff-refinement`](../codex/skills/2e_handoff-refinement/SKILL.md) fingerprints
 the received package and records source identities, code evidence, technical
 constraints, repo ownership, dependencies and product questions. It can inspect
 a handoff and prepare questions before every repo has finished intake. Prototype
@@ -96,7 +99,7 @@ sessions stay in their run; a new handoff version or a deliberately fresh
 assessment opens a new run and keeps the old one. Ownership that is still open
 stays `ownership unresolved` in the inventory instead of being assigned to the
 inspected repository. See the
-[run layout](../codex/skills/handoff-refinement/references/run-layout.md).
+[run layout](../codex/skills/2e_handoff-refinement/references/run-layout.md).
 
 Before a repository's refinement review and architecture handoff,
 `handoff-refinement` initializes its local PROJ state through `chain state init`.
@@ -111,9 +114,9 @@ are accounted for as open, resolved with evidence, superseded or needing
 reassessment. Changed rules, approved answers or engineering constraints trigger
 checks of affected requirements even when their PRD text is unchanged. No new
 findings does not mean earlier questions are answered; see the
-[repeat-round procedure](../codex/skills/handoff-refinement/SKILL.md#repeat-rounds-and-package-consistency).
+[repeat-round procedure](../codex/skills/2e_handoff-refinement/SKILL.md#repeat-rounds-and-package-consistency).
 
-The [external input contract](../codex/skills/handoff-refinement/references/input-contract.md)
+The [external input contract](../codex/skills/2e_handoff-refinement/references/input-contract.md)
 is the common reference for validators and context generation. The explicit
 `external-handoff.json` marker selects external mode; a malformed marker fails
 rather than falling back to local PRDs. Product files stay immutable. Local
@@ -182,6 +185,8 @@ After decomposition:
 | 2 | requirements-engineer | Write PRDs, user stories, acceptance criteria, and edge cases; pass the required opposite-provider review before full-chain or Linear handoff |
 | 2b | handoff-package | Assemble a standalone, zippable handoff package for external UI/UX experts and developers (discovery endpoint or requested full-chain export) |
 | 2c | review-reconcile | Resolve PRD review gaps point by point; defer engineering items to a developer meeting (discovery endpoint or requested full-chain export) |
+| 2d | delivery-workspace | Receiving side of an external handoff: discover or set up the team coordination checkout and route baseline intake per implementation repo |
+| 2e | handoff-refinement | Receiving side of an external handoff: refine the immutable package against code, return product questions, prepare pinned per-repo inputs for Step 3 |
 | 3 | architecture | Produce the PROJ technical architecture for developers |
 | 4 | writing-plans | Split independently verifiable stories into dependency-ordered waves; use expand–contract for wide migrations |
 | 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through `5_executing`'s subskills, then the waves under the same gate and state contracts, with procedure reduced to intent and invariants ([SKILL.md](../claude/skills/5b_executing-large-model/SKILL.md)) |
@@ -302,8 +307,6 @@ For a detailed explanation of Step 5 loops, gates, proof files, and QA handoff, 
 
 | Skill | Purpose |
 |---|---|
-| delivery-workspace | Discover/reuse shared team coordination, safely onboard checkouts and route baseline intake per implementation repo |
-| handoff-refinement | Refine immutable external product inputs against code, return product questions and prepare pinned per-repo implementation scope |
 | bugfixing | Reproduce and diagnose one reported defect, prove a regression test red before the fix, dispatch a narrow repair, run at most three Ralph repair attempts, and explain why prior tests missed it; standalone evidence lives in `specs/_bugfixing/BUGFIX-YYYYMMDD-HHMM-<slug>/bugfix-report.md` |
 | refactor-dreamer | Run an overnight/deep codebase scan for architecture drift, larger refactor opportunities, ADR candidates, fitness functions, and chain-ready input |
 | vibecoder | Freeform exploratory coding on a scratch branch with a live-appended journal, distilled at wrap-up into a `chain-input.md` feature seed for `1_concept` |

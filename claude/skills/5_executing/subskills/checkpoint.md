@@ -83,7 +83,7 @@ itself.
 
 ## External handoff at CP1
 
-If the PROJ contains `external-handoff.json`, read [the receiving input contract](../../handoff-refinement/references/input-contract.md) and run `chain check inputs <project-directory>` before the fast path or any seal. Verify the accepted team revision against the coordination remote and each affected repo baseline. The marker's resolved scope replaces local PRD lookup in the structure gates below; a malformed marker or unresolved applicable product question blocks CP1, including the automatic fast path.
+If the PROJ contains `external-handoff.json`, read [the receiving input contract](../../2e_handoff-refinement/references/input-contract.md) and run `chain check inputs <project-directory>` before the fast path or any seal. Verify the accepted team revision against the coordination remote and each affected repo baseline. The marker's resolved scope replaces local PRD lookup in the structure gates below; a malformed marker or unresolved applicable product question blocks CP1, including the automatic fast path.
 
 Checkpoint decisions can change engineering plans, not product approval. Product questions return through `handoff-refinement`; retain their owner, baseline and blocked scope rather than auto-deferring them as debt. Never edit immutable sources during the cascade. After explicit product responses or a superseding package, reconcile derived artifacts and repeat applicable review, input and context checks before sealing. Bind this seal to one repository's pinned scope; it does not approve other repo runs or integrated feature delivery.
 

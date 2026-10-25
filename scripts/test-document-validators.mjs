@@ -164,7 +164,7 @@ try {
         const embeddedCloser = 'AC-1: First\n  ~~~~\nRemaining source.';
         const collision = `## ${id}: Example\n- [ ] ${ac}:\n~~~~external-ac\n${embeddedCloser}\n~~~~\n\n## ${nextId}: Next\n- [ ] ${nextId}-AC-1: Second criterion.\n`;
         assert.notEqual(module.parseStories(collision)[0].acs[0].text, embeddedCloser);
-        const { checkExternalStories } = await import(pathToFileURL(path.join(skills, 'handoff-refinement/scripts/resolve-inputs.mjs')));
+        const { checkExternalStories } = await import(pathToFileURL(path.join(skills, '2e_handoff-refinement/scripts/resolve-inputs.mjs')));
         const pinned = { acs: [{ id: ac, story: id, text: embeddedCloser, kind: 'product', source: 'source' }], questions: [], responses: [], engineeringStories: [], team: {}, dependencies: [], prototype: {}, repository: 'ui' };
         assert.throws(() => checkExternalStories(pinned, module.parseStories(collision)), /differs from pinned wording/);
         const safe = collision.replace('~~~~external-ac', '~~~~~external-ac').replace('\n~~~~\n\n##', '\n~~~~~\n\n##');

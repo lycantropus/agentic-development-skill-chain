@@ -9,7 +9,7 @@ Refine a product-owned handoff into evidence-backed engineering inputs without t
 
 ## Inputs and ownership
 
-Read [the input contract](references/input-contract.md) for the authoritative manifest schema, resolver commands and readiness rules, and [the run layout](references/run-layout.md) for where everything is stored and how provenance is declared. Reuse the inventory from [delivery-workspace](../delivery-workspace/SKILL.md), including portable repo keys and machine-local checkout bindings. Missing coordination identity or checkout setup belongs to that skill; do not initialize another coordination repo for each package. An agreed tracked location in one code repo is sufficient for single-repo work.
+Read [the input contract](references/input-contract.md) for the authoritative manifest schema, resolver commands and readiness rules, and [the run layout](references/run-layout.md) for where everything is stored and how provenance is declared. Reuse the inventory from [delivery-workspace](../2d_delivery-workspace/SKILL.md), including portable repo keys and machine-local checkout bindings. Missing coordination identity or checkout setup belongs to that skill; do not initialize another coordination repo for each package. An agreed tracked location in one code repo is sufficient for single-repo work.
 
 Product owns the immutable baseline and explicit product responses. Engineering owns evidence, technical constraints and implementation decisions. Architecture and plans derive from those inputs; neither engineering judgment nor model review grants product approval. Contradictions get an owner and block affected scope, with no blanket engineering-over-product precedence.
 

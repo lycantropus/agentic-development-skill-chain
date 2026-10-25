@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { validateInventory, verifyInventory, probeAccess, remoteIdentity, inspectCheckout, discover, cloneOrReuse, ensureGithubRemote, nextBaselineStep } from '../codex/skills/delivery-workspace/scripts/workspace.mjs';
+import { validateInventory, verifyInventory, probeAccess, remoteIdentity, inspectCheckout, discover, cloneOrReuse, ensureGithubRemote, nextBaselineStep } from '../codex/skills/2d_delivery-workspace/scripts/workspace.mjs';
 const root = mkdtempSync(join(tmpdir(), 'workspace-test-'));
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const inventory = { schemaVersion: 1, mode: 'team', coordinationRepo: 'specs', repositories: [
@@ -138,7 +138,7 @@ try {
   assert.deepEqual([access.create, access.missing.includes('exists: unknown')], [true, true]);
   access = probeAccess({ github: 'me/specs' }, gh({ 'api repos/me/specs': new Error('HTTP 404'), 'api users/me': JSON.stringify({ type: 'User' }), 'api user': JSON.stringify({ login: 'Me' }) }));
   assert.equal(access.create, true);
-  const cli = (...args) => { try { return JSON.parse(execFileSync('node', [new URL('../codex/skills/delivery-workspace/scripts/workspace.mjs', import.meta.url).pathname, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })); } catch (error) { return { error: error.stderr }; } };
+  const cli = (...args) => { try { return JSON.parse(execFileSync('node', [new URL('../codex/skills/2d_delivery-workspace/scripts/workspace.mjs', import.meta.url).pathname, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })); } catch (error) { return { error: error.stderr }; } };
   writeFileSync(join(root, 'inventory.json'), JSON.stringify(inventory));
   const checked = cli('check', join(root, 'inventory.json'));
   assert.deepEqual([checked.schemaValid, checked.remoteVerified, checked.teamReady], [true, false, false]);

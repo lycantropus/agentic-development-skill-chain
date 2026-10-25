@@ -170,7 +170,7 @@ sources, and hands off to `handoff-package` for a new dated run when needed.
 Neither side edits a prior generated package. Preparing feedback does not
 authorize sending it.
 
-Each return round leads with a [decision summary](../codex/skills/handoff-refinement/references/feedback-and-readiness.md#portable-product-return-package):
+Each return round leads with a [decision summary](../codex/skills/2e_handoff-refinement/references/feedback-and-readiness.md#portable-product-return-package):
 decisions needed now, known questions that now block work, items resolved since
 the previous round when applicable, and open non-blocking items with an owner
 and next decision point. Empty groups are omitted. Stable IDs connect these summaries to the evidence; engineering-only

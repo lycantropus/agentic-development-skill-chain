@@ -7,7 +7,7 @@ description: "Run P8 delivery for a finished PROJ: probe merge conflicts against
 
 ## External handoff inputs (conditional)
 
-For `external-handoff.json`, read [the receiving input contract](../handoff-refinement/references/input-contract.md). Revalidate pinned inputs and applicable blockers before delivery. Record repository key, baseline/response revision, external dependencies, compatible implementation revisions, release order and integration evidence in the delivery evidence supplied to the existing renderer; PR bodies and reports still come only from template scripts.
+For `external-handoff.json`, read [the receiving input contract](../2e_handoff-refinement/references/input-contract.md). Revalidate pinned inputs and applicable blockers before delivery. Record repository key, baseline/response revision, external dependencies, compatible implementation revisions, release order and integration evidence in the delivery evidence supplied to the existing renderer; PR bodies and reports still come only from template scripts.
 
 Keep this run's state and PR local to its owning repository. Report repo delivery separately from integrated feature acceptance. The coordination location must account for every source requirement and required integration check across repos before claiming whole-feature completion; one green PR is insufficient. New upstream answers or concurrent changes require reconciliation and affected checks, not a last-write-wins approval. No automatic cross-repo merge or deployment is implied.
 

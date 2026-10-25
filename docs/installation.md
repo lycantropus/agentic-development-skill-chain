@@ -128,7 +128,7 @@ not a remote branch, and never silently discards project-specific adaptations.
   again; do not try to push from `~/.claude/skills/` or `~/.codex/skills/`.
 - Re-running the installers also refreshes the shared P0/P8 worktree helper,
   the plan-consistency validator, and the provider-specific Wave Gate.
-- The 0-to-8 core chain and its `cross-review` mechanism are installed, along with the documented optional skills: `bugfixing`, `delivery-workspace`, `handoff-refinement`, `refactor-dreamer`, `sonar-cli`, `supabase-local-dev`, `update-chain`, and `vibecoder`.
+- The 0-to-8 core chain and its `cross-review` mechanism are installed, along with the optional steps `2d_delivery-workspace` and `2e_handoff-refinement`, and the documented optional skills: `bugfixing`, `refactor-dreamer`, `sonar-cli`, `supabase-local-dev`, `update-chain`, and `vibecoder`.
 - `CLAUDE.md` is not installed as a skill. It is a repo-level pointer file only.
 
 ## Updating an existing PROJ for the optimized gates

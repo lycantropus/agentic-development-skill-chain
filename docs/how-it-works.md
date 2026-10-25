@@ -32,7 +32,7 @@ The shared document and architecture readers do no I/O or process control. Their
 ## External product inputs
 
 An explicit `external-handoff.json` in the PROJ directory selects the optional
-[receiving contract](../codex/skills/handoff-refinement/references/input-contract.md).
+[receiving contract](../codex/skills/2e_handoff-refinement/references/input-contract.md).
 `chain check inputs <project-directory>` checks hashes, source identities, scope,
 response provenance and readiness. `--allow-blocked` bypasses readiness blockers
 only for read-only refinement of structurally valid inventories. A requirement
@@ -46,7 +46,7 @@ input resolver. Worker and reviewer contexts receive approved responses and
 separate engineering criteria with source provenance, plus relevant unresolved
 questions and unapproved answers clearly marked as non-authoritative. Complex
 source criteria can use the lossless `external-ac` literal described in the
-[receiving contract](../codex/skills/handoff-refinement/references/input-contract.md#consumers-and-checks):
+[receiving contract](../codex/skills/2e_handoff-refinement/references/input-contract.md#consumers-and-checks):
 Markdown boundaries, CRLF and significant whitespace remain intact, and exact
 source comparison still applies. Received product files are never normalized to
 fit the plan parser.
