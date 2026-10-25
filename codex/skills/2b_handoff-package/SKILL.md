@@ -91,6 +91,8 @@ Ask the user which audiences the package targets:
 
 Confirm the delivery phasing if the concept defines phases, and whether the design assignment is the full target product or only the first phase.
 
+Ask explicitly: **"Should the interactive prototype also be included in the handoff?"** Reuse an explicit answer already given for this run; otherwise wait for the answer before finalizing the package. Explain the available format: standalone HTML or, for component prototypes, an existing runnable bundle with start instructions. Screenshots and flow descriptions are static references, not an included interactive prototype. If the user wants a component prototype included but no runnable bundle is available, ask for its location or agree on preparing it separately; do not silently substitute static references. Record the inclusion decision and actual format in the manifest and README.
+
 ### 2. Detect Previous Handoff And Create The Run Folder
 
 Create a new standalone package run under `2b_handoff/` for every invocation. Do not overwrite, patch, or reuse a previous handoff run. Name the run folder with the local date. Before writing it, look for the latest existing run folder matching `YYYY-MM-DD-handoff*`; that is the baseline for the delta section. If no previous run exists, mark this as the first handoff. `handoff-package` is the only skill that may create or update files under `2b_handoff/`; all other skills must update source artifacts and then trigger a new package run when needed.
@@ -115,9 +117,9 @@ Use the local current date for `YYYY-MM-DD`. If `YYYY-MM-DD-handoff/` already ex
 
 Copy the mode-appropriate visual references described below, design language, sitemap, implementation handoff, and iteration log into the run folder's `06-mockups/` so the package is self-contained. Rewrite any links to use package-relative paths within that run folder. If `2_PRDs/review-changelog.md` exists (a `review-reconcile` round ran), copy it in as `07-review-changelog.md` so downstream readers see what changed since the version they reviewed. If any `2_PRDs/*-review-decisions.md` files exist, copy them into `08-review-decisions/` as an audit appendix; do not put them in the primary reading path. Omit `04-ui-handoff.md` if UI experts are not an audience; omit `05-developer-handoff.md` if developers are not.
 
-**Component mockups:** The original interactive preview requires the project runtime; the package does not promise a runnable demo. Package the current approved screen/state screenshots and the implementation handoff’s `Flow Descriptions` instead. Do not copy component source files, fixtures, or the application into the package, install dependencies, or rebuild the UI as HTML. If captures or flow coverage are missing/stale, have `prototyping` refresh those source artifacts before completing the package. Only this skill writes the dated package run.
+**Component mockups:** The original interactive preview requires the project runtime; include a supplied runnable bundle only when requested in Step 1. Always package the current approved screen/state screenshots and the implementation handoff’s `Flow Descriptions` as offline references. Apart from a supplied runnable bundle, do not copy component source files, fixtures, or the application into the package, install dependencies, or rebuild the UI as HTML. If captures or flow coverage are missing/stale, have `prototyping` refresh those source artifacts before completing the package. Only this skill writes the dated package run.
 
-In the packaged sitemap and handoff, replace required localhost/repository links with relative links to the captured screens and flow descriptions. Keep original source paths, start instructions, and preview URLs only as clearly labeled provenance text requiring the original project, not as package navigation. Preserve screen/state mapping and explicitly label the exported references as static. HTML-mode mockups remain copied as standalone interactive files. Verify each packaged screen reference is usable offline.
+In the packaged sitemap and handoff, replace required localhost/repository links with relative links to the captured screens and flow descriptions. Keep original source paths, start instructions, and preview URLs only as clearly labeled provenance text requiring the original project, not as package navigation. Preserve screen/state mapping and explicitly label the exported references as static. When prototype inclusion is requested, copy HTML-mode mockups as standalone interactive files. When declined, use static screen/state captures and flow descriptions instead; have `prototyping` supply missing captures before completing the package. Verify each packaged screen reference is usable offline.
 
 ### 3. Write `00-what-changed-since-last-handoff.md`
 
@@ -162,7 +164,7 @@ If there are no material changes since the previous run, say that clearly and st
 
 Include the stable source/package identity and version, product decision owner, source revision when available, and exact SHA-256 values for packaged source artifacts in the manifest. Preserve source requirement IDs. Hash final payload files after package-relative links are finalized; do not attempt to hash the manifest inside itself. The receiver fingerprints every received file independently. Record whether the package is approved, proposed or blocked and cite its actual readiness evidence; product discovery completion is distinct from engineering implementation readiness.
 
-Prefer a pinned prototype source revision or an already available runnable bundle with start instructions and a list of simulated behavior. The static export rules above remain the default for component mockups: do not build or copy an application just to satisfy packaging. A supplied runnable bundle is an optional additional reference, with its exact revision/hash and prerequisites, never production architecture. Static-only references may be sufficient; label their interaction limits honestly.
+Prefer a pinned prototype source revision or an already available runnable bundle with start instructions and a list of simulated behavior. The static export rules above remain the default for component mockups: do not build or copy an application just to satisfy packaging. A supplied runnable bundle is an additional reference included according to the user’s Step 1 decision, with its exact revision/hash and prerequisites, never production architecture. Static-only references may be sufficient; label their interaction limits honestly.
 
 In the developer handoff, point receivers to `delivery-workspace` when setup is missing, then `handoff-refinement`. Explain that received files stay immutable; developers return stable question IDs, source AC references, code evidence, alternatives/impact and blocked scope. Product answers identify owner, date, baseline and explicit approval. Product-side `review-reconcile` updates source artifacts; only a new `handoff-package` run distributes those changes. This package does not require product authors to inspect implementation repositories or create a central handoff repository.
 
@@ -182,6 +184,7 @@ Product decision owner: `<owner>`
 Approval status and evidence: `<approved | proposed | blocked; source evidence>`
 Readiness basis: approved concept + PRDs; no unreconciled scope/behavior iterations (cite the checked log or state no iterations)
 Audiences: UI/UX expert | developers | both
+Interactive prototype: included | excluded — user decision and actual format
 
 ## Included Artifacts
 | Package path | Source path | SHA-256 of final payload | Notes |
@@ -283,7 +286,7 @@ Verify the package stands alone:
 - No link points outside the dated run folder.
 - `00-what-changed-since-last-handoff.md` exists and clearly states previous handoff baseline or first-handoff status.
 - `handoff-manifest.md` exists and records run metadata, previous handoff, included artifacts, and open items.
-- Every required visual reference resolves within `06-mockups/`: interactive HTML files in standalone mode, or current screenshots and flow descriptions in component mode. No required navigation depends on localhost or the source repository.
+- Every required visual reference resolves within `06-mockups/`: interactive HTML files when inclusion is requested in standalone mode, or current screenshots and flow descriptions otherwise; include the supplied component bundle when requested. No required navigation depends on localhost or the source repository.
 - `07-review-changelog.md` is included when `2_PRDs/review-changelog.md` exists.
 - `08-review-decisions/` is included when any `2_PRDs/*-review-decisions.md` files exist, and the `README.md` labels it as audit appendix.
 - Cross-cutting facts appear once (in `02`) and are referenced elsewhere, not duplicated.
@@ -306,6 +309,7 @@ Ask the user to spot-check that an outside reader could act on it without furthe
 ## Completion Checklist
 
 - [ ] Audiences confirmed (UI expert / developers / both)
+- [ ] Prototype inclusion explicitly answered; decision and actual format recorded in manifest and README, with any requested runnable prototype included
 - [ ] New dated run folder created under `2b_handoff/` without overwriting prior runs
 - [ ] Previous handoff detected, or first-handoff status recorded
 - [ ] `00-what-changed-since-last-handoff.md` written as curated delta
@@ -317,7 +321,7 @@ Ask the user to spot-check that an outside reader could act on it without furthe
 - [ ] PRDs copied into `03-requirements/`
 - [ ] `04-ui-handoff.md` present when UI experts are an audience, with red lines vs. latitude
 - [ ] `05-developer-handoff.md` present when developers are an audience, with explicit out-of-scope
-- [ ] Mode-appropriate references copied into `06-mockups/`: standalone HTML screens, or current component screen/state screenshots and the handoff’s Flow Descriptions; include design language, sitemap, implementation handoff, and iteration log
+- [ ] Mode-appropriate references copied into `06-mockups/`: standalone HTML screens when requested, or current screen/state screenshots and the handoff’s Flow Descriptions; include the supplied component bundle when requested; include design language, sitemap, implementation handoff, and iteration log
 - [ ] Review changelog copied to `07-review-changelog.md` when present
 - [ ] Review decision records copied to `08-review-decisions/` when present and summarized into `02`
 - [ ] Self-contained check passed (no external links)
