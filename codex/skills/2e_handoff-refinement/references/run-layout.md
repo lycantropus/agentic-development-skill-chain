@@ -14,6 +14,7 @@ Run IDs are `YYYY-MM-DD-NN`: the local date the run started plus a two-digit cou
 <coordination-project>/specs/PROJ-<id>-<theme>/
 ├── README.md                    current run, status, key results (new per project)
 ├── external-handoff.json        resolver marker; fixed path, see below
+├── refinement/findings.json     review history across runs; written only by findings helper
 ├── refinement/integration.json  shared integration report; fixed path, written after integrated verification
 └── runs/
     └── YYYY-MM-DD-NN/
@@ -35,7 +36,7 @@ Fixed paths outside `runs/`:
 
 - `external-handoff.json` stays at the project root because every validator, gate and context compiler reads it there. It belongs to exactly one run: its `sources[].path` entries name that run's `handoff/` directory, and the project README names the same run. When a new run supersedes the inventory, the marker moves with it; the old run's README keeps the old inventory's fingerprint for reference.
 - `refinement/integration.json` at the project root is the shared integration report read by `chain render pr`. It is pinned to the inventory fingerprint, not to a run, and is written only after integrated verification.
-- Review defects go through the existing findings helper and stage ledger; `runs/<run>/refinement/reviews/` holds the human-readable review output copies, not a second ledger.
+- Review defects go through the existing findings helper into project-level `refinement/findings.json` (outside `runs/`, selected by `--stage requirements` when `external-handoff.json` exists). Migrate an existing requirements ledger with `chain findings migrate-refinement <X> <theme>` before review; `runs/<run>/refinement/reviews/` holds the human-readable review output copies, not a second ledger.
 
 ## Provenance table
 
@@ -74,27 +75,10 @@ Earlier runs: runs/2026-10-18-01 (superseded by v3 handoff)
 - Examined repository revisions: repo key, commit, baseline status from workspace onboarding.
 - The provenance table above.
 - Current results: scope and ownership state, open decisions (at most five, prioritized), readiness per repository.
-- Review rounds: round number, reviewer provider, date, result reference under `refinement/reviews/`. A clean review is a checked state of this run's inputs, not a product or team approval.
+- Review rounds: the record defined below.
 - Changes against the previous run: new handoff version, changed baselines, dispositions of earlier questions and findings by ID.
 - Status vocabulary for every artifact and every repository: `local draft`, `branch published`, `PR open`, `reviewed`, `approved by <owner>`, `merged`, `team accepted`. Each status names its evidence; missing evidence names the next step that would produce it.
 
 ## One review status per round
 
-The run README owns the review-round record: round, provider, input fingerprint
-(inventory plus examined evidence revisions), status, result path and reconciliation
-references. Readiness and project summaries link to this record; do not repeat
-“pending”, “completed” or “clean” in independently maintained prose. Provenance
-stays `observation` until a review output actually exists.
-
-Use `pending` before output exists, `reviewed-with-findings` after receiving defects,
-and `reconciled` when their dispositions and changed inputs have been recorded.
-`clean` requires a review result for the current fingerprint with no unresolved
-blocking review findings. A changed inventory/evidence state gets a new `pending`
-round; preserve the old record and never extend its clean verdict to new inputs.
-Product answers and team acceptance remain separate authority.
-
-Behavioral check when changing this workflow: simulate pending → reviewed-with-findings
-→ reconciled, then change one inventory entry. The old review must retain its old
-fingerprint; only a new pending round and a new clean result may establish clean
-status for the changed input. Open readiness and project summaries at every step:
-they must resolve to the same authoritative record, with no independent status text.
+The run README owns the review-round record: round, provider, input fingerprint (inventory plus examined evidence revisions), status, result path and reconciliation references. Readiness and project summaries link to it and never repeat review status in their own prose. Statuses: `pending` before output exists, `reviewed-with-findings` after defects arrive, `reconciled` once dispositions and changed inputs are recorded, `clean` only for a result on the current fingerprint with no unresolved blocking findings. A changed inventory or evidence state opens a new `pending` round; the old record keeps its fingerprint and its clean verdict never extends to new inputs. Product answers and team acceptance remain separate authority.

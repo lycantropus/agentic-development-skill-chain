@@ -80,7 +80,7 @@ JS
     [ "$rc" = 1 ] || fail "$provider invalid $invalid should exit 1, got $rc"
     [ ! -s "$W/invalid-pr.txt" ] || fail "$provider invalid $invalid emitted a partial PR body"
     grep -q '^render.mjs: ' "$W/invalid-pr.err" || fail "$provider invalid $invalid has no concise renderer diagnostic"
-    [ "$(wc -l <"$W/invalid-pr.err")" = 1 ] || fail "$provider invalid $invalid leaked a stack trace"
+    [ "$(wc -l <"$W/invalid-pr.err")" -eq 1 ] || fail "$provider invalid $invalid leaked a stack trace"
   done
 done
 echo "test-render: ok"
