@@ -105,8 +105,10 @@ they locate, the prepare subagent judges):
   DESIGN-SYSTEM draft. If no real tokens exist, write a pointer to the
   **frontend-design** skill (1c) instead of inventing a design system.
 
-Draft ALL nine files into `specs/intake/` with a provenance marker on
-EVERY statement:
+Draft the nine baseline files into `specs/intake/` as applicable: the seven
+core files, including `review-checklist.md`, are always required; the two UI
+files follow the component-directory condition in the output table above.
+Put a provenance marker on EVERY statement:
 
 - `[extracted: <file:line evidence>]` — derived from code/README/git
   history, with the evidence reference
@@ -148,8 +150,10 @@ the orchestrator edits no draft.
    syntax, the sealed baseline never carries them.
 2. `bash scripts/chain check intake` (no `scripts/chain` yet: use
    `~/.claude/skills/5_executing/scripts/chain`, which finds the helpers in the
-   installed skills). It verifies: all nine files exist,
-   zero residual markers, `specs/intake/decisions.md` carries
+   installed skills). It verifies the nine baseline files subject to the
+   output table’s UI condition: seven core files always exist (including
+   `review-checklist.md`), plus both UI files when component directories exist;
+   zero residual markers; `specs/intake/decisions.md` carries
    `D-BOOTSTRAP` reconcile decisions (undiscussed drafts never seal),
    file caps hold. Red → fix, re-run; NEVER seal past a red check.
 3. Commit: `docs: intake baseline — initial curated docs`
