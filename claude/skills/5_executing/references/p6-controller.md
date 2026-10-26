@@ -83,7 +83,8 @@ QA completion does not certify shared integration across repositories.
 - Final regression run, when any fix was committed in this phase: run
   every wave's `regression_commands` and the `quality` entries of
   `phase_commands` from `wave-gate-config.json` once against HEAD. A red
-  command is a fresh open finding (`chain findings add --stage qa`), never
-  a seal.
-- Exit requires: no Critical/High open and a green final regression run. Then seal:
+  command is a fresh open `high` finding (`chain findings add --stage qa`),
+  so the seal checks block it.
+- Exit requires: no Critical/High open and, when any fix was committed in
+  this phase, a green final regression run on the current HEAD. Then seal:
   `bash scripts/chain state transition <X> <theme> P6 done`.
