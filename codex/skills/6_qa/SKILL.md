@@ -300,6 +300,7 @@ Flag a QA bug when the implementation adds complexity that is not required by th
 - Overbuilt state: duplicated derived state, parallel sources of truth, unnecessary reducers/state machines, excessive context providers, or manual caches where framework/server state is enough.
 - Excessive code paths: feature flags, modes, fallbacks, branches, compatibility paths, or options that were not requested and are not needed for safe rollout.
 - Duplicated logic/components: new helpers or UI primitives that duplicate existing project utilities, registered components, framework APIs, or straightforward inline code.
+- Reinvented or unapproved libraries: a hand-built generic capability (file export, date handling, parsing, upload, charts) that the architecture's `## Dependencies` does not record as hand-built with a reason, and any new dependency that section does not list.
 - Unclear indirection: wrappers, mappers, service classes, barrel files, hooks, or utility layers that obscure the behavior they contain.
 - Dead or speculative code: unused exports, unreachable branches, TODO scaffolding, mock-only pathways, unused props, unused types, or tests that encode behavior the product does not need.
 
