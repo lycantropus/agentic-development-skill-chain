@@ -110,12 +110,22 @@ caps() (
   fi
   if [ -f docs/GUIDELINES.md ]; then
     # Top-level Markdown bullets or numbered items; continuations/nested bullets
-    # are part of the same entry. Stop at the next level-1/2 heading.
+    # are part of the same entry. A top-level marker may be indented 0–3
+    # spaces; markers at/after its content column are nested, not new Traps.
+    # Stop at the next level-1/2 heading.
     traps="$(awk '
       { sub(/\r$/, "") }
-      /^## Traps[[:space:]]*$/ { active=1; next }
+      /^## Traps[[:space:]]*$/ { active=1; have_top=0; next }
       /^##?[[:space:]]/ { active=0 }
-      active && /^([-*+] |[0-9]+[.)] )/ { count++ }
+      active {
+        item=$0; sub(/^ */, "", item)
+        indent=length($0)-length(item)
+        marker=match(item, /^([-*+]|[0-9]+[.)])[ 	]+/)
+        if (marker && indent <= 3 &&
+            (!have_top || indent < content_indent)) {
+          count++; have_top=1; content_indent=indent+RLENGTH
+        } else if (!marker && item ~ /[^[:space:]]/ && indent < content_indent) have_top=0
+      }
       END { print count+0 }
     ' docs/GUIDELINES.md)"
     check 'docs/GUIDELINES.md § Traps' "$traps" 10 "entries"
@@ -159,6 +169,25 @@ seal() (
       FAIL=1
     fi
   done
+
+  if [ -f docs/review-checklist.md ]; then
+    for heading in '## Antipatterns' '## Known Debt'; do
+      if ! awk -v heading="$heading" '
+        { sub(/\r$/, ""); line=$0; sub(/^ ? ? ?/, "", line) }
+        match(line, /^(```+|~~~+)/) {
+          marker=substr(line, 1, RLENGTH); tail=substr(line, RLENGTH+1)
+          if (!fence) { fence=substr(marker, 1, 1); width=length(marker) }
+          else if (substr(marker, 1, 1)==fence && length(marker)>=width && tail ~ /^[[:space:]]*$/) fence=""
+          next
+        }
+        !fence { sub(/[[:space:]]*$/, "", line); if (line==heading) found=1 }
+        END { exit !found }
+      ' docs/review-checklist.md; then
+        echo "MISSING docs/review-checklist.md $heading — required checklist section"
+        FAIL=1
+      fi
+    done
+  fi
 
   # DESIGN-SYSTEM.md and components.md are UI-only baseline files: a backend-only
   # repo never has a component directory and must not be blocked from sealing

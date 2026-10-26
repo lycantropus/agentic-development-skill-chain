@@ -22,7 +22,8 @@ them into a baseline the developer actually stands behind.
   `Bootstrap`).
 - **Cascade:** the apply subagent applies every decision to the affected
   draft(s) — a GUIDELINES ruling may also touch ARCHITECTURE or add a
-  Known Debt note in `docs/review-checklist.md`. No plan validator runs.
+  Known Debt note in the `review-checklist` draft in `specs/intake/`; the seal
+  step promotes it to `docs/review-checklist.md`. No plan validator runs.
 - **Seal:** a git COMMIT of the curated baseline (done by the intake
   skill after `chain check intake` passes) — explicitly NO
   `chain state init` and NO phase transition. The bootstrap is pre-PROJ:

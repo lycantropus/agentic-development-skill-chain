@@ -135,8 +135,9 @@ the orchestrator edits no draft.
 - Every answer becomes a GUIDELINES rule (or a PRODUCT/ARCHITECTURE
   statement, wherever it belongs).
 - For inconsistencies: the developer picks the rule going forward; the
-  LOSING pattern becomes a **Known Debt** note in `docs/review-checklist.md` — recorded,
-  not silently rewritten.
+  LOSING pattern becomes a **Known Debt** note in the `review-checklist` draft
+  in `specs/intake/`; the seal step promotes it to `docs/review-checklist.md` —
+  recorded, not silently rewritten.
 - `[assumed]` items the developer confirms lose their marker; corrected
   ones are rewritten from the answer.
 
