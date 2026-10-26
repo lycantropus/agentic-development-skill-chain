@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { baselineApplicability, validateInventory, verifyInventory, probeAccess, remoteIdentity, inspectCheckout, discover, cloneOrReuse, ensureGithubRemote, nextBaselineStep } from '../codex/skills/2d_delivery-workspace/scripts/workspace.mjs';
-const root = mkdtempSync(join(tmpdir(), 'workspace-test-'));
+const root = realpathSync(mkdtempSync(join(tmpdir(), 'workspace-test-'))); // macOS: /var -> /private/var
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const inventory = { schemaVersion: 1, mode: 'team', coordinationRepo: 'specs', repositories: [
   { key: 'specs', role: 'coordination', remote: 'https://git.example/team/specs', planned: false },
