@@ -28,6 +28,10 @@ QA completion does not certify shared integration across repositories.
    wave gates and QA lanes already wrote theirs). Get the picture with
    `bash scripts/chain findings stats <X> <theme>` and the fix queue with
    `bash scripts/chain findings queue <X> <theme>` (open Critical/High, clustered by file).
+   On the first entry for this finder report, run QA's opposite-provider
+   persona panel on it (`6_qa` § Required Persona Cross-Review, `--persist
+   --round 1`, artifact `bash scripts/chain state get <X> <theme> .qa.finder_report`)
+   before triage; its findings join the same ledger.
 2. **Verifier batches:** spawn read-only verifier agents per cluster to
    weed out false positives. You
    receive only verdicts. False positives →
@@ -52,9 +56,12 @@ QA completion does not certify shared integration across repositories.
    `not scriptable` reason) = failed attempt, no opposite check needed.
    If no existing `regression_commands` entry would pick the test up,
    note it in your final output. **Fresh opposite re-verification:**
-   after each fix batch, a NEW read-only QA check from the provider (or
-   in degraded mode: model) opposite the fixer reruns only the affected
-   checks that a test does not already prove — findings whose fixer
+   after each fix batch, ONE fresh reviewer from the provider (or in
+   degraded mode: model) opposite the fixer — not the persona panel — gets
+   the fixed findings' text and the fix diff (`bash scripts/chain review qa
+   <X> <theme> --persist --round N`, no `--personas`), checks that each fix
+   resolves its finding without breaking the touched code, and reruns only
+   the affected checks that a test does not already prove — findings whose fixer
    reported `not scriptable`, plus the batch as a whole where the test
    covers only part of the finding. The fixer never
    certifies its own repair. If re-verification finds the problem again,
@@ -73,5 +80,12 @@ QA completion does not certify shared integration across repositories.
 - Medium/Low: `bash scripts/chain findings auto-defer <X> <theme>` — debt marker
   (`ponytail:` convention) in the code where applicable; the human
   decides at Checkpoint 2, never mid-run.
-- Exit requires: no Critical/High open. Then seal:
+- Final regression run, when any fix was committed in this phase: run
+  every wave's `regression_commands` and the `quality` entries of
+  `phase_commands` from `wave-gate-config.json` once against HEAD. A red
+  command is a fresh open `high` finding naming the command and its failing
+  output (`bash scripts/chain findings add <X> <theme> --stage qa`), so the
+  seal checks block it.
+- Exit requires: no Critical/High open and, when any fix was committed in
+  this phase, a green final regression run on the current HEAD. Then seal:
   `bash scripts/chain state transition <X> <theme> P6 done`.

@@ -208,7 +208,7 @@ render_prompt() { # role task_text out_var — writes prompt file, sets $out_var
   else
     rules="- You are STRICTLY READ-ONLY on the repository: never modify tracked files, never commit. Running tests/dev servers is allowed where your tools permit it.
 - Produce independent review/prep input: risks, missing tests, weak ACs, factual errors.
-- Output findings as JSON lines, one per line, nothing else in the final answer:
+- Output findings as JSON lines, one per line, starting at column 0; nothing else in the final answer, except that the P6 QA finder puts its QA report text before them:
   {\"source\":\"review\",\"severity\":\"critical|high|medium|low\",\"category\":\"...\",\"summary\":\"...\",\"file\":\"...\",\"line\":N}
 - The runner feeds your lines into the findings ledger; invalid lines are dropped."
   fi
