@@ -108,6 +108,24 @@ Ask the user directly only about open cross-cutting questions, e.g.
 accounts and roles, cross-device sync, third-party integrations, migration
 rollback policy, or a UI handoff that conflicts with § Stack.
 
+## Library Scan (build vs. buy)
+
+Before deciding, list every generic capability the PRDs require — file
+export/import (Excel, CSV, PDF), date/time zones, uploads, charts, rich text,
+i18n, validation, auth, payments, search and the like — and settle how each is
+covered, in this order: existing project code, an already installed dependency,
+the platform/framework, a new library. Hand-building a generic capability needs
+a stated reason (no fit, license, size, security). Delegate the scan to one
+subagent when it covers several capabilities.
+
+Verify every candidate against its registry (e.g. `npm view <pkg>`, PyPI,
+crates.io), never from memory: exact package name and source, license, last
+release, maintenance, known advisories, server/client and bundle fit with
+§ Stack, and whether it covers the ACs. Prefer the smallest fit; compare 2–3
+candidates only when the choice is not obvious. A library that cannot meet an
+AC is a product question (adapt the AC or accept a heavier library) for the
+user or, in external mode, `handoff-refinement` — never silently narrow the AC.
+
 ## Output: `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`
 
 One file. It is the single architecture source for CP1, the implementer
@@ -157,7 +175,9 @@ If the handoff conflicts with § Stack, § Stack wins — raise it as an open qu
 [Only if decomposed: siblings consumed/blocking, contract, out of scope]
 
 ## Dependencies
-[New packages only, with affected PRDs]
+[One line per generic capability from the Library Scan: capability → package
+(or existing dependency/code) with version range and license, affected PRDs,
+one-line reason. Hand-built capabilities state why no library fits.]
 ```
 
 Example decision:

@@ -34,3 +34,5 @@ the role file without a story, and your report starts with
 `Brief: <Finding-ID>`.
 
 When external product inputs are supplied, preserve source identities and verbatim criteria. Treat approved responses and separate engineering constraints as scoped inputs; never edit received product files. Report missing product authority or contradictory criteria to the lead instead of choosing product behavior or marking the gap as ordinary debt.
+
+Use the packages the architecture's `## Dependencies` lists for their capabilities; do not hand-build those capabilities. Do not add a dependency it does not list — report the need to the lead instead.
