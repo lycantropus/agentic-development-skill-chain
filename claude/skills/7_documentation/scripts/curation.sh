@@ -6,6 +6,8 @@
 #       docs/PRODUCT.md        <= 30 non-blank lines   ("half page")
 #       docs/ARCHITECTURE.md   <= 200 lines
 #       docs/DESIGN-SYSTEM.md  <= 80 lines    (injected into every frontend bundle)
+#       docs/review-checklist.md <= 80 lines (reviewers / QA, read by path)
+#       docs/GUIDELINES.md § Traps <= 10 top-level list entries
 #       docs/GUIDELINES.md     <= 120 lines   (injected into every tier-1 bundle)
 #       docs/security-baseline.md <= 60 lines (backend / generic bundles)
 #       docs/test-conventions.md  <= 60 lines (every tier-1 bundle)
@@ -101,6 +103,24 @@ caps() (
   [ -f docs/security-baseline.md ] && check docs/security-baseline.md "$(total docs/security-baseline.md)"  60 "lines"
   [ -f docs/test-conventions.md ]  && check docs/test-conventions.md  "$(total docs/test-conventions.md)"   60 "lines"
 
+  if [ -f docs/review-checklist.md ]; then
+    check docs/review-checklist.md "$(total docs/review-checklist.md)" 80 "lines"
+  else
+    missing docs/review-checklist.md
+  fi
+  if [ -f docs/GUIDELINES.md ]; then
+    # Top-level Markdown bullets or numbered items; continuations/nested bullets
+    # are part of the same entry. Stop at the next level-1/2 heading.
+    traps="$(awk '
+      { sub(/\r$/, "") }
+      /^## Traps[[:space:]]*$/ { active=1; next }
+      /^##?[[:space:]]/ { active=0 }
+      active && /^([-*+] |[0-9]+[.)] )/ { count++ }
+      END { print count+0 }
+    ' docs/GUIDELINES.md)"
+    check 'docs/GUIDELINES.md § Traps' "$traps" 10 "entries"
+  fi
+
   if [ -d src ]; then
     while IFS= read -r f; do
       check "$f" "$(total "$f")" 100 "lines"
@@ -121,10 +141,12 @@ seal() (
 
   FAIL=0
 
+  # Nine baseline files: seven below plus the two UI-only files checked next.
   BASELINE=(
     docs/PRODUCT.md
     docs/ARCHITECTURE.md
     docs/GUIDELINES.md
+    docs/review-checklist.md
     docs/security-baseline.md
     docs/test-conventions.md
     AGENTS.md

@@ -1,6 +1,6 @@
 # Agent Workflow Framework — Concept
 
-**Status:** Draft v0.22 — under iteration (leading version; the German
+**Status:** Draft v0.23 — under iteration (leading version; the German
 KONZEPT.md is frozen at v0.9)
 *(v0.4: context-economy review — session-per-phase, spawn tiering,
 scripts instead of LLM for deterministic work, budget enforcement)*
@@ -67,7 +67,10 @@ names, the roadmap and version notes keep the historical ones;
 `5b_executing-large-model` becomes the default Step 5 and runner P5 skill,
 `5_executing` the full-procedure alternative for weaker writer models)*
 
-**Date:** 2026-10-08
+*(v0.23: role-based rule placement — trap test, nine baseline files, reviewer-only
+checklist and post-writing self-review access; capped project Traps)*
+
+**Date:** 2026-10-26
 **Basis:** the repository's aligned Codex + Claude SkillChain 0–8
 (`codex/skills/`, `claude/skills/`) at the current main branch
 
@@ -345,7 +348,7 @@ The intake is therefore a collaborative session with the developer,
 not a batch job.
 
 **Provenance markers** make the two sources visible: the scan drafts all
-eight baseline files with a marker on every statement — `extracted` (with
+nine baseline files with a marker on every statement — `extracted` (with
 file evidence), `assumed` (needs confirmation), `gap` (must be asked) — and
 every detected inconsistency goes into the interview queue, never silently
 decided. The developer interview works the `gap`/`assumed` items and
@@ -353,7 +356,7 @@ inconsistencies point by point through the checkpoint loop (§4; the
 losing pattern becomes a known-debt note, not a rewrite); the sealed
 baseline carries no markers, passes the file caps (§5) and is committed as
 the initial curation baseline. From then on P7 curation owns every update;
-`0b_intake` is re-run only as a deliberate drift audit. Steps, the eight
+`0b_intake` is re-run only as a deliberate drift audit. Steps, the nine
 files and the near-greenfield variant (thin extraction, the interview
 carries the weight): [0b_intake/SKILL.md](claude/skills/0b_intake/SKILL.md).
 
@@ -762,7 +765,35 @@ primarily deterministic scripts and start model lanes only for judgment):
 | 3. PROJ artifacts | `specs/PROJ-<X>-<theme>/` | until merge | compiled into the worker files / path reference | during the PROJ |
 | 4. Local knowledge | `src/**/agent.md` | forever | reading protocol (explicit) | immediately on learning; curated in P7 |
 
+### Trap test and rule placement
+
+> Would the model do it wrong without this sentence? If the wrong path is the
+> model’s default, or the damage is expensive or invisible to QA, the Don’t belongs
+> to the implementer, with the alternative and the reason. Otherwise it belongs to QA.
+
+`docs/GUIDELINES.md` holds target-state rules grouped by topic and one `## Traps`
+section (≤10 top-level Markdown list entries, each `Don’t X → instead Y — why it
+happens here`; ≤120 lines for the whole file). Generic implementer Don’ts live only
+in the chain role manifests; project-specific Traps live only in GUIDELINES.
+Nothing appears in both. Use decision criteria rather than catalogs of artifacts.
+
+`docs/review-checklist.md` (≤80 lines) holds `## Antipatterns` with project-specific
+detection signals and severities, plus `## Known Debt`: do not re-flag, do not spread.
+The generic antipattern catalog stays in QA §6.4. A thin checklist with both headers
+is required to seal. At a cap, curate instead of appending or deleting load-bearing truth.
+
+| Role | Rules and review context |
+|---|---|
+| Implementer (tier 1) | GUIDELINES including Traps; DESIGN-SYSTEM for frontend/full-stack; chain-owned generic rules in role manifest |
+| Reviewer | PRODUCT, review criteria, diff scope + review-checklist by path; consult GUIDELINES and QA §6.4 for relevant rule/simplicity checks (DESIGN-SYSTEM by path for UI audit) |
+| QA | GUIDELINES, relevant DESIGN-SYSTEM, review-checklist + QA §6.4 generic catalog and testing-antipatterns reference |
+| Inner Ralph self-review | Only after writing, implementer reads review-checklist by path; never injected into an implementer bundle |
+
 ### Files
+
+The nine baseline files are AGENTS.md plus PRODUCT, ARCHITECTURE, GUIDELINES,
+review-checklist, DESIGN-SYSTEM, components, security-baseline and test-conventions
+under docs/. DESIGN-SYSTEM and components are required only for repos with components.
 
 ```
 AGENTS.md                      ← ROOT-ONLY durable agent rules
@@ -772,7 +803,10 @@ docs/                          ← LONG-LIVED, curated, injectable
 ├── ARCHITECTURE.md            ← § Stack (THE stack source of truth) +
 │                                overarching architecture (capped)
 ├── architecture/…             ← details/ADRs, referenced only
-├── GUIDELINES.md              ← code conventions, error handling, naming (capped)
+├── GUIDELINES.md              ← target-state rules + ≤10 project-specific Traps (≤120 lines)
+├── review-checklist.md        ← project antipatterns + Known Debt (≤80 lines; reviewer/QA)
+├── security-baseline.md       ← security floor (≤60 lines)
+├── test-conventions.md        ← test operations and conventions (≤60 lines)
 ├── DESIGN-SYSTEM.md           ← tokens, scales, patterns, do/don't (capped)
 └── components.md              ← component registry (GENERATED from the code)
 
@@ -807,7 +841,7 @@ class decides first, then the agent type:
 |---|---|---|
 | 0 | Micro-fix (1 finding, 1 AC, 1 build error) | **NOTHING** — the spawn prompt contains the finding verbatim + file paths + possibly an agent.md pointer. It needs nothing more. |
 | 1 | Story implementer (whole US) | one story file: type-scoped pack (matrix below) plus the story slice |
-| 2 | Reviewer/QA personas | PRODUCT.md + review criteria + diff scope; no ladder, no design system (except ui-audit) |
+| 2 | Reviewer/QA personas | PRODUCT.md + review-checklist by path + review criteria + diff scope; design system by path for ui-audit |
 | — | Explore/scout spawns | nothing (read-only, own assignment) |
 
 Implementation: **the tier is encoded in provider-neutral role

@@ -6,9 +6,9 @@ roles, point-by-point decisions, cascade) specialised for the intake
 drafts. The generated docs are HYPOTHESES, not truth — the loop turns
 them into a baseline the developer actually stands behind.
 
-- **Input:** the provenance-marked drafts in `specs/intake/` (all eight
+- **Input:** the provenance-marked drafts in `specs/intake/` (all nine
   baseline files: PRODUCT, ARCHITECTURE, GUIDELINES, DESIGN-SYSTEM,
-  components, security-baseline, test-conventions, root AGENTS.md).
+  components, review-checklist, security-baseline, test-conventions, root AGENTS.md).
 - **Review queue:** every `[gap: ...]`, every `[assumed]`, every
   inconsistency the scan flagged — plus anything the developer wants to
   challenge in the `[extracted: ...]` statements. The prepare subagent
@@ -22,7 +22,7 @@ them into a baseline the developer actually stands behind.
   `Bootstrap`).
 - **Cascade:** the apply subagent applies every decision to the affected
   draft(s) — a GUIDELINES ruling may also touch ARCHITECTURE or add a
-  Known Debt note. No plan validator runs.
+  Known Debt note in `docs/review-checklist.md`. No plan validator runs.
 - **Seal:** a git COMMIT of the curated baseline (done by the intake
   skill after `chain check intake` passes) — explicitly NO
   `chain state init` and NO phase transition. The bootstrap is pre-PROJ:

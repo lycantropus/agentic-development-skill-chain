@@ -126,6 +126,18 @@ A worker reads exactly one compiled file, named by path in its spawn prompt. Not
 
 The role comes from the `Agent Type` column of the wave plan. Micro-fixer and explore spawns get no file. Whole PRDs, other stories' plans, `progress.md` and `agent.md` files are never injected. A role over its token budget makes `compile` fail before anything is written.
 
+The nine baseline files are root `AGENTS.md`, plus `docs/PRODUCT.md`,
+`ARCHITECTURE.md`, `GUIDELINES.md`, `DESIGN-SYSTEM.md`, `components.md`,
+`security-baseline.md`, `test-conventions.md` and `review-checklist.md`.
+DESIGN-SYSTEM and components are required only when component directories exist.
+GUIDELINES contains target-state rules plus ≤10 top-level `## Traps` entries within
+120 lines. The required review-checklist is capped at 80 lines, with project-specific
+Antipatterns (detection signal + severity) and Known Debt (do not re-flag, do not spread).
+Generic Don’ts stay in chain role manifests, without duplicates in project Traps.
+Reviewers receive a checklist path reference; QA reads it with its generic Simplicity
+catalog. Every implementer bundle excludes it; Inner Ralph reads it by path only
+after writing. See the [trap test](../CONCEPT.md#trap-test-and-rule-placement).
+
 ## Three files, three writers
 
 | File | Only writer | Never |

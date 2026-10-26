@@ -19,7 +19,7 @@ Three call sites, one loop:
 | Call site (orchestrator) | Reviewed | Seal |
 |---|---|---|
 | **CP1** (Step 5 lead — main) | architecture + wave plans + gate config + api-contracts | `state.json` → `CP1:approved` — the ONLY thing that unlocks P0 |
-| **Bootstrap** (via 0b_intake) | intake first drafts (all eight baseline files) | curated baseline commit — no state.json |
+| **Bootstrap** (via 0b_intake) | intake first drafts (all nine baseline files) | curated baseline commit — no state.json |
 | **CP2** (via delivery, 8) | PR review comments | classified comments: fix now / debt / reject |
 
 ## Codex Adaptation

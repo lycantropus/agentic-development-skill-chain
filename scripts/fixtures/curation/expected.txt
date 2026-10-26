@@ -5,6 +5,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -15,6 +17,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -25,6 +29,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -35,6 +41,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -45,6 +53,8 @@ OK      AGENTS.md 40/40 non-blank lines
 BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -55,6 +65,20 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 BREACH  docs/security-baseline.md 61/60 lines — curate: shrink before sealing
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps breach docs/review-checklist.md (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+BREACH  docs/review-checklist.md 81/80 lines — curate: shrink before sealing
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -65,6 +89,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 BREACH  docs/test-conventions.md 61/60 lines — curate: shrink before sealing
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -75,6 +101,8 @@ BREACH  AGENTS.md 41/40 non-blank lines — curate: shrink before sealing
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -85,6 +113,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 BREACH  src/feature/agent.md 101/100 lines — curate: shrink before sealing
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -95,6 +125,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -106,6 +138,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -117,6 +151,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -127,6 +163,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 BREACH  src/other/agent.md 101/100 lines — curate: shrink before sealing
 --- stderr
@@ -135,12 +173,14 @@ BREACH  src/other/agent.md 101/100 lines — curate: shrink before sealing
 WARN    docs/PRODUCT.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
 WARN    docs/ARCHITECTURE.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
 WARN    AGENTS.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
+WARN    docs/review-checklist.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
 ✓ curation caps ok
 --- stderr
 ### caps empty repo require-baseline (exit 1)
 BREACH  docs/PRODUCT.md missing (required baseline file)
 BREACH  docs/ARCHITECTURE.md missing (required baseline file)
 BREACH  AGENTS.md missing (required baseline file)
+BREACH  docs/review-checklist.md missing (required baseline file)
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
 ### caps missing product warns (exit 0)
@@ -150,6 +190,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -160,13 +202,99 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps missing checklist warns (exit 0)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+WARN    docs/review-checklist.md missing — no baseline yet (not a breach; run 0a/0c for a new build, 0b_intake for an existing codebase)
+OK      docs/GUIDELINES.md § Traps 0/10 entries
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+### caps missing checklist require-baseline (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+BREACH  docs/review-checklist.md missing (required baseline file)
+OK      docs/GUIDELINES.md § Traps 0/10 entries
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### caps ten multiline numbered Traps (exit 0)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 33/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 10/10 entries
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
+### caps eleven Traps breach (exit 1)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 12/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+BREACH  docs/GUIDELINES.md § Traps 11/10 entries — curate: shrink before sealing
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+### intake eleven Traps breach (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 12/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+BREACH  docs/GUIDELINES.md § Traps 11/10 entries — curate: shrink before sealing
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
+❌ intake baseline NOT sealable — fix the items above first
+### caps empty Traps (exit 0)
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 3/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
+OK      src/feature/agent.md 100/100 lines
+✓ curation caps ok
+--- stderr
 ### intake sealable (exit 0)
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -179,6 +307,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 ✓ intake baseline is sealable — commit it: docs: intake baseline — initial curated docs
@@ -187,6 +317,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -199,6 +330,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 ✓ intake baseline is sealable — commit it: docs: intake baseline — initial curated docs
@@ -207,6 +340,7 @@ OK      src/feature/agent.md 100/100 lines
 MISSING docs/PRODUCT.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -219,6 +353,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -227,6 +363,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 MISSING docs/ARCHITECTURE.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -239,6 +376,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -247,6 +386,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 MISSING docs/GUIDELINES.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -258,14 +398,39 @@ OK      docs/ARCHITECTURE.md 200/200 lines
 OK      AGENTS.md 40/40 non-blank lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
+❌ intake baseline NOT sealable — fix the items above first
+### intake missing docs/review-checklist.md (exit 1)
+OK      docs/PRODUCT.md exists
+OK      docs/ARCHITECTURE.md exists
+OK      docs/GUIDELINES.md exists
+MISSING docs/review-checklist.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
+OK      docs/security-baseline.md exists
+OK      docs/test-conventions.md exists
+OK      AGENTS.md exists
+OK      docs/DESIGN-SYSTEM.md, docs/components.md not required — no src/components or src/features/*/components found (backend-only repo)
+OK      no residual provenance markers
+OK      specs/intake/decisions.md carries D-BOOTSTRAP reconcile decisions
+OK      docs/PRODUCT.md 30/30 non-blank lines
+OK      docs/ARCHITECTURE.md 200/200 lines
+OK      AGENTS.md 40/40 non-blank lines
+OK      docs/GUIDELINES.md 120/120 lines
+OK      docs/security-baseline.md 60/60 lines
+OK      docs/test-conventions.md 60/60 lines
+BREACH  docs/review-checklist.md missing (required baseline file)
+OK      docs/GUIDELINES.md § Traps 0/10 entries
+OK      src/feature/agent.md 100/100 lines
+--- stderr
+❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
 ❌ intake baseline NOT sealable — fix the items above first
 ### intake missing docs/security-baseline.md (exit 1)
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 MISSING docs/security-baseline.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -277,6 +442,8 @@ OK      docs/ARCHITECTURE.md 200/200 lines
 OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -285,6 +452,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 MISSING docs/test-conventions.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
 OK      AGENTS.md exists
@@ -296,6 +464,8 @@ OK      docs/ARCHITECTURE.md 200/200 lines
 OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -304,6 +474,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 MISSING AGENTS.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
@@ -316,6 +487,8 @@ BREACH  AGENTS.md missing (required baseline file)
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -324,6 +497,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -337,6 +511,8 @@ OK      AGENTS.md 40/40 non-blank lines
 BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -345,6 +521,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -358,6 +535,8 @@ OK      AGENTS.md 40/40 non-blank lines
 BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -366,6 +545,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -379,6 +559,8 @@ OK      AGENTS.md 40/40 non-blank lines
 BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -387,6 +569,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -399,6 +582,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -407,6 +592,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -419,6 +605,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -427,6 +615,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -440,6 +629,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -448,6 +639,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -462,6 +654,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 ✓ intake baseline is sealable — commit it: docs: intake baseline — initial curated docs
@@ -470,6 +664,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -483,6 +678,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 ✓ curation caps ok
 --- stderr
@@ -491,6 +688,7 @@ OK      src/feature/agent.md 100/100 lines
 OK      docs/PRODUCT.md exists
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 OK      AGENTS.md exists
@@ -503,6 +701,8 @@ OK      AGENTS.md 40/40 non-blank lines
 OK      docs/GUIDELINES.md 120/120 lines
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap
@@ -511,6 +711,7 @@ OK      src/feature/agent.md 100/100 lines
 MISSING docs/PRODUCT.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
 OK      docs/ARCHITECTURE.md exists
 OK      docs/GUIDELINES.md exists
+OK      docs/review-checklist.md exists
 OK      docs/security-baseline.md exists
 OK      docs/test-conventions.md exists
 MISSING AGENTS.md — the intake must draft every baseline file (a thin file with a pointer beats an absent one)
@@ -524,6 +725,8 @@ BREACH  AGENTS.md missing (required baseline file)
 BREACH  docs/GUIDELINES.md 121/120 lines — curate: shrink before sealing
 OK      docs/security-baseline.md 60/60 lines
 OK      docs/test-conventions.md 60/60 lines
+OK      docs/review-checklist.md 80/80 lines
+OK      docs/GUIDELINES.md § Traps 0/10 entries
 OK      src/feature/agent.md 100/100 lines
 --- stderr
 ❌ curation caps BREACHED — P7 must not seal until every file above fits its cap

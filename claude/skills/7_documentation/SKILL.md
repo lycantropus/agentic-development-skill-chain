@@ -397,9 +397,10 @@ and P7 is the running phase. Standalone documentation requests skip this
 section and the seal in section 8.
 
 This is the curation step of CONCEPT.md §4 P7: the curated docs under
-`docs/` (PRODUCT, ARCHITECTURE, GUIDELINES, DESIGN-SYSTEM, components —
-created by the intake baseline) are injected into every future
-implementer. They are updated HERE, gated on form and truth, and nowhere
+`docs/` (PRODUCT, ARCHITECTURE, GUIDELINES, DESIGN-SYSTEM, components,
+review-checklist, security-baseline, test-conventions —
+created by the intake baseline) are supplied according to role to future
+implementers and reviewers. They are updated HERE, gated on form and truth, and nowhere
 else. If no intake baseline exists yet, curate only the files that do
 exist — `chain check caps` warns on missing baseline files instead of
 failing.
@@ -430,7 +431,15 @@ failing.
    `ground-file.md` — the ground file holds ONLY what docs/ does not
    (redundancy rule §5).
 3. Update `docs/PRODUCT.md` for new user-facing scope or terms.
-4. Update `docs/GUIDELINES.md`; durable project-wide rules still go
+4. Route QA proposals using the [trap test](../../../CONCEPT.md#trap-test-and-rule-placement):
+   target-state rules go in `docs/GUIDELINES.md` by topic; project-specific traps
+   or hard limits go in its `## Traps` (≤10 top-level list entries, each
+   `Don’t X → instead Y — why it happens here`). Project-specific quality checks
+   go in `docs/review-checklist.md` § Antipatterns with detection signal and severity;
+   existing losing patterns go in § Known Debt (do not re-flag, do not spread).
+   Generic quality findings use the existing QA catalog, not a copied project catalog.
+   Chain-owned generic Don’ts stay only in role manifests; never duplicate them in Traps.
+   At either cap, curate rather than append. Durable project-wide rules still go
    through the AGENTS.md candidate pipeline (section 5), never directly.
 5. Register new components in `docs/components.md`.
 6. Curate `src/**/agent.md`: keep what this PROJ confirmed, delete what
@@ -445,7 +454,8 @@ bash scripts/chain state set <X> <theme> '.authorship["docs-delta"]' \
 
 **7c. FORM gate:** `bash scripts/chain check caps` — exit != 0 means a
 cap is breached (PRODUCT <= 30 non-blank lines, ARCHITECTURE <= 200
-lines, GUIDELINES <= 120, security-baseline and test-conventions <= 60
+lines, DESIGN-SYSTEM <= 80, GUIDELINES <= 120 with <= 10 Traps entries,
+review-checklist <= 80, security-baseline and test-conventions <= 60
 lines, each agent.md <= 100 lines, AGENTS.md <= 40 non-blank lines).
 Shrink by curating — move detail into `docs/architecture/`, delete stale
 statements — and re-run until exit 0. Never delete true load-bearing

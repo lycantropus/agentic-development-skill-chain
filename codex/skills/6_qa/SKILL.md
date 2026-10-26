@@ -207,6 +207,8 @@ Read the `SonarCloud` row of the `### Gate Status` table and the `### SonarCloud
 
 ### 1c. Mutation Input
 
+During test-evidence review, apply [testing antipatterns](references/testing-antipatterns.md).
+
 Read the `Mutation` row of the `### Gate Status` table in `5_progress/PROJ-<X>-progress.md` (rendered from the evidence records).
 
 - `ran (N survivors carried forward)`: surviving mutants in files touched by the PROJ are **Medium** QA bugs; on a security or authorization path they are **High**. Cite file, mutant and the tests the last round added.
@@ -288,6 +290,17 @@ Using Playwright or the active agent browser, verify existing features still wor
 - Check for visual regressions on shared components (compare snapshots)
 
 ### 6.4 Simplicity Gate
+
+Read `docs/review-checklist.md` and [testing antipatterns](references/testing-antipatterns.md).
+Use the latter also during test-evidence review. The checklist holds project-specific
+checks; the generic catalog below stays here. Do not re-flag Known Debt as new;
+flag a change that spreads it. If the checklist is missing in a pre-intake repo,
+report the missing baseline and continue with the available evidence.
+
+Framework runs may propose a new checklist entry (detection signal + severity)
+or a project-specific Trap (alternative + reason, passing the
+[trap test](../../../CONCEPT.md#trap-test-and-rule-placement)) in the QA summary,
+alongside AGENTS.md candidates. Keep the finder read-only; P7 curates proposals.
 
 Before production-readiness is decided, run a focused maintainability pass on the implementation diff since BASE_SHA. This is not a style review; it is a buildability and long-term maintenance gate.
 
