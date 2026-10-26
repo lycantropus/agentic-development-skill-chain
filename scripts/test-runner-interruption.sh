@@ -34,7 +34,8 @@ echo "$$" > "$FIXTURE_READY"
 echo "$$" >> "$FIXTURE_READY.launches"
 if [ "$FIXTURE_MODE" = kill ]; then kill -KILL "$$"; fi
 if [ "$FIXTURE_MODE" = daemon ]; then
-  sleep 30 </dev/null >/dev/null 2>&1 &
+  # Cleanup owns this daemon's lifetime, including on slow CI runners.
+  (while :; do sleep 1; done) </dev/null >/dev/null 2>&1 &
   echo "$!" > "$FIXTURE_READY.daemon"
   exit 1
 fi
