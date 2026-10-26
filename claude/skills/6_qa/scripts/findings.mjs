@@ -228,12 +228,13 @@ if (cmd === "migrate-refinement") {
     if (files.length > 1) {
       // Conflicting ledgers merge losslessly: every record kept verbatim; identical
       // repeats (an interrupted earlier merge) collapse, a differing duplicate ID stops.
-      if (files.some(f => lstatSync(f).isSymbolicLink())) fail("refusing findings symlink — nothing written");
+      if (files.some(f => lstatSync(dirname(f)).isSymbolicLink() || lstatSync(f).isSymbolicLink())) fail("refusing findings symlink — nothing written");
       let ledgers;
       try { ledgers = files.map(f => JSON.parse(readFileSync(f, "utf8"))); } catch (error) { fail(`unreadable ledger: ${error.message} — nothing written`); }
+      ledgers.forEach(validateLedger);
       if (ledgers.some(l => l.proj !== proj)) fail(`a ledger does not name ${proj} — nothing written`);
       const byId = new Map();
-      for (const f of ledgers.flatMap(l => l.findings ?? [])) {
+      for (const f of ledgers.flatMap(l => l.findings)) {
         if (byId.has(f.id) && !isDeepStrictEqual(byId.get(f.id), f)) fail(`finding ${f.id} differs between ledgers; resolve it with its owner — nothing written`);
         byId.set(f.id, f);
       }

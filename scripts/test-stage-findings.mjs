@@ -101,6 +101,16 @@ try {
     assert.equal(fs.existsSync(oldRequirements), true);
     fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-2", findings: [extra] }));
     assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "another project's ledger is never merged");
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1" }));
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "a malformed ledger is never dropped");
+    assert.equal(fs.existsSync(oldRequirements), true);
+    fs.unlinkSync(oldRequirements);
+    const outside = path.join(work, "outside-prds"); fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(outside, "findings.json"), JSON.stringify({ proj: "PROJ-1", findings: [extra] }));
+    fs.rmSync(path.join(base, "3_PRDs"), { recursive: true }); fs.symlinkSync(outside, path.join(base, "3_PRDs"));
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "a symlinked ledger directory is refused");
+    assert.equal(fs.existsSync(path.join(outside, "findings.json")), true);
+    fs.unlinkSync(path.join(base, "3_PRDs")); fs.mkdirSync(path.join(base, "3_PRDs"));
     const reordered = Object.fromEntries(Object.entries(beforeMerge[0]).reverse());
     fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [reordered, extra] }));
     ok(["migrate-refinement", "1", "test"]);
