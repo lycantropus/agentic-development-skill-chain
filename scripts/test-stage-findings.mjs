@@ -66,6 +66,51 @@ try {
     ok(["add", "1", "test", "--stage", "requirements"], record);
     assert.equal(fs.existsSync(path.join(base, "2_PRDs")), false, "legacy folder remains canonical");
     assert.equal(aggregate().length, 7);
+    // External refinement migrates the existing ledger without rewriting any history.
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "linear projects cannot migrate");
+    const oldRequirements = path.join(base, "3_PRDs/findings.json");
+    const preserved = fs.readFileSync(oldRequirements);
+    fs.writeFileSync(path.join(base, "external-handoff.json"), '{"schemaVersion":1}');
+    assert.equal(JSON.parse(ok(["list", "1", "test", "--stage", "requirements"])).findings.length, 1);
+    ok(["migrate-refinement", "1", "test"]);
+    const refinement = path.join(base, "refinement/findings.json");
+    assert.deepEqual(fs.readFileSync(refinement), preserved, "IDs, attempts, status and provenance are byte-identical");
+    assert.equal(fs.existsSync(oldRequirements), false);
+    ok(["migrate-refinement", "1", "test"]);
+    assert.deepEqual(fs.readFileSync(refinement), preserved, "migration is idempotent");
+    const migrated = JSON.parse(preserved).findings[0];
+    ok(["set-status", "1", "test", migrated.id, "fixed", "revision"]);
+    ok(["record-attempt", "1", "test", migrated.id]);
+    ok(["add", "1", "test", "--stage", "requirements"], record);
+    assert.equal(aggregate().length, 7, "re-report dedupes after migration");
+    const updated = JSON.parse(ok(["list", "1", "test", "--stage", "requirements"])).findings[0];
+    assert.equal(updated.id, migrated.id); assert.equal(updated.status, "open");
+    assert.equal(updated.fix_attempts, migrated.fix_attempts + 1);
+    fs.mkdirSync(path.join(base, "runs/second/refinement"), { recursive: true });
+    ok(["add", "1", "test", "--stage", "requirements"], JSON.stringify({ ...JSON.parse(record), anchor: "second-round" }));
+    assert.ok(aggregate().some(f => f.id === "F-PROJ-1-008"), "IDs continue across stages and runs");
+    assert.equal(fs.existsSync(path.join(base, "runs/second/refinement/findings.json")), false);
+    // A second ledger must never be overwritten or silently accepted.
+    fs.writeFileSync(oldRequirements, preserved);
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0);
+    assert.deepEqual(fs.readFileSync(oldRequirements), preserved);
+    fs.unlinkSync(oldRequirements);
+    const fresh = path.join(work, "specs/PROJ-2-external"); fs.mkdirSync(fresh);
+    fs.writeFileSync(path.join(fresh, "external-handoff.json"), '{"schemaVersion":1}');
+    ok(["add", "2", "external", "--stage", "requirements"], record);
+    assert.equal(fs.existsSync(path.join(fresh, "refinement/findings.json")), true);
+    assert.equal(fs.existsSync(path.join(fresh, "2_PRDs")), false);
+    // Current numbered requirements ledgers migrate too; unrelated documents remain.
+    const numbered = path.join(work, "specs/PROJ-3-received"); fs.mkdirSync(numbered);
+    ok(["add", "3", "received", "--stage", "requirements"], record);
+    const numberedLedger = path.join(numbered, "2_PRDs/findings.json");
+    const numberedBytes = fs.readFileSync(numberedLedger);
+    fs.writeFileSync(path.join(numbered, "2_PRDs/notes.md"), "Keep original evidence");
+    fs.writeFileSync(path.join(numbered, "external-handoff.json"), '{"schemaVersion":1}');
+    ok(["migrate-refinement", "3", "received"]);
+    assert.deepEqual(fs.readFileSync(path.join(numbered, "refinement/findings.json")), numberedBytes);
+    assert.equal(fs.existsSync(numberedLedger), false);
+    assert.equal(fs.readFileSync(path.join(numbered, "2_PRDs/notes.md"), "utf8"), "Keep original evidence");
     // Corrupt ledgers fail closed, rather than making gates see zero findings.
     const ledger = path.join(base, "6_qa/findings.json"); const bytes = fs.readFileSync(ledger);
     fs.writeFileSync(ledger, "broken"); assert.notEqual(run(["list", "1", "test"]).status, 0); fs.writeFileSync(ledger, bytes);

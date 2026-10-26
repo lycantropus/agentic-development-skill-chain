@@ -67,12 +67,21 @@ Storage inside a PROJ:
 | Review | Ledger |
 |---|---|
 | Concept | `1_concept/findings.json` |
-| Requirements | `2_PRDs/findings.json` |
+| Requirements | `2_PRDs/findings.json` (linear); `refinement/findings.json` (external handoff) |
 | Architecture and plans | `3-4_plan/findings.json` |
 | Implementation, CodeRabbit, Sonar and debt | `5_progress/findings.json` |
 | QA | `6_qa/findings.json` |
 | Documentation | `7_documentation/findings.json` |
 | Delivery | `8_delivery/findings.json` |
+
+For projects with `external-handoff.json`, requirements-mode findings belong in
+project-level `refinement/findings.json`, shared across runs. Before reviewing an
+existing external project, run `chain findings migrate-refinement <X> <theme>`.
+It moves an existing `2_PRDs/findings.json` (or legacy `3_PRDs/findings.json`)
+byte-for-byte under the project lock; rerunning is safe. Other files remain in
+place. If both old and new ledgers exist, it refuses to overwrite either; reconcile
+the conflict before continuing. Until migration, helpers retain the old ledger as
+its owner. Never rename/delete it manually or create a per-run ledger.
 
 `chain findings list` aggregates these files and an existing legacy root ledger
 without writing a central copy. IDs remain unique per PROJ; status and attempt

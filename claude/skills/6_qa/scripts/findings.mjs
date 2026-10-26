@@ -8,6 +8,7 @@
 //
 // Usage:
 //   node findings.mjs add            <proj-x> <theme> [--wave N]    read raw findings as JSON lines on stdin, dedupe + merge
+//   node findings.mjs migrate-refinement <proj-x> <theme>     move an external requirements ledger byte-for-byte
 //   node findings.mjs set-status     <proj-x> <theme> <id> <status> [fix-commit]
 //   node findings.mjs record-attempt <proj-x> <theme> <id>          count a fix ATTEMPT (before dispatch; basis of the 3-attempt stop rule)
 //   node findings.mjs auto-defer     <proj-x> <theme>               open medium/low -> deferred (autonomy policy §8)
@@ -38,7 +39,7 @@
 // Exit codes: 0 ok · 1 invalid input / unknown severity / lock timeout (nothing written) · 2 findings.json missing · 64 usage
 import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync } from "node:fs";
 import { join, dirname, isAbsolute } from "node:path";
-import { stageDirectory, readFindingLedgers } from "./findings-store.mjs";
+import { stageDirectory, readFindingLedgers, REFINEMENT_DIR } from "./findings-store.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 
@@ -54,7 +55,7 @@ const SOURCES = ["coderabbit", "sonar", "review", "qa", "merge-gate", "cross-rev
 
 function usage() {
   console.error(
-    "Usage: findings.mjs <add|list|set-status|record-attempt|auto-defer|queue|stats|harvest> <proj-x> <theme> [args]\n" +
+    "Usage: findings.mjs <migrate-refinement|add|list|set-status|record-attempt|auto-defer|queue|stats|harvest> <proj-x> <theme> [args]\n" +
     "  --stage <concept|requirements|architecture|plan|implementation|qa|docs|delivery> selects the add/list location\n" +
     "  add            [--wave N]   (raw findings as JSON lines on stdin)\n" +
     "  harvest        [search-root]   (ponytail: markers -> deferred debt findings)\n" +
@@ -116,7 +117,10 @@ function withLock(fn) {
 
 function load({ mustExist = false } = {}) {
   let entries;
-  try { entries = readFindingLedgers(base); } catch (error) { fail(error.message); }
+  try {
+    target = join(stageDirectory(base, stage ?? "implementation"), "findings.json");
+    entries = readFindingLedgers(base);
+  } catch (error) { fail(error.message); }
   if (mustExist && !entries.length) { console.error(`findings.mjs: no findings ledger in ${base}`); process.exit(2); }
   origins = new Map(); originals = new Map();
   for (const { file, ledger } of entries) {
@@ -215,7 +219,20 @@ function harvestLines(root) {
   });
 }
 
-if (cmd === "add" || cmd === "harvest") {
+if (cmd === "migrate-refinement") {
+  withLock(() => {
+    if (!existsSync(join(base, "external-handoff.json"))) fail("refinement migration requires external-handoff.json");
+    const ledger = load();
+    validateLedger(ledger);
+    const source = join(stageDirectory(base, "requirements"), "findings.json");
+    const destination = join(base, REFINEMENT_DIR, "findings.json");
+    if (source !== destination && existsSync(source)) {
+      mkdirSync(dirname(destination), { recursive: true });
+      renameSync(source, destination);
+      console.log(`findings.mjs: migrated ${source} -> ${destination}`);
+    } else console.log("findings.mjs: no refinement migration needed");
+  });
+} else if (cmd === "add" || cmd === "harvest") {
   const waveIdx = cmd === "add" ? rest.indexOf("--wave") : -1;
   const wave = waveIdx >= 0 ? Number(rest[waveIdx + 1]) : undefined;
   if (waveIdx >= 0 && !Number.isInteger(wave)) fail("--wave must be an integer — nothing written");

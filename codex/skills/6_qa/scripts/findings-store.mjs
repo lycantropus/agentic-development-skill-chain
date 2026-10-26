@@ -6,17 +6,26 @@ export const STAGE_DIRS = {
   concept: "1_concept", requirements: "2_PRDs", architecture: "3-4_plan", plan: "3-4_plan",
   implementation: "5_progress", qa: "6_qa", docs: "7_documentation", delivery: "8_delivery",
 };
+export const REFINEMENT_DIR = "refinement";
 const LEGACY_DIRS = { "2_PRDs": "3_PRDs", "3-4_plan": "6_plan", "5_progress": "7_progress" };
 
 export function stageDirectory(base, stage) {
   const directory = STAGE_DIRS[stage];
   if (!directory) throw new Error(`unknown findings stage '${stage}'`);
+  if (stage === "requirements" && fs.existsSync(path.join(base, "external-handoff.json"))) {
+    const existing = [REFINEMENT_DIR, "2_PRDs", "3_PRDs"].filter(dir =>
+      fs.existsSync(path.join(base, dir, "findings.json")));
+    if (existing.length > 1) throw new Error("multiple requirements/refinement ledgers: reconcile before migration");
+    // Keep old ledgers usable until the explicit, lossless migration.
+    return path.join(base, existing[0] ?? REFINEMENT_DIR);
+  }
   const legacy = LEGACY_DIRS[directory];
   return path.join(base, !fs.existsSync(path.join(base, directory)) && legacy && fs.existsSync(path.join(base, legacy)) ? legacy : directory);
 }
 
 export function readFindingLedgers(base) {
-  const directories = ["", ...new Set(Object.values(STAGE_DIRS)), ...Object.values(LEGACY_DIRS)];
+  stageDirectory(base, "requirements");
+  const directories = ["", REFINEMENT_DIR, ...new Set(Object.values(STAGE_DIRS)), ...Object.values(LEGACY_DIRS)];
   const ids = new Set();
   return directories.flatMap(directory => {
     const parent = path.join(base, directory), file = path.join(parent, "findings.json");
