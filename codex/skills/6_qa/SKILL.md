@@ -140,10 +140,12 @@ QA's persona review is the opposite-provider panel below; there is no in-session
 BASE="specs/PROJ-<X>-<theme>"
 BASE_SHA="$(bash scripts/chain state get <X> <theme> .base_sha)"
 # The QA report is the QA summary sections only — never the whole progress.md.
-QA_REPORT="$(mktemp)"
-# Interactive run: export the QA Results section of progress.md.
-# (P6 controller: use the stored finder report, chain state get <X> <theme> .qa.finder_report)
-# awk '/^## /{p=($0=="## QA Results")} p' "$BASE/5_progress/PROJ-<X>-progress.md" >"$QA_REPORT"
+if [ -f "$BASE/state.json" ]; then   # framework run: the P6 controller uses the stored finder report
+  QA_REPORT="$(bash scripts/chain state get <X> <theme> .qa.finder_report)"
+else                                # interactive run: the QA Results section of progress.md
+  QA_REPORT="$(mktemp)"
+  awk '/^## /{p=($0=="## QA Results")} p' "$BASE/5_progress/PROJ-<X>-progress.md" >"$QA_REPORT"
+fi
 bash scripts/chain review qa <X> <theme> \
   --artifacts "$QA_REPORT" \
   --ground-truth "$BASE/3-4_plan/PROJ-<X>-architecture.md" "$BASE"/2_PRDs/PROJ-<X>-PRD-*.md \
