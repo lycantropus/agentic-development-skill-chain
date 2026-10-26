@@ -39,7 +39,7 @@
 // Exit codes: 0 ok · 1 invalid input / unknown severity / lock timeout (nothing written) · 2 findings.json missing · 64 usage
 import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync, lstatSync, unlinkSync } from "node:fs";
 import { join, dirname, isAbsolute } from "node:path";
-import { stageDirectory, readFindingLedgers, REFINEMENT_DIR } from "./findings-store.mjs";
+import { stageDirectory, readFindingLedgers, assertNotSourceProject, REFINEMENT_DIR } from "./findings-store.mjs";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { execFileSync } from "node:child_process";
@@ -223,6 +223,7 @@ function harvestLines(root) {
 if (cmd === "migrate-refinement") {
   withLock(() => {
     if (!existsSync(join(base, "external-handoff.json"))) fail("refinement migration requires external-handoff.json");
+    try { assertNotSourceProject(base); } catch (error) { fail(`${error.message} — nothing written`); }
     const destination = join(base, REFINEMENT_DIR, "findings.json");
     if (lstatSync(dirname(destination), { throwIfNoEntry: false })?.isSymbolicLink()) fail("refusing findings symlink — nothing written");
     const files = [destination, join(base, "2_PRDs/findings.json"), join(base, "3_PRDs/findings.json")].filter(existsSync);

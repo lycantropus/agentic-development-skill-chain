@@ -1,17 +1,17 @@
 ---
 name: delivery-workspace
-description: "Discover or set up the shared team coordination checkout for an incoming product handoff and route baseline onboarding per implementation repository. Use when developers need to locate the handoff workspace, safely clone or create its team remote, or identify which repositories need intake. Optional; not feature refinement or application implementation."
+description: "Discover or set up the shared team coordination location for an incoming product handoff (a dedicated repository, the repository that produced the handoff, or an implementation repository) and route baseline onboarding per implementation repository. Use when developers need to locate the handoff workspace, safely clone it or create a dedicated team remote, or identify which repositories need intake. Optional; not feature refinement or application implementation."
 ---
 
 # Delivery Workspace
 
-We use one shared repository for handoffs, PRD refinement and open decisions. If the team has none yet, we set one up. Read [references/workspace-contract.md](references/workspace-contract.md) for the portable inventory, the access and creation procedure and the baseline evidence. This skill owns workspace setup; `handoff-refinement` reuses its inventory for each incoming version.
+We keep handoffs, refinement and open decisions in one agreed coordination location: a dedicated repository, the repository that produced the handoff, or an implementation repository. If the team has none yet, it chooses one; a new repository is created only when the team chooses a dedicated one. Read [references/workspace-contract.md](references/workspace-contract.md) for the portable inventory, the access and creation procedure and the baseline evidence. This skill owns workspace setup; `handoff-refinement` reuses its inventory for each incoming version.
 
 Three outcomes are distinct and are reported separately: a **prepared draft** (inventory written, remote not confirmed), a **set-up team workspace** (remote verified, marker registered on the team path) and **team acceptance** of a baseline. Schema validity alone never promotes a draft.
 
 ## 1. Explain purpose, then discover
 
-Tell the user what the coordination repo is for and that an existing repo or a tracked subdirectory of an implementation repo is fine. Discover in order: explicit team remote/identity, valid registered inventory and checkout, bounded inspection of the current and user-supplied neighboring repositories. Inspect Git roots, remotes and the marker; directory names are not ownership evidence. Ask which owner to use when ambiguous. If nothing is identified, request the address or search only the selected organization with authenticated provider tools. Local absence does not prove remote absence. An inaccessible remote is an access blocker; an unmarked repository is legacy/unregistered. Neither permits replacement or overwriting.
+Tell the user what the coordination location is for and that a dedicated repository, the repository that produced the handoff (for example a product lab) or an implementation repository are equally fine. The role describes the repository's work for this handoff: `coordination` when it only hosts coordination (a dedicated repository, or a source repository whose code is reference only), `both` when it also has implementation work. Discover in order: explicit team remote/identity, valid registered inventory and checkout, bounded inspection of the current repository, the handoff's source repository and user-supplied neighboring repositories. Inspect Git roots, remotes and the marker; directory names are not ownership evidence. Ask which owner to use when ambiguous. If nothing is identified, request the address or search only the selected organization with authenticated provider tools. Local absence does not prove remote absence. An inaccessible remote is an access blocker; an unmarked repository is legacy/unregistered. Neither permits replacement or overwriting.
 
 ## 2. Probe access early
 
@@ -19,11 +19,11 @@ Before proposing a clone or creation, run `workspace.mjs access` and report four
 
 ## 3. Reuse, clone or create, then verify
 
-Reuse a matching checkout without resetting or switching branches. Clone a known remote into an unoccupied path when onboarding calls for it. For a missing remote, make provider, owner, name, visibility and minimal README/inventory concrete, confirm authorization for that exact target, and create only within it. Follow the bounded procedure in the reference; never infer public visibility. Register the team marker only after `workspace.mjs verify` confirms the coordination remote. Until then the inventory is a draft kept outside the coordination location. A local-only mode exists only when the user explicitly selects it; do not set up a local-only store on your own as a substitute for the team remote.
+Reuse a matching checkout without resetting or switching branches. Clone a known remote into an unoccupied path when onboarding calls for it. Choosing an existing source or implementation repository needs no creation: register the marker there through its normal branch/PR policy. For a missing dedicated remote, make provider, owner, name, visibility and minimal README/inventory concrete, confirm authorization for that exact target, and create only within it. Follow the bounded procedure in the reference; never infer public visibility. Register the team marker only after `workspace.mjs verify` confirms the coordination remote. Until then the inventory is a draft kept outside the coordination location. A local-only mode exists only when the user explicitly selects it; do not set up a local-only store on your own as a substitute for the team remote.
 
 ## 4. Record portable identities
 
-Record identities in `delivery-workspace.json` at the agreed tracked coordination location. Keep local checkout bindings outside versioned content. A dedicated specifications repository is optional: a tracked location in one implementation repository works. Do not create empty placeholder trees, initialize a code checkout's parent as Git, track nested repositories, or clone unrelated repositories.
+Record identities in `delivery-workspace.json` at the agreed tracked coordination location. Keep local checkout bindings outside versioned content. A dedicated specifications repository is optional: the handoff's source repository or one implementation repository works equally. There, refinement projects live beside, never inside, the source product project (refinement input contract, § Storage and ownership). Do not create empty placeholder trees, initialize a code checkout's parent as Git, track nested repositories, or clone unrelated repositories.
 
 ## 5. Investigate in two stages
 
@@ -35,7 +35,7 @@ For each affected implementation repository rate three things independently: bas
 
 Keep shared changes on the team's normal review path. Record local drafts, proposed PRs and accepted revisions distinctly. Pin inputs to accepted commits/content hashes. Reconcile upstream changes and conflicting answers before readiness; no force-push, last-write-win, distributed lock or new approval system.
 
-Recommend sibling checkouts under a plain `work/` directory for convenience (`delivery-specs/`, `frontend/`, `backend/`), without requiring that layout. Non-sibling paths, worktrees and spaces work. In apps that bind sessions to repositories, bind the next session to its actual repo/worktree; a prompt saying `cd` does not bind it.
+Recommend sibling checkouts under a plain `work/` directory for convenience (`coordination/`, `frontend/`, `backend/`), without requiring that layout. Non-sibling paths, worktrees and spaces work. In apps that bind sessions to repositories, bind the next session to its actual repo/worktree; a prompt saying `cd` does not bind it.
 
 ## 7. Close with one status report
 

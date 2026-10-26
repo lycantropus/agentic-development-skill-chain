@@ -15,6 +15,8 @@ export function resolveInputs(directory, { allowBlocked = false } = {}) {
   const marker = path.join(base, MARKER);
   if (!fs.lstatSync(marker, { throwIfNoEntry: false })) return null;
   const fail = message => { throw new Error(`${marker}: ${message}`); };
+  // Only handoff-package creates 2b_handoff/, so a marker beside it sits in the source product project.
+  if (fs.lstatSync(path.join(base, '2b_handoff'), { throwIfNoEntry: false })) fail('must not share a source product project (2b_handoff/ present); use a sibling refinement project');
   let m;
   try { m = JSON.parse(fs.readFileSync(marker, 'utf8')); } catch (e) { fail(`invalid JSON: ${e.message}`); }
   const need = (ok, message) => { if (!ok) fail(message); };

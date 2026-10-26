@@ -75,8 +75,11 @@ approval or migration.
 
 [`delivery-workspace`](../codex/skills/2d_delivery-workspace/SKILL.md) discovers the
 team coordination remote and reuses its checkout, safely clones it, or creates a
-missing remote within the user's authorization. An existing team repository can
-own the tracked coordination location; a separate repository is optional.
+missing remote within the user's authorization. The repository that produced the
+handoff or an implementation repository can own the tracked coordination location
+equally; a separate repository is optional and is the only case that creates a
+new remote. Refinement projects sit beside, never inside, the source product
+project.
 Access denial is an access problem, and local-only staging is explicitly chosen
 and remains unpublished. A plain common parent directory is convenient, never
 required. Portable repository identities belong in version control; each

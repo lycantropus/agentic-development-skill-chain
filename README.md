@@ -189,7 +189,7 @@ The existing linear chain remains unchanged. External handoffs separate three
 responsibilities:
 
 - **Prototype repo — Product:** concepts, prototypes and PRDs, delivered as versioned packages.
-- **Refinement location — shared coordination:** shared package, decision, dependency and integration records, plus shared engineering analysis as agreed by the team. A separate refinement repo is optional; an agreed tracked location in an existing team repo also works.
+- **Refinement location — shared coordination:** shared package, decision, dependency and integration records, plus shared engineering analysis as agreed by the team. A separate refinement repo is optional; the prototype repo or a production repo works equally, with the refinement project as a sibling of the product project (`specs/PROJ-<X>-<theme>-refinement/`), never inside it.
 - **Production repos — Engineering:** scoped, pinned refinement inputs and readiness records alongside architecture, implementation plans, tests and PRs, with execution state owned by each repo.
 
 Start with optional `delivery-workspace` (2d) to find or onboard the coordination

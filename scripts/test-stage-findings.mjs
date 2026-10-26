@@ -71,6 +71,16 @@ try {
     const oldRequirements = path.join(base, "3_PRDs/findings.json");
     const preserved = fs.readFileSync(oldRequirements);
     fs.writeFileSync(path.join(base, "external-handoff.json"), '{"schemaVersion":1}');
+    // A marker beside 2b_handoff/ sits in the source product project: every path refuses, nothing written.
+    assert.match(run(["add", "1", "test", "--stage", "requirements"], record).stderr, /sibling refinement project/);
+    assert.equal(fs.existsSync(path.join(base, "refinement")), false);
+    fs.mkdirSync(path.join(base, "refinement"));
+    fs.copyFileSync(oldRequirements, path.join(base, "refinement/findings.json"));
+    assert.match(run(["migrate-refinement", "1", "test"]).stderr, /sibling refinement project.*nothing written/);
+    assert.deepEqual(fs.readFileSync(oldRequirements), preserved);
+    assert.deepEqual(fs.readFileSync(path.join(base, "refinement/findings.json")), preserved);
+    fs.rmSync(path.join(base, "refinement"), { recursive: true });
+    fs.rmSync(path.join(base, "2b_handoff"), { recursive: true });
     assert.equal(JSON.parse(ok(["list", "1", "test", "--stage", "requirements"])).findings.length, 1);
     ok(["migrate-refinement", "1", "test"]);
     const refinement = path.join(base, "refinement/findings.json");

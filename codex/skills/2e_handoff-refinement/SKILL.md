@@ -15,7 +15,7 @@ Refine a product-owned handoff into evidence-backed engineering inputs without t
 - [evidence-brief.md](references/evidence-brief.md) — delegated read-only inspection and consistency briefs.
 - [package-tools.md](references/package-tools.md) — byte copies, hashes, AC ranges, detached link checks, source status.
 
-Reuse the inventory from [delivery-workspace](../2d_delivery-workspace/SKILL.md), including portable repo keys and machine-local checkout bindings; missing coordination identity or checkout setup belongs there. Do not initialize another coordination repo per package; an agreed tracked location in one code repo suffices for single-repo work.
+Reuse the inventory from [delivery-workspace](../2d_delivery-workspace/SKILL.md), including portable repo keys and machine-local checkout bindings; missing coordination identity or checkout setup belongs there. Do not initialize another coordination repo per package; the handoff's source repository or, for single-repo work, the implementation repository is an equally valid tracked location.
 
 Product owns the immutable baseline and explicit product responses; engineering owns evidence, technical constraints and implementation decisions (authority rules: input contract § Storage and ownership). There is no blanket engineering-over-product precedence. Write new artifacts in English; never translate or rewrite a received requirement to satisfy a local validator.
 

@@ -33,6 +33,8 @@ The shared document and architecture readers do no I/O or process control. Their
 
 An explicit `external-handoff.json` in the PROJ directory selects the optional
 [receiving contract](../codex/skills/2e_handoff-refinement/references/input-contract.md).
+The resolver and findings helpers refuse a marker beside `2b_handoff/`: refinement
+never shares the source product project.
 `chain check inputs <project-directory>` checks hashes, source identities, scope,
 response provenance and readiness. `--allow-blocked` bypasses readiness blockers
 only for read-only refinement of structurally valid inventories. A requirement
