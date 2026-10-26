@@ -272,10 +272,10 @@ Stage 2 adds the bootstrap and the full context system:
   [setup.md §6](../claude/skills/5_executing/subskills/setup.md); what each
   role gets (`inject` lists and budgets) in the
   [role manifests](../claude/skills/5_executing/manifests/roles/).
-- **Ponytail parity:** the minimalism ladder comes from the Ponytail plugin on
-  all active providers, with installation and mode `full` gated in the P0 preflight;
-  plugin versions may differ
-  ([setup.md §6d](../claude/skills/5_executing/subskills/setup.md)).
+- **Minimal by default:** the minimalism rules are part of the implementer
+  role manifests (and `micro-fixer`), so every tier-1 worker file carries
+  them; no plugin is gated for it (the Ponytail plugin was retired 2026-10-26,
+  [CONCEPT.md §7](../CONCEPT.md)).
 - **P7 curation + gates:** `documentation` (7) curates `docs/` and
   `src/**/agent.md` in place, then must pass FORM (`chain check caps`; all
   caps are defined once in that script's header — `chain check caps --help`

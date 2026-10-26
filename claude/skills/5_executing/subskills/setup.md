@@ -293,7 +293,7 @@ Commit the manifest and changed helpers/templates with setup. Do not manually ov
 |---|---|
 | `2_requirements-engineer/scripts/validate-prds.mjs`; `3_architecture/scripts/validate-architecture.mjs` | `scripts/` |
 | `4_writing-plans/scripts/validate-wave-plan.mjs`, `document-parser.mjs`; `3_architecture/scripts/architecture-parser.mjs` | `scripts/` |
-| `5_executing/scripts/chain`, `resolve-inputs.mjs`, `render.mjs`, `compile-context.mjs`, `story-slice.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `ponytail-check.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
+| `5_executing/scripts/chain`, `resolve-inputs.mjs`, `render.mjs`, `compile-context.mjs`, `story-slice.mjs`, `state.sh`, `preflight.sh`, `env-local.sh`, `worktree.sh`, `migration-drift-check.sh`, `sync-framework.mjs` | `scripts/` |
 | `5_executing/manifests/roles/*.md` | `templates/roles/` |
 | `5_executing/templates/decisions.md.tmpl`, `morning-report.md.tmpl`, `stop-report.md.tmpl` | `templates/` |
 | `cross-review/scripts/cross-review.sh`, `review-with-claude.sh`, `review-with-codex.sh` | `scripts/` |
@@ -410,12 +410,6 @@ prompts. After `sync` the lead runs `compile --wave N` in the same step; no work
 starts in between (lead discipline: a worker holding a path to an outdated file is
 not caught).
 
-**6d. Ponytail parity** is already gated inside step 4's preflight
-(`chain check ponytail`: absence or wrong mode on active
-providers blocks P0). Never work around a red gate; `PONYTAIL_ENFORCE=0`
-is the loud, recorded escape hatch — it lands in state.json and the
-reports, never silent.
-
 ### 7. Seal P0
 
 1. `bash scripts/chain state transition <X> <theme> P0 done`
@@ -438,10 +432,8 @@ re-executes itself there once, and starts every later phase from that path. The
 - [ ] persistent `proj/PROJ-<X>` worktree exists; `base_sha`, `branch`, and `.worktree` metadata are in state.json
 - [ ] `.env.local` is an ignored control-checkout symlink (or explicitly absent); dependencies are isolated
 - [ ] `preflight` block in state.json; `degraded` set truthfully
-- [ ] `.context.ponytail` in state.json (parity gate result, enforced truthfully)
 - [ ] `specs/.../context/` has `workers/wave-N/` (one file per story) and `roles/wave-N/` for every wave; nothing recorded in state.json
 - [ ] `ground-file.md` written (only assumptions docs/ does not state)
-- [ ] No `PONYTAIL_SUBAGENT_MATCHER` in `.claude/settings.json` (`chain check ponytail` blocks a scoped matcher)
 - [ ] `scripts/` + `templates/` contain the framework copies, executable
 - [ ] `.coderabbit.yaml` present at repo root
 - [ ] One safe negative control was observed red, restored, and recorded

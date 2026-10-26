@@ -14,7 +14,7 @@
 //   node findings.mjs auto-defer     <proj-x> <theme>               open medium/low -> deferred (autonomy policy §8)
 //   node findings.mjs queue          <proj-x> <theme>               open critical/high clustered by file (fix queue, JSON)
 //   node findings.mjs stats          <proj-x> <theme>               counts by severity/status (JSON)
-//   node findings.mjs harvest        <proj-x> <theme> [search-root] record `ponytail:` markers (the debt-marker convention, CONCEPT.md §7)
+//   node findings.mjs harvest        <proj-x> <theme> [search-root] record `debt:` markers (the debt-marker convention, CONCEPT.md §7; `ponytail:` still accepted for one release)
 //                                    as `deferred` debt findings; same dedupe as add. search-root defaults to <app_root>/src
 //                                    (pass . for the whole repo); zero markers or a missing root is not an error.
 //
@@ -59,7 +59,7 @@ function usage() {
     "Usage: findings.mjs <migrate-refinement|add|list|set-status|record-attempt|auto-defer|queue|stats|harvest> <proj-x> <theme> [args]\n" +
     "  --stage <concept|requirements|architecture|plan|implementation|qa|docs|delivery> selects the add/list location\n" +
     "  add            [--wave N]   (raw findings as JSON lines on stdin)\n" +
-    "  harvest        [search-root]   (ponytail: markers -> deferred debt findings)\n" +
+    "  harvest        [search-root]   (debt: markers -> deferred debt findings)\n" +
     "  set-status     <id> <open|fixed|deferred|false-positive> [fix-commit]\n" +
     "  record-attempt <id>\n" +
     "  auto-defer | queue | stats",
@@ -197,12 +197,12 @@ function defaultHarvestRoot() {
   return join(appRoot, "src");
 }
 
-// One raw debt finding per `ponytail:` marker; the summary is the marker text after it.
+// One raw debt finding per `debt:` marker (or the retired `ponytail:` spelling); the summary is `debt: ` + the marker text.
 function harvestLines(root) {
   if (!(existsSync(root) && statSync(root).isDirectory())) { console.log(`findings.mjs: search root '${root}' does not exist — nothing to harvest`); process.exit(0); }
   let matches = "";
   try {
-    matches = execFileSync("grep", ["-R", "-n", "-I", "ponytail:", root, "--exclude-dir=.git", "--exclude-dir=node_modules", "--exclude-dir=specs"],
+    matches = execFileSync("grep", ["-R", "-n", "-I", "-E", "(debt|ponytail):", root, "--exclude-dir=.git", "--exclude-dir=node_modules", "--exclude-dir=specs"],
       { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 });
   } catch (error) {
     // grep exits 1 without a match, 2 on unreadable files: use what it found; but never a truncated scan
@@ -210,12 +210,12 @@ function harvestLines(root) {
     matches = error.stdout ?? "";
   }
   const found = matches.split("\n").map((l) => /^(.+):(\d+):(.*)$/.exec(l)).filter(Boolean);
-  if (found.length === 0) { console.log(`findings.mjs: no ponytail: markers under ${root}`); process.exit(0); }
+  if (found.length === 0) { console.log(`findings.mjs: no debt: markers under ${root}`); process.exit(0); }
   return found.map(([, file, line, text]) => {
-    const note = /ponytail:\s*(.*)/.exec(text)?.[1] ?? text;
+    const note = /(?:debt|ponytail):\s*(.*)/.exec(text)?.[1] ?? text;
     return JSON.stringify({
       source: "debt", severity: "low", status: "deferred", category: "debt",
-      summary: `ponytail: ${note.startsWith(" ") ? note.slice(1) : note}`, file, line: Number(line), debt_marker: note,
+      summary: `debt: ${note.startsWith(" ") ? note.slice(1) : note}`, file, line: Number(line), debt_marker: note,
     });
   });
 }

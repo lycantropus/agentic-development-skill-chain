@@ -6,7 +6,7 @@ KONZEPT.md is frozen at v0.9)
 scripts instead of LLM for deterministic work, budget enforcement)*
 *(v0.5: git/subagent review — tiering via agent types, manually managed
 story worktrees, gotcha channel for parallel waves, Claude Code mapping §6b)*
-*(v0.6: ponytail adopted as a ready-made plugin — decided; manifest schema
+*(v0.6: ponytail adopted as a ready-made plugin — retired 2026-10-26, see §7; manifest schema
 following the claude-skills taxonomy in Stage 2; consolidated CLI list §7)*
 *(v0.7: executive summary + overall diagram)*
 *(v0.8: checkpoint skill `4a_checkpoint` — structured reconcile loop
@@ -145,8 +145,8 @@ that require Claude fail closed when Claude review is unavailable.
 curated half-page docs instead of full texts, injection only by spawn
 class (micro-fixes get nothing), deterministic work runs as scripts
 rather than through the LLM, and token budgets are enforced in the
-preflight. Minimalism at code-writing time is delivered by the ponytail
-plugin (decided). Dual lanes do NOT mean double flagship cost: every
+preflight. Minimalism at code-writing time comes from the eight
+`## Minimal by default` rules in the implementer role manifests (§7). Dual lanes do NOT mean double flagship cost: every
 lane runs the cheapest model adequate for its role (model tiering in
 the role record — flagship models only for the few judgment-heavy
 roles), so the second lane buys provider diversity at a fraction of
@@ -596,7 +596,7 @@ create or resume the persistent sibling worktree on `proj/PROJ-X`, tag
 development database and the hosted-auth budget shared and serialized
 through the common lock); sync the framework helpers into the repo;
 permission and CodeRabbit-config preflight; tool + auth preflight of the §7
-list (both provider auth states, Ponytail parity, migration drift — `codex`
+list (both provider auth states, migration drift — `codex`
 missing sets `degraded`, never silently); commit a checkpoint (the negative
 control's clean-tree gate stays strict); verify the verifier with one
 controlled red gate; suggest static-check commands; write the ground file
@@ -692,7 +692,7 @@ After three failed repair/re-verification attempts on the same
 Critical/High finding, P6 enters the stop behavior in §8. Exit requires
 no Critical/High open. Medium/Low → **auto-defer**
 (no user prompt, unlike today's Skill 5/6): debt marker in the code
-(`ponytail:` convention with ceiling + upgrade path) + ledger status
+(`debt:` convention with ceiling + upgrade path) + ledger status
 `deferred`. The human decides about debt at Checkpoint 2 based on the
 debt section in the PR — not mid-run.
 
@@ -830,8 +830,8 @@ the compiler, so the matrix lives in exactly one place:
 [manifests/roles/](claude/skills/5_executing/manifests/roles/); the
 section order of a compiled file in
 [how-it-works.md](docs/how-it-works.md#what-a-worker-file-contains). The
-minimalism ladder comes from the Ponytail plugin (§7), never from the file;
-prior-wave context is a short orchestrator summary; folder `agent.md`
+minimalism rules are part of the implementer role manifests (§7) and so
+of every tier-1 file; prior-wave context is a short orchestrator summary; folder `agent.md`
 follows the reading protocol below and is never injected.
 
 **Redundancy rules (overlap costs double):**
@@ -988,7 +988,7 @@ not the source of workflow semantics.
 | Background process | shell child process | shell child process | runner starts both, waits for both, captures exit/status |
 | Type-scoped context | worker file path in the spawn prompt | worker file path in the lane prompt | same compiled worker file |
 | Agent role | `.claude/agents/*.md` | Codex skill/agent metadata | role, tools, write scope, budget |
-| Minimalism | Ponytail Claude plugin | Ponytail Codex plugin | Ponytail mode `full`; versions may differ |
+| Minimalism | role manifest body | role manifest body | same byte-identical manifests; the Ponytail plugin was retired 2026-10-26 |
 | Cross-review | OpenAI `codex-plugin-cc` pattern | Codex-facing `claude` skill pattern | provider opposite to `author_provider` |
 | Wave-gate enforcement | optional external PreToolUse hook (`~/.claude/hooks/wave-gate-enforcer.js`, not shipped or installed by this repo) as defense-in-depth | prompt contract (no verified hook equivalent) | RUNNER-owned: the next wave/lane is not started until `chain gate wave` exits 0; hooks only harden this, they don't carry it |
 | Gotcha broadcast | agent-team messaging within one process | agent-team messaging within one process | across processes: runner-owned shared JSONL file (§6) |
@@ -1022,7 +1022,7 @@ port allocation. Mode 3 stays disabled until this passes.
 | `git` | branching, worktrees, merge gate, rescue, conflict probe | ✅ hard |
 | `gh` | create PR, `gh pr checks` polling (P8) | ✅ hard |
 | `claude` | Claude phase lane + provider-opposite review via `claude -p` | ✅ hard |
-| `node` | hooks (ponytail; the optional external wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
+| `node` | hooks (the optional external wave-gate-enforcer) + scripts (ledger, rendering) | ✅ hard |
 | `jq` | `chain gate wave`, `chain findings`, `chain state` | ✅ hard |
 | `coderabbit` | wave review (`--agent --base-commit`) | ✅ hard (gate component) |
 | `codex` | Codex phase lane + provider-opposite review via `codex exec` | 🟡 preferred, degradable — missing/unauthenticated → single-provider run with model-opposite review, flagged in report + PR body, never silent |
@@ -1034,7 +1034,6 @@ port allocation. Mode 3 stays disabled until this passes.
 | `supabase` | migrations, types, local instances (if the product uses Supabase) | 🟡 only if Supabase in the stack |
 | Jira access (Atlassian MCP or CLI/REST) | PRD intake Mode B (P2d) + status sync-back | 🟡 TODO — only for Mode B (Stage 3); Mode A (local PRDs in specs/) needs nothing |
 | `npm`/`pnpm` | build/tests; pnpm decision for worktree installs is made in Stage 4 | ✅ hard (project-dependent) |
-| Ponytail plugin | minimalism ladder through aligned Claude and Codex adapters (needs `node`) | ✅ hard on all ACTIVE providers (§7 below) |
 
 Preflight behavior: hard tools missing → stop condition (§8), never
 skipped silently. Skippable tools missing → skip with a log entry in
@@ -1087,36 +1086,36 @@ progress.md/state.json. Auth is checked too (`gh auth status`,
   writer's model), recorded in `state.json` and
   flagged in the morning report and PR body.
 
-### ponytail (ready-made plugin — DECIDED, do not rebuild ourselves)
+### Minimalism rules (Ponytail retired 2026-10-26)
 
-The minimalism ladder is NOT maintained as our own bundle component;
-Ponytail now ships native Claude Code and Codex plugin adapters backed
-by a shared runtime; both lanes use mode `full`, while plugin versions may differ:
+Until 2026-10-26 the minimalism ladder came from the third-party Ponytail
+plugin, installed in mode `full` on every active provider and gated in the
+P0 preflight (`chain check ponytail`). It was retired: it injected ~60 lines
+of persona, output rules and an artifact-level Don't catalog into every
+subagent on both providers — reviewers, QA and doc writers included — and
+most of its useful content already lived in our briefs (YAGNI,
+`## Dependencies`, the registry rule, the Simplicity Gate). Plan:
+`specs/_plans/2026-10-26-dos-donts-placement-and-ponytail-retirement.md`.
 
-```
-/plugin marketplace add DietrichGebert/ponytail
-/plugin install ponytail@ponytail
+What replaces it, chain-owned and byte-identical across providers:
 
-# Codex
-codex plugin marketplace add DietrichGebert/ponytail
-# install from Codex /plugins, then review/trust its hooks
-```
+- **Implementer roles** (`implementer`, `frontend-implementer`,
+  `backend-implementer`): the `## Minimal by default` section of the role
+  manifest — reuse before writing, listed dependencies only, no abstraction
+  without a second current user, no scaffolding for later, no silent
+  fallbacks, and never minimized validation/security/accessibility.
+- **`micro-fixer`** and `bugfixing`: trace the flow before the smallest
+  diff; grep every caller and fix once where they all route through.
+- **Debt markers:** the `debt:` comment convention (ceiling + upgrade path)
+  replaces `ponytail:`; `chain findings harvest` reads both for one release.
+- **Leftover installs:** `check-setup.sh` warns while the plugin is still
+  installed (it would still inject into every subagent) and `uninstall.sh`
+  offers its removal for one release. `install.sh` never installs it.
+- `.context.ponytail` in `state.json` is deprecated: nothing writes it; the
+  schema keeps it so older runs validate.
 
-- **Mode:** persist `full` as the default on all active providers and
-  record the detected plugin version/mode in P0 state.
-- **Coverage:** leave `PONYTAIL_SUBAGENT_MATCHER` unset so Ponytail reaches
-  every normal subagent, including generic implementation fallbacks. P0
-  rejects scoped matchers because they silently drop that coverage.
-- **No double delivery:** our compiled worker files carry NO ladder of
-  their own — ponytail is the single source for it.
-- **Debt integration:** ponytail's `ponytail:` comment convention is
-  our debt-marker convention (P6). Harvest for PR body/morning report
-  via `/ponytail-debt` or our own grep script into the ledger.
-- **Gate:** Ponytail must be installed in mode `full` on every active provider;
-  versions are recorded for diagnostics and may differ. In degraded
-  single-provider mode the gate applies to the surviving provider alone.
-- **Update policy:** check plugin updates occasionally; no version pin across
-  providers is required.
+Not carried over on purpose: output rules ("code first, three lines"), the
+persona framing, "boring over clever", hardware calibration.
 
 ### Scripts & Templates — the Deterministic Output Layer
 
@@ -1289,7 +1288,7 @@ agent-browser smoke tests.
    design's provider projections and SubagentStart injector are retired —
    the path in the spawn prompt replaces them; manifest schema following
    the claude-skills frontmatter taxonomy),
-   install + parity-check Ponytail on Claude and Codex (§7), agent.md protocol +
+   the minimalism rules in the role manifests (§7), agent.md protocol +
    P7 curation, and the symmetric `cross-review` mechanism. The current
    producing skills now wire automatic concept/architecture/plan reviews and
    required Requirements/P6/P7 gates. The optional focused `bugfixing` workflow
@@ -1332,7 +1331,7 @@ agent-browser smoke tests.
 | PRD source | TWO modes, downstream identical. Mode A (DEFAULT): PRDs written directly into the repo (existing structure) — the new chain is tested in this mode first. Mode B (TODO, Stage 3): Jira import, created/enriched via Teklens (teklens.ai); local snapshot = working truth per run; Jira keys in commits/PRs; sync-back |
 | PRD ownership | PM PRDs are raw input: developers enrich with technical stories, re-cut into buildable PRDs (in Jira for Mode B), and OWN the selection of the story set sent into the agentic loop — the framework checks AC quality, not scope |
 | Morning report | one-line summary + best-effort notification at run end; file in `specs/` rendered on demand (or at run end when P8 left neither an open PR nor a removed worktree) |
-| Minimalism ladder | Ponytail as a ready-made plugin on all active providers; installed in mode `full` on all active providers; versions may differ, no own ladder, no double injection |
+| Minimalism ladder | eight `## Minimal by default` rules in the implementer role manifests (plus two micro-fixer rules), chain-owned and byte-identical across providers; the Ponytail plugin was retired 2026-10-26 (§7) |
 | Context pack manifest | schema following the claude-skills frontmatter taxonomy, defined when building the compiler (Stage 2) |
 | Cross-model review | symmetric provider-opposite review via our thin `cross-review`: Claude-authored → Codex, Codex-authored → authenticated isolated Claude with validated structured output, joint → both independently; required for Requirements/P6/P7 and automatic on saved concept/architecture/plan outputs; conservative default input cap, explicit diff omissions and Claude 10 MB stdin failure; any permitted model-opposite fallback is flagged, and same-model review never satisfies the gate (the six-persona QA fallback excepted, see §4); findings → ledger, blocking per §8 |
 | Focused bug repair | `bugfixing` stays outside the feature chain: reproduce first (real browser for UI), trace code cause + test escape, prove a regression test red before the fix, dispatch a micro-fixer, and stop after at most three Ralph repair attempts; CodeRabbit/Sonar are proportional existing gates, not new dependencies |

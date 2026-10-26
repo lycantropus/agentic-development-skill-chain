@@ -245,7 +245,7 @@ points are unresolved-but-blocking.
 
 Same loop over PR review comments instead of plan artifacts: classify
 each comment `fix now` (spawn fix, verify, push) / `debt` (ledger record
-via `scripts/chain findings`, `ponytail:` marker) / `reject with rationale`
+via `scripts/chain findings`, `debt:` marker) / `reject with rationale`
 (reply on the PR via `gh`). Decision log entries carry the PR comment
 link. Principle-level feedback ("I never want to see this again") is
 harvested as an AGENTS.md/GUIDELINES candidate through the existing

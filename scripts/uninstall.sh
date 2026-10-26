@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Undo install.sh: remove the chain's skill folders (by name, so other skills in the same
-# directories stay) and, where installed, the Ponytail plugin and marketplace on each
-# provider (Ponytail's shared config stays: other Ponytail installs read it too).
+# directories stay) and, where still installed, the retired Ponytail plugin and marketplace
+# on each provider (Ponytail's shared config stays: other Ponytail installs read it too).
 # Everything is shown first and each part is confirmed separately; anything but "y"
 # (or a non-interactive stdin) keeps that part.
 # Claude Code, Codex, the toolchain and helper copies synced into projects stay.
@@ -22,18 +22,18 @@ for provider in claude codex; do
 done
 skills="${skills#"$NL"}"
 
-# Ponytail plugin and marketplace per provider.
+# Retired Ponytail plugin and marketplace per provider (it still injects into every subagent).
 pt_plan="" pt_manual=""
 if ponytail_on claude; then
   if has claude; then
-    pt_plan="$pt_plan${NL}claude plugin uninstall ponytail@ponytail${NL}claude plugin marketplace remove ponytail"
+    pt_plan="$pt_plan$NL$PONYTAIL_REMOVE_CLAUDE"
   else
     pt_manual="$pt_manual claude"
   fi
 fi
 if ponytail_on codex; then
   if has codex; then
-    pt_plan="$pt_plan${NL}codex plugin remove ponytail@ponytail${NL}codex plugin marketplace remove ponytail"
+    pt_plan="$pt_plan$NL$PONYTAIL_REMOVE_CODEX"
   else
     pt_manual="$pt_manual codex"
   fi

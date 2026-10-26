@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # uninstall.sh: shows everything and asks per part; declining keeps it; accepting removes
 # only the chain's skill folders (foreign skills and the skills directories stay) and runs
-# the Ponytail removal for each provider where it is installed; a failed command is
+# the retired Ponytail's removal for each provider where it is still installed; a failed command is
 # reported without skipping the rest; a missing provider CLI is named; an empty home is a
 # no-op. Skills come from the real installers into a scratch home; claude/codex are fake
 # CLIs that log their arguments, on a PATH farm so the host's real CLIs never count.

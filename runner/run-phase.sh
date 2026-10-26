@@ -67,10 +67,6 @@ REVIEW_MODEL="${CLAUDE_REVIEW_MODEL:-$(pick_review_model "$WRITER_MODEL")}"
 PEER_GRACE="${PEER_GRACE:-300}"
 PHASES=(CP1 P0 P5 P6 P7 P8 done)
 
-# Ponytail's unset matcher is its all-subagent path. Do not let a caller's
-# narrow matcher silently drop generic implementation fallbacks.
-unset PONYTAIL_SUBAGENT_MATCHER
-
 # Pin helper scripts to THIS run's PROJ (no guessing the most recently modified
 # specs/PROJ-* with parallel PROJs).
 export SKILLCHAIN_PROJ="$PROJ" SKILLCHAIN_THEME="$THEME" SKILLCHAIN_RUNNER_DIR="$RUNNER_DIR"

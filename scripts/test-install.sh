@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # install.sh: missing prerequisites are all reported with an install offer; declining or a
 # failed install copies nothing; accepting installs them and continues; with every
-# prerequisite present both chains install, then a missing Ponytail is offered (only for
-# the providers lacking it) and a declined offer only warns. PATH is a farm
+# prerequisite present both chains install and no plugin command ever runs (the Ponytail
+# plugin is retired). PATH is a farm
 # of the real tools minus the ones under test, with stubbed claude/codex and fake
 # installers (sudo, apt-get, curl, npm) that log calls and drop stubs into the farm,
 # so whatever is installed on the host never counts and nothing real is installed.
@@ -18,22 +18,14 @@ REAL="$TMP/real" FAKES="$TMP/fakes" LOG="$TMP/installs.log"
 mkdir -p "$REAL" "$FAKES" "$TMP/npm-prefix"
 for tool in $TOOLS; do ln -s "$(command -v "$tool")" "$REAL/$tool"; done
 
-# Provider CLIs log their arguments; a Ponytail install writes what chain check ponytail reads.
+# Provider CLIs log their arguments.
 cat >"$FAKES/claude" <<'EOF'
 #!/bin/sh
 echo "claude $*" >>"$FAKE_LOG"
-if [ "$*" = "plugin install ponytail@ponytail" ]; then
-  echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' >"$PONYTAIL_CLAUDE_REGISTRY"
-fi
 EOF
 cat >"$FAKES/codex" <<'EOF'
 #!/bin/sh
 echo "codex $*" >>"$FAKE_LOG"
-if [ "$*" = "plugin add ponytail@ponytail" ]; then
-  printf '[plugins."ponytail@ponytail"]\nenabled = true\n' >"$PONYTAIL_CODEX_CONFIG"
-  mkdir -p "$PONYTAIL_CODEX_CACHE/4.8.4/.codex-plugin"
-  echo '{"version":"4.8.4"}' >"$PONYTAIL_CODEX_CACHE/4.8.4/.codex-plugin/plugin.json"
-fi
 EOF
 cat >"$FAKES/sudo" <<'EOF'
 #!/bin/sh
@@ -105,21 +97,6 @@ farm() { # farm <omitted tool>...: real TOOLS plus stubs and fake installers, mi
   done
 }
 
-PT="$TMP/pt"
-ponytail() { # ponytail healthy|absent|claude-only: plugin registries per provider, mode full
-  rm -rf "$PT"; mkdir -p "$PT/cfg"
-  echo '{"defaultMode":"full"}' >"$PT/cfg/config.json"
-  if [ "$1" = claude-only ]; then
-    echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' >"$PT/claude.json"
-  elif [ "$1" = healthy ]; then
-    mkdir -p "$PT/cache/4.8.4/.codex-plugin"
-    echo '{"version":2,"plugins":{"ponytail@ponytail":[{"version":"4.8.4"}]}}' >"$PT/claude.json"
-    echo '{"version":"4.8.4"}' >"$PT/cache/4.8.4/.codex-plugin/plugin.json"
-    printf '[plugins."ponytail@ponytail"]\nenabled = true\n' >"$PT/codex.toml"
-  else
-    echo '{"version":2,"plugins":{}}' >"$PT/claude.json"
-  fi
-}
 run() { # run [answer]: install into a scratch home, answering the prompt (none: closed stdin);
         # exit code in $rc, output in $TMP/out, $TMP/err
   rm -rf "$TMP/home"; mkdir -p "$TMP/home"
@@ -131,8 +108,6 @@ run() { # run [answer]: install into a scratch home, answering the prompt (none:
   rc=0
   { if [ $# -gt 0 ]; then printf '%s\n' "$1"; fi; } | env -i PATH="$BIN" HOME="$TMP/home" \
     CLAUDE_HOME="$TMP/home/.claude" CODEX_HOME="$TMP/home/.codex" \
-    PONYTAIL_CLAUDE_REGISTRY="$PT/claude.json" PONYTAIL_CODEX_CACHE="$PT/cache" \
-    PONYTAIL_CODEX_CONFIG="$PT/codex.toml" PONYTAIL_CONFIG="$PT/cfg/config.json" \
     FAKE_LOG="$LOG" FAKE_REAL="$REAL" FAKE_BIN="$BIN" FAKE_NPM_PREFIX="$TMP/npm-prefix" FAKE_FAKES="$FAKES" \
     FAKE_APT_FAILS="${FAKE_APT_FAILS:-}" \
     "$(command -v bash)" "$ROOT/scripts/install.sh" >"$TMP/out" 2>"$TMP/err" || rc=$?
@@ -144,7 +119,7 @@ installed_nothing() {
 
 # Declined (closed stdin, then "n"): every gap listed with the exact plan, nothing run or copied.
 for answer in "" n; do
-  farm claude codex jq; ponytail healthy
+  farm claude codex jq
   if [ -n "$answer" ]; then run "$answer"; else run; fi
   [ "$rc" = 1 ] || fail "declined install should exit 1, got $rc"
   for tool in claude codex jq; do
@@ -161,7 +136,7 @@ for answer in "" n; do
 done
 
 # Accepted: packages, Claude and Codex installed in order, then both chains, with a sign-in reminder.
-farm claude codex jq; ponytail healthy; run y
+farm claude codex jq; run y
 [ "$rc" = 0 ] || fail "accepted install should exit 0, got $rc: $(cat "$TMP/err")"
 grep -q '^apt-get install -y jq$' "$LOG" || fail "jq not installed: $(cat "$LOG")"
 [ "$(grep -nE '^(apt-get install|curl|npm install)' "$LOG" | cut -d: -f2 | cut -c1-3 | tr '\n' ' ')" = "apt cur npm " ] || \
@@ -173,7 +148,7 @@ done
 grep -q 'newly installed: claude codex; start each once to sign in' "$TMP/err" || fail "sign-in reminder missing"
 
 # A failed install stops the remaining commands and copies nothing.
-farm claude codex jq; ponytail healthy; FAKE_APT_FAILS=1 run y
+farm claude codex jq; FAKE_APT_FAILS=1 run y
 [ "$rc" = 1 ] || fail "failed install should exit 1, got $rc"
 grep -q 'install: failed: .*apt-get' "$TMP/err" || fail "failure not reported: $(cat "$TMP/err")"
 ! grep -qE '^(curl|npm install)' "$LOG" || fail "commands after a failure ran: $(cat "$LOG")"
@@ -198,7 +173,7 @@ grep -q '^  - node: found 18.20.0, need >= 22: install the current Node.js LTS' 
 grep -qxF "    $nvm_line" "$TMP/err" || fail "old node not replaced through nvm"
 
 # Accepted with node missing: nvm installs the LTS, its node goes on PATH, Codex installs with it.
-farm codex node npm; ponytail healthy; run y
+farm codex node npm; run y
 [ "$rc" = 0 ] || fail "nvm install should exit 0, got $rc: $(cat "$TMP/err")"
 grep -q "^nvm install --lts$" "$LOG" && grep -q "^nvm alias default lts/\*$" "$LOG" || fail "nvm not driven: $(cat "$LOG")"
 grep -q '^npm install -g @openai/codex$' "$LOG" && [ -x "$BIN/codex" ] || fail "codex not installed with nvm's npm: $(cat "$LOG")"
@@ -209,7 +184,7 @@ farm perl; run
 grep -q '^  - perl: needed because timeout is absent' "$TMP/err" || fail "perl not required without timeout: $(cat "$TMP/err")"
 grep -qE 'apt-get install -y perl$' "$TMP/err" || fail "perl not offered without timeout"
 for t in timeout gtimeout; do
-  farm perl; printf '#!/bin/sh\nexit 0\n' >"$BIN/$t"; chmod +x "$BIN/$t"; ponytail healthy; run
+  farm perl; printf '#!/bin/sh\nexit 0\n' >"$BIN/$t"; chmod +x "$BIN/$t"; run
   [ "$rc" = 0 ] || fail "perl must not be required with $t: $(cat "$TMP/err")"
 done
 
@@ -219,47 +194,20 @@ grep -q 'cannot install automatically, install manually: jq' "$TMP/err" || fail 
 grep -qxF '    curl -fsSL https://claude.ai/install.sh | bash' "$TMP/err" || fail "claude still installable without a package manager"
 installed_nothing "no package manager"
 
-# Everything present, Ponytail healthy: no prompt, both chains installed with their runner, no warning.
-farm; ponytail healthy; run
+# Everything present: no prompt, both chains installed with their runner, no plugin command, no warning.
+farm; run
 [ "$rc" = 0 ] || fail "full install should exit 0, got $rc: $(cat "$TMP/err")"
 ! grep -q 'Run them now' "$TMP/err" || fail "prompted with nothing missing"
 for provider in claude codex; do
   [ -f "$TMP/home/.$provider/skills/0_chain-guide/SKILL.md" ] || fail "$provider skills not installed"
   [ -d "$TMP/home/.$provider/skills/5_executing/runner" ] || fail "$provider runner not installed"
 done
-grep -q 'ponytail parity ok' "$TMP/out" || fail "ponytail status not reported: $(cat "$TMP/out")"
-! grep -q 'Ponytail' "$TMP/err" || fail "healthy Ponytail must be neither offered nor warned: $(cat "$TMP/err")"
+! grep -q 'plugin' "$LOG" || fail "a fresh install must never run a plugin command (the plugin is retired): $(cat "$LOG")"
+! grep -qi 'ponytail' "$TMP/out" "$TMP/err" || fail "the retired plugin is mentioned by the installer: $(cat "$TMP/err")"
 ! grep -q 'newly installed' "$TMP/err" || fail "sign-in reminder without new installs"
 
-# Ponytail absent, offer declined: skills still installed, nothing run, exit 0, loud warning.
-farm; ponytail absent; run
-[ "$rc" = 0 ] || fail "Ponytail gap must not fail the install, got $rc"
-[ -f "$TMP/home/.codex/skills/0_chain-guide/SKILL.md" ] || fail "skills not installed with Ponytail absent"
-for c in 'claude plugin marketplace add DietrichGebert/ponytail' 'claude plugin install ponytail@ponytail' \
-         'codex plugin marketplace add DietrichGebert/ponytail' 'codex plugin add ponytail@ponytail'; do
-  grep -qxF "    $c" "$TMP/err" || fail "Ponytail plan line missing: $c: $(cat "$TMP/err")"
-done
-grep -q 'Install Ponytail now? \[y/N\]' "$TMP/err" || fail "Ponytail not offered"
-! grep -q 'plugin' "$LOG" || fail "Ponytail commands ran without consent: $(cat "$LOG")"
-grep -q 'Ponytail is not ready (see above), fix it before framework runs' "$TMP/err" || fail "Ponytail warning missing"
-
-# Ponytail absent, offer accepted: marketplace then plugin per provider, then the check passes.
-farm; ponytail absent; run y
-[ "$rc" = 0 ] || fail "Ponytail install should exit 0, got $rc: $(cat "$TMP/err")"
-[ "$(grep plugin "$LOG")" = "claude plugin marketplace add DietrichGebert/ponytail
-claude plugin install ponytail@ponytail
-codex plugin marketplace add DietrichGebert/ponytail
-codex plugin add ponytail@ponytail" ] || fail "Ponytail commands wrong: $(cat "$LOG")"
-grep -q 'ponytail parity ok' "$TMP/out" || fail "Ponytail not ready after install: $(cat "$TMP/err")"
-! grep -q 'not ready' "$TMP/err" || fail "warned after a successful Ponytail install"
-
-# Only Codex lacks Ponytail: only Codex's commands are offered.
-farm; ponytail claude-only; run
-grep -qxF '    codex plugin add ponytail@ponytail' "$TMP/err" || fail "codex Ponytail not offered"
-! grep -q '^    claude plugin' "$TMP/err" || fail "claude Ponytail offered although installed"
-
 # Sonar CLIs missing (the farm never has them), offer declined: plan shown, nothing run, exit 0.
-farm; ponytail healthy; run
+farm; run
 [ "$rc" = 0 ] || fail "a declined Sonar offer must not fail the install, got $rc"
 grep -qxF '    curl -o- https://raw.githubusercontent.com/SonarSource/sonarqube-cli/refs/heads/master/user-scripts/install.sh | bash' "$TMP/err" || fail "sonar plan missing: $(cat "$TMP/err")"
 grep -qF "binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$(pin SONAR_SCANNER_VERSION)-" "$TMP/err" || fail "sonar-scanner plan missing"
@@ -267,7 +215,7 @@ grep -q 'Install the Sonar CLIs now? \[y/N\]' "$TMP/err" || fail "Sonar not offe
 ! grep -q 'sonar' "$LOG" || fail "Sonar commands ran without consent: $(cat "$LOG")"
 
 # Sonar offer accepted (the only question here): both CLIs land per user, then the manual next steps.
-farm; ponytail healthy; run y
+farm; run y
 [ "$rc" = 0 ] || fail "Sonar install should exit 0, got $rc: $(cat "$TMP/err")"
 [ -x "$TMP/home/.local/share/sonarqube-cli/bin/sonar" ] || fail "sonar not installed: $(cat "$LOG")"
 [ -x "$TMP/home/.local/bin/sonar-scanner" ] || fail "sonar-scanner link missing: $(cat "$TMP/err")"
@@ -275,14 +223,14 @@ grep -q "Sonar CLIs installed. By hand: run 'sonar auth login'" "$TMP/err" || fa
 grep -qF "Sonar CLIs not on your PATH when this ran: $TMP/home/.local/share/sonarqube-cli/bin $TMP/home/.local/bin;" "$TMP/err" || fail "PATH hint missing: $(cat "$TMP/err")"
 
 # Re-run before a new shell: the per-user installs are found, not offered again, PATH hint repeated.
-farm; ponytail healthy; SEED_SONAR=1 run
+farm; SEED_SONAR=1 run
 ! grep -q 'Install the Sonar CLIs now' "$TMP/err" || fail "Sonar offered again although installed per user"
 grep -qF "Sonar CLIs not on your PATH when this ran:" "$TMP/err" || fail "PATH hint missing on re-run"
 
 # Both Sonar CLIs present: not offered. Without unzip, the plan installs it first.
-farm; for t in sonar sonar-scanner; do printf '#!/bin/sh\nexit 0\n' >"$BIN/$t"; chmod +x "$BIN/$t"; done; ponytail healthy; run
+farm; for t in sonar sonar-scanner; do printf '#!/bin/sh\nexit 0\n' >"$BIN/$t"; chmod +x "$BIN/$t"; done; run
 ! grep -q 'Sonar' "$TMP/err" || fail "Sonar offered (or PATH hint shown) although installed on PATH"
-farm unzip; ponytail healthy; run
+farm unzip; run
 grep -qE '^    (sudo )?apt-get update && (sudo )?apt-get install -y unzip$' "$TMP/err" || fail "unzip not planned: $(cat "$TMP/err")"
 
 echo "test-install: ok"

@@ -78,7 +78,7 @@ QA completion does not certify shared integration across repositories.
   Critical/High finding → STOP CONDITION: report it in your final
   output and do not seal the phase.
 - Medium/Low: `bash scripts/chain findings auto-defer <X> <theme>` — debt marker
-  (`ponytail:` convention) in the code where applicable; the human
+  (`debt:` convention) in the code where applicable; the human
   decides at Checkpoint 2, never mid-run.
 - Final regression run, when any fix was committed in this phase: run
   every wave's `regression_commands` and the `quality` entries of

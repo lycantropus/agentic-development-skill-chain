@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full setup: verify both provider CLIs and the helper toolchain, install both skill
-# chains, then offer Ponytail and the optional Sonar CLIs. Every missing or outdated prerequisite
+# chains, then offer the optional Sonar CLIs. Every missing or outdated prerequisite
 # (minimums in requirements.sh) is listed at once, with an offer to install it (the
 # exact commands are shown first; anything but "y" declines, including a
 # non-interactive stdin). Nothing is copied until all are present.
@@ -140,24 +140,6 @@ fi
 bash "$ROOT/scripts/install-claude.sh"
 bash "$ROOT/scripts/install-codex.sh"
 
-# Ponytail is required for framework runs only (P0 blocks without it): it is offered
-# once the skills are in place, and a declined or failed install only warns.
-pt_plan=""
-if ! ponytail_on claude; then pt_plan="$PONYTAIL_INSTALL_CLAUDE"; fi
-if ! ponytail_on codex; then pt_plan="$pt_plan$NL$PONYTAIL_INSTALL_CODEX"; fi
-pt_plan="${pt_plan#"$NL"}"
-if [ -n "$pt_plan" ]; then
-  echo "install: Ponytail (needed for framework runs) is missing; these commands install it:" >&2
-  show "$pt_plan"
-  if ask "Install Ponytail now?"; then
-    # Every line runs (adding a marketplace that is already there may fail harmlessly);
-    # the check below decides whether Ponytail is in place.
-    run_each "$pt_plan"
-  fi
-fi
-if ! (cd "$ROOT" && bash "${CLAUDE_HOME:-$HOME/.claude}/skills/5_executing/scripts/chain" check ponytail); then
-  echo "install: skills installed; Ponytail is not ready (see above), fix it before framework runs" >&2
-fi
 # Sonar CLIs: only projects with sonar-project.properties need them (P0 preflight enforces
 # that per project), so they are optional here. Login and SONAR_TOKEN stay manual.
 # Their per-user folders count before a new shell picks them up, so a re-run does not

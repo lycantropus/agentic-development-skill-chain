@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Check this machine against the current checkout; run it after pulling. Read-only.
 # Reports tools below the minimums in requirements.sh, installed skill copies that differ
-# from this checkout (changed, missing or retired folders), and Ponytail (a warning only:
-# framework runs need it, the tools do not). Exits 1 when ./scripts/install.sh is needed.
+# from this checkout (changed, missing or retired folders), and a leftover Ponytail plugin
+# (a warning only: retired, but it still injects into every subagent). Exits 1 when
+# ./scripts/install.sh is needed.
 # Keep this file bash-3.2-safe so stock macOS reaches the bash hint, not a syntax error.
 set -euo pipefail
 
@@ -54,12 +55,11 @@ for provider in claude codex; do
   if [ -n "$changed$absent$retired" ]; then problems=$((problems + 1)); fi
 done
 
-echo "Ponytail (framework runs only):"
 for provider in claude codex; do
   if ponytail_on "$provider"; then
-    echo "  ✓ $provider"
-  else
-    echo "  ! $provider: not installed (./scripts/install.sh offers it)"
+    if [ "$provider" = claude ]; then pt_remove="$PONYTAIL_REMOVE_CLAUDE"; else pt_remove="$PONYTAIL_REMOVE_CODEX"; fi
+    echo "  ! $provider: the retired Ponytail plugin is still installed and injects into every subagent; remove it:"
+    printf '%s\n' "$pt_remove" | sed 's/^/      /'
   fi
 done
 

@@ -41,7 +41,7 @@ fi
 if command -v timeout >/dev/null 2>&1; then TIMEOUT_BIN=(timeout)
 elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_BIN=(gtimeout)
 else
-  # ponytail: seconds only (no m/h suffix, no fractions); extend if a caller needs them.
+  # debt: seconds only (no m/h suffix, no fractions); extend if a caller needs them.
   TIMEOUT_BIN=(perl -e '
     use POSIX qw(:sys_wait_h); no warnings "exec";
     my ($fg, $ka) = (0, 0);
@@ -99,7 +99,7 @@ lock_acquire() {
     if [ "$secs" -eq 0 ]; then flock "--$mode" -n "$fd"; else flock "--$mode" -w "$secs" "$fd"; fi
     return
   fi
-  # ponytail: two waiters can both reap one stale lock and both acquire; flock (brew install flock) has no such race.
+  # debt: two waiters can both reap one stale lock and both acquire; flock (brew install flock) has no such race.
   : >>"$file" || return 2 # keep the lock file itself present, as flock would
   dir="$file.d"; deadline=$((SECONDS + secs))
   while ! mkdir "$dir" 2>/dev/null; do

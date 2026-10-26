@@ -29,7 +29,7 @@
 //       2 usage/IO error
 //       3 hand-written registry, refused (migration pending — not a failure)
 //
-// ponytail: regex scan over component declarations and exports in .tsx/.jsx,
+// debt: regex scan over component declarations and exports in .tsx/.jsx,
 // not a real AST parse, and React-shaped. Good enough while the chain targets
 // React; swap in a parser (or per-stack extractors for Vue SFC / Svelte) when
 // a project needs it.

@@ -134,15 +134,10 @@ runner/run-phase.sh <phase> <proj-x> <theme> [--timeout 3600] [--writer claude|c
   no SubagentStart hook, no lock and no hash bookkeeping (a file's first line carries the plan hash): `compile --wave N` runs at each
   wave start, and no worker starts after a non-zero exit until a rerun
   exits 0.
-- **Ponytail coverage (Stage 2):** the runner clears
-  `PONYTAIL_SUBAGENT_MATCHER`, using Ponytail's native all-subagent path;
-  P0 blocks any scoped matcher because it can miss generic implementation
-  fallbacks. Installation and mode `full` remain gated in `chain check ponytail`; versions may differ.
 
 Env knobs: `CLAUDE_WRITER_MODEL`, `CLAUDE_REVIEW_MODEL`, `CLAUDE_MODEL_RANK`, `PEER_GRACE`
 (seconds a peer may outlive the writer, default 300), `SKILLCHAIN_POLL_SECONDS`
 (lane poll interval, default 5; the test harnesses set 0.1),
-`PONYTAIL_ENFORCE` (0 = loud escape hatch for the P0 ponytail gate),
 `SKILLCHAIN_WORKTREE_ROOT` overrides the default sibling-worktree base;
 `SKILLCHAIN_DEV_PORT` records the PROJ dev port when setup needs a non-default.
 
