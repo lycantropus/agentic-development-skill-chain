@@ -99,7 +99,10 @@ try {
     fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [conflicting] }));
     assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "a differing duplicate ID needs its owner");
     assert.equal(fs.existsSync(oldRequirements), true);
-    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [beforeMerge[0], extra] }));
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-2", findings: [extra] }));
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "another project's ledger is never merged");
+    const reordered = Object.fromEntries(Object.entries(beforeMerge[0]).reverse());
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [reordered, extra] }));
     ok(["migrate-refinement", "1", "test"]);
     assert.equal(fs.existsSync(oldRequirements), false);
     assert.deepEqual(JSON.parse(fs.readFileSync(refinement)).findings, [...beforeMerge, extra], "every record kept verbatim");

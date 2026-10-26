@@ -41,6 +41,7 @@ import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSy
 import { join, dirname, isAbsolute } from "node:path";
 import { stageDirectory, readFindingLedgers, REFINEMENT_DIR } from "./findings-store.mjs";
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { execFileSync } from "node:child_process";
 
 const SEVERITY_MAP = {
@@ -230,10 +231,10 @@ if (cmd === "migrate-refinement") {
       if (files.some(f => lstatSync(f).isSymbolicLink())) fail("refusing findings symlink — nothing written");
       let ledgers;
       try { ledgers = files.map(f => JSON.parse(readFileSync(f, "utf8"))); } catch (error) { fail(`unreadable ledger: ${error.message} — nothing written`); }
-      if (new Set(ledgers.map(l => l.proj)).size !== 1) fail("ledgers name different projects — nothing written");
+      if (ledgers.some(l => l.proj !== proj)) fail(`a ledger does not name ${proj} — nothing written`);
       const byId = new Map();
       for (const f of ledgers.flatMap(l => l.findings ?? [])) {
-        if (byId.has(f.id) && JSON.stringify(byId.get(f.id)) !== JSON.stringify(f)) fail(`finding ${f.id} differs between ledgers; resolve it with its owner — nothing written`);
+        if (byId.has(f.id) && !isDeepStrictEqual(byId.get(f.id), f)) fail(`finding ${f.id} differs between ledgers; resolve it with its owner — nothing written`);
         byId.set(f.id, f);
       }
       const merged = { proj: ledgers[0].proj, updated_at: now, findings: [...byId.values()] };
@@ -250,6 +251,7 @@ if (cmd === "migrate-refinement") {
     validateLedger(ledger);
     const source = join(stageDirectory(base, "requirements"), "findings.json");
     if (source !== destination && existsSync(source)) {
+      if (JSON.parse(readFileSync(source, "utf8")).proj !== proj) fail(`${source} does not name ${proj} — nothing written`);
       mkdirSync(dirname(destination), { recursive: true });
       renameSync(source, destination);
       console.log(`findings.mjs: migrated ${source} -> ${destination}`);
