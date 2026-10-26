@@ -178,7 +178,8 @@ If the handoff conflicts with § Stack, § Stack wins — raise it as an open qu
 
 ## Dependencies
 [One line per generic capability from the Library Scan: capability → package
-(or existing dependency/code) with version range and license, affected PRDs,
+with version range and license, or the existing dependency, code or
+platform/framework feature that covers it; affected PRDs,
 one-line reason. Hand-built capabilities state their reason (no fit, license,
 size, security).]
 ```
