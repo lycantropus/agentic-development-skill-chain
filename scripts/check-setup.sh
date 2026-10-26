@@ -58,7 +58,7 @@ done
 for provider in claude codex; do
   if ponytail_on "$provider"; then
     if [ "$provider" = claude ]; then pt_remove="$PONYTAIL_REMOVE_CLAUDE"; else pt_remove="$PONYTAIL_REMOVE_CODEX"; fi
-    echo "  ! $provider: the retired Ponytail plugin is still installed and injects into every subagent; remove it:"
+    echo "  ! $provider: the retired Ponytail plugin is still installed (while enabled it injects into every subagent); remove it:"
     printf '%s\n' "$pt_remove" | sed 's/^/      /'
   fi
 done

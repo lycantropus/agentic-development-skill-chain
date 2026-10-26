@@ -94,6 +94,9 @@ run_suite() {
     || fail "$label: retired ponytail: spelling not harvested, or marker without a space after the colon"
   (cd "$hv" && node "$ledger" harvest 1 test) >/dev/null
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 2 ]] || fail "$label: harvest is not idempotent"
+  echo '{"source":"debt","severity":"low","status":"deferred","category":"debt","summary":"ponytail: global lock, per-account locks if throughput matters","file":"src/a.ts","line":2}' \
+    | (cd "$hv" && node "$ledger" add 1 test) >/dev/null
+  [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 2 ]] || fail "$label: a record under the retired ponytail: prefix must merge with its debt: re-harvest"
   (cd "$hv" && node "$ledger" harvest 1 test nowhere) | grep -q 'does not exist' || fail "$label: a missing search root should be reported, not fatal"
   (cd "$hv" && node "$ledger" harvest 1 test src/a.ts) | grep -q 'does not exist' || fail "$label: a file as search root should be reported like a missing directory"
   mkdir "$hv/empty"; (cd "$hv" && node "$ledger" harvest 1 test empty) | grep -q 'no debt: markers' || fail "$label: no markers should be reported, not fatal"

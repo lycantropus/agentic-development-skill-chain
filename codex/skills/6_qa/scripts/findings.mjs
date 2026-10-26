@@ -162,8 +162,9 @@ function save(ledger) {
   }
 }
 
+// The retired `ponytail:` debt prefix fingerprints like `debt:`, so a re-harvest merges into the old record.
 const summaryFingerprint = (summary) => createHash("sha256")
-  .update(String(summary ?? "").trim().replace(/\s+/g, " ").toLowerCase())
+  .update(String(summary ?? "").trim().replace(/\s+/g, " ").toLowerCase().replace(/^ponytail:/, "debt:"))
   .digest("hex")
   .slice(0, 16);
 

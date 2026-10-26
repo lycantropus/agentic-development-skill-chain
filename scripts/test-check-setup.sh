@@ -103,9 +103,9 @@ has_line "  ✗ claude: not installed in $H/.claude/skills"; has_line "  ✗ cod
 # Retired Ponytail still installed: warned with the removal commands, but not a problem.
 install_all; ponytail on; run
 [ "$rc" = 0 ] || fail "a leftover Ponytail must only warn, got $rc: $(cat "$TMP/out")"
-has_line "  ! claude: the retired Ponytail plugin is still installed and injects into every subagent; remove it:"
+has_line "  ! claude: the retired Ponytail plugin is still installed (while enabled it injects into every subagent); remove it:"
 has_line "      claude plugin uninstall ponytail@ponytail"; has_line "      claude plugin marketplace remove ponytail"
-has_line "  ! codex: the retired Ponytail plugin is still installed and injects into every subagent; remove it:"
+has_line "  ! codex: the retired Ponytail plugin is still installed (while enabled it injects into every subagent); remove it:"
 has_line "      codex plugin remove ponytail@ponytail"; has_line "      codex plugin marketplace remove ponytail"
 
 echo "test-check-setup: ok"
