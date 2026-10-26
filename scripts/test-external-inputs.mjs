@@ -43,6 +43,9 @@ try {
       assert.throws(() => resolveInputs(base), /repositories must be unique keys/);
     }
     save();
+    fs.mkdirSync(path.join(base, '2b_handoff'));
+    assert.throws(() => resolveInputs(base, { allowBlocked: true }), /sibling refinement project/);
+    fs.rmdirSync(path.join(base, '2b_handoff'));
     const skills = path.join(root, provider, 'skills');
     const chain = path.join(skills, '5_executing/scripts/chain');
     const run = (args, ok = true, cwd = repo) => {

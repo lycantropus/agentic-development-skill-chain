@@ -151,9 +151,9 @@ Use it for external/standalone handoffs.
 
 ## Engineering receives the package
 
-The receiving team uses optional `delivery-workspace` for shared coordination
-and per-code-repo intake routing, then `handoff-refinement` to compare the pinned
-package with code. Source discovery completion does not prove implementation
+The receiving team uses optional `handoff-refinement`, which also locates or
+records the shared coordination location and routes per-code-repo intake, to
+compare the pinned package with code. Source discovery completion does not prove implementation
 readiness. Engineering keeps original product files immutable and records
 technical constraints and product questions separately. Independently testable
 technical prerequisites may become engineering stories in the receiver's plans;

@@ -7,7 +7,7 @@ DEST="${CLAUDE_HOME:-$HOME/.claude}/skills"
 mkdir -p "$DEST"
 
 # Skills folded into others; a leftover copy would still be discoverable.
-for retired in 4a_checkpoint 4b_setup delivery-workspace handoff-refinement; do
+for retired in 4a_checkpoint 4b_setup 2d_delivery-workspace delivery-workspace handoff-refinement; do
   rm -rf "${DEST:?}/$retired"
 done
 

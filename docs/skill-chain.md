@@ -63,9 +63,9 @@ Through Step 4, each producing skill has its own user-started session, including
 
 ## External product handoffs
 
-This optional receiving route is numbered `2d`/`2e` because it sits on the
+This optional receiving step is numbered `2e` because it sits on the
 engineering side of Stage 2 and joins the existing chain at architecture:
-`delivery-workspace` (2d) → `handoff-refinement` (2e) → architecture (3) → plans
+`handoff-refinement` (2e) → architecture (3) → plans
 (4) → per-repo execution, QA and delivery → shared integration verification.
 From Step 3 on, the receiving route runs in the production repository like the
 linear chain. Each producing
@@ -73,23 +73,26 @@ skill hands off through a copyable prompt to a new user-started session.
 The linear route requires no workspace inventory, external marker, additional
 approval or migration.
 
-[`delivery-workspace`](../codex/skills/2d_delivery-workspace/SKILL.md) discovers the
-team coordination remote and reuses its checkout, safely clones it, or creates a
-missing remote within the user's authorization. An existing team repository can
-own the tracked coordination location; a separate repository is optional.
+[`handoff-refinement`](../codex/skills/2e_handoff-refinement/SKILL.md) first discovers
+the team coordination remote and reuses its checkout, safely clones it, or creates a
+missing remote within the user's authorization. The repository that produced the
+handoff or an implementation repository can own the tracked coordination location
+equally; a separate repository is optional and is the only case that creates a
+new remote. Refinement projects sit beside, never inside, the source product
+project.
 Access denial is an access problem, and local-only staging is explicitly chosen
 and remains unpublished. A plain common parent directory is convenient, never
-required. Portable repository identities belong in version control; each
+required. Portable repository identities (`delivery-workspace.json`) belong in version control; each
 developer's checkout paths and credentials do not.
 
-Workspace onboarding reports each implementation repository separately: reuse an
+It reports each implementation repository's baseline separately: reuse an
 accepted baseline revision, resume an interrupted intake, offer `intake` for
 existing code without a baseline, or route genuinely new code to bootstrap.
 Check for active team intake work before starting another. A local seal or open
 PR does not prove team acceptance. Coordination-only repositories need no app
 intake. These distinctions do not add team PR gates to standalone linear use.
 
-[`handoff-refinement`](../codex/skills/2e_handoff-refinement/SKILL.md) fingerprints
+It then fingerprints
 the received package and records source identities, code evidence, technical
 constraints, repo ownership, dependencies and product questions. It can inspect
 a handoff and prepare questions before every repo has finished intake. Prototype
@@ -97,6 +100,7 @@ references describe interactions and simulated behavior; static references can
 be sufficient and runnable prototypes do not establish production architecture.
 
 Each refinement is stored as a run under `specs/PROJ-<id>-<theme>/runs/<YYYY-MM-DD-NN>/`
+(in the handoff's source repository a `-refinement` sibling of the product project)
 with the received files byte-identical under `handoff/<version>/` and all new
 results under `refinement/`. The run README's provenance table states for every
 path whether it was received unchanged, extracted, newly written, generated or
@@ -192,8 +196,7 @@ After decomposition:
 | 2 | requirements-engineer | Write PRDs, user stories, acceptance criteria, and edge cases; pass the required opposite-provider review before full-chain or Linear handoff |
 | 2b | handoff-package | Assemble a standalone, zippable handoff package for external UI/UX experts and developers (discovery endpoint or requested full-chain export) |
 | 2c | review-reconcile | Resolve PRD review gaps point by point; defer engineering items to a developer meeting (discovery endpoint or requested full-chain export) |
-| 2d | delivery-workspace | Receiving side of an external handoff: discover or set up the team coordination checkout and route baseline intake per implementation repo |
-| 2e | handoff-refinement | Receiving side of an external handoff: refine the immutable package against code, return product questions, prepare pinned per-repo inputs for Step 3 |
+| 2e | handoff-refinement | Receiving side of an external handoff: locate or set up the team coordination location, route baseline intake per implementation repo, refine the immutable package against code, return product questions, prepare pinned per-repo inputs for Step 3 |
 | 3 | architecture | Produce the PROJ technical architecture for developers |
 | 4 | writing-plans | Split independently verifiable stories into dependency-ordered waves; use expand–contract for wide migrations |
 | 5b | executing-large-model | Default Step 5: Checkpoint 1 and P0 through `5_executing`'s subskills, then the waves under the same gate and state contracts, with procedure reduced to intent and invariants ([SKILL.md](../claude/skills/5b_executing-large-model/SKILL.md)) |
