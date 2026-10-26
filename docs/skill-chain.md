@@ -100,6 +100,7 @@ references describe interactions and simulated behavior; static references can
 be sufficient and runnable prototypes do not establish production architecture.
 
 Each refinement is stored as a run under `specs/PROJ-<id>-<theme>/runs/<YYYY-MM-DD-NN>/`
+(in the handoff's source repository a `-refinement` sibling of the product project)
 with the received files byte-identical under `handoff/<version>/` and all new
 results under `refinement/`. The run README's provenance table states for every
 path whether it was received unchanged, extracted, newly written, generated or

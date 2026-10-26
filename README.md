@@ -197,6 +197,7 @@ location, identifies each code repository's baseline status, then inspects the
 immutable product package against code, records engineering constraints, and
 prepares questions for the product team.
 Each refinement is one run under `specs/PROJ-<id>-<theme>/runs/<date>-<nn>/`
+(in the handoff's source repository a `-refinement` sibling of the product project)
 with the received files kept unchanged and every new result marked as proposal,
 question, checked or approved. Explicit product answers unblock the affected
 scope; model review cannot approve product changes.

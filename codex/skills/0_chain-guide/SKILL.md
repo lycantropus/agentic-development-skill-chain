@@ -36,7 +36,7 @@ Detect where the user is in the 0-to-8 skill chain and tell them what to do next
 | 2 | requirements-engineer | PRDs `2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`: stories, ACs, edge cases; Linear handoff mode for the discovery track |
 | 2b | handoff-package (opt) | Standalone zippable package for external UI/UX experts and developers → `2b_handoff/YYYY-MM-DD-handoff*/` |
 | 2c | review-reconcile (opt) | Resolve PRD review gaps point by point → `2_PRDs/<prd>-review-decisions.md` + `review-changelog.md` |
-| 2e | handoff-refinement (opt, receiving side) | Locate or record the team coordination location (`delivery-workspace.json`), refine the received package against code; product questions back, pinned per-repo inputs for Step 3 → `specs/PROJ-<X>-<theme>/runs/<YYYY-MM-DD-NN>/` + `external-handoff.json` |
+| 2e | handoff-refinement (opt, receiving side) | Locate or record the team coordination location (`delivery-workspace.json`), refine the received package against code; product questions back, pinned per-repo inputs for Step 3 → `specs/PROJ-<X>-<theme>/runs/<YYYY-MM-DD-NN>/` + `external-handoff.json` (in the handoff's source repo a `-refinement` sibling of the product project) |
 | 3 | architecture | PROJ-level tech design → `3-4_plan/PROJ-<X>-architecture.md` |
 | 4 | writing-plans | Wave plans → `3-4_plan/PROJ-<X>-wave-<N>-plan.md`; propagates the UI handoff into frontend tasks |
 | 5b | executing-large-model | Default Step 5: CP1 + P0 subskills (`decisions.md`, `state.json` `CP1:approved` → `P0:done`, `proj/PROJ-<X>` worktree + `scripts/`), then waves → code, tests, `5_progress/PROJ-<X>-progress.md` |
