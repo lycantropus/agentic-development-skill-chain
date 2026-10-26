@@ -145,7 +145,7 @@ that require Claude fail closed when Claude review is unavailable.
 curated half-page docs instead of full texts, injection only by spawn
 class (micro-fixes get nothing), deterministic work runs as scripts
 rather than through the LLM, and token budgets are enforced in the
-preflight. Minimalism at code-writing time comes from the eight
+preflight. Minimalism at code-writing time comes from the six
 `## Minimal by default` rules in the implementer role manifests (§7). Dual lanes do NOT mean double flagship cost: every
 lane runs the cheapest model adequate for its role (model tiering in
 the role record — flagship models only for the few judgment-heavy
@@ -1331,7 +1331,7 @@ agent-browser smoke tests.
 | PRD source | TWO modes, downstream identical. Mode A (DEFAULT): PRDs written directly into the repo (existing structure) — the new chain is tested in this mode first. Mode B (TODO, Stage 3): Jira import, created/enriched via Teklens (teklens.ai); local snapshot = working truth per run; Jira keys in commits/PRs; sync-back |
 | PRD ownership | PM PRDs are raw input: developers enrich with technical stories, re-cut into buildable PRDs (in Jira for Mode B), and OWN the selection of the story set sent into the agentic loop — the framework checks AC quality, not scope |
 | Morning report | one-line summary + best-effort notification at run end; file in `specs/` rendered on demand (or at run end when P8 left neither an open PR nor a removed worktree) |
-| Minimalism ladder | eight `## Minimal by default` rules in the implementer role manifests (plus two micro-fixer rules), chain-owned and byte-identical across providers; the Ponytail plugin was retired 2026-10-26 (§7) |
+| Minimalism ladder | six `## Minimal by default` rules in the implementer role manifests (plus two micro-fixer rules), chain-owned and byte-identical across providers; the Ponytail plugin was retired 2026-10-26 (§7) |
 | Context pack manifest | schema following the claude-skills frontmatter taxonomy, defined when building the compiler (Stage 2) |
 | Cross-model review | symmetric provider-opposite review via our thin `cross-review`: Claude-authored → Codex, Codex-authored → authenticated isolated Claude with validated structured output, joint → both independently; required for Requirements/P6/P7 and automatic on saved concept/architecture/plan outputs; conservative default input cap, explicit diff omissions and Claude 10 MB stdin failure; any permitted model-opposite fallback is flagged, and same-model review never satisfies the gate (the six-persona QA fallback excepted, see §4); findings → ledger, blocking per §8 |
 | Focused bug repair | `bugfixing` stays outside the feature chain: reproduce first (real browser for UI), trace code cause + test escape, prove a regression test red before the fix, dispatch a micro-fixer, and stop after at most three Ralph repair attempts; CodeRabbit/Sonar are proportional existing gates, not new dependencies |
