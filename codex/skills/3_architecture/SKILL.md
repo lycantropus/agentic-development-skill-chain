@@ -123,7 +123,8 @@ crates.io), never from memory: exact package name and source, license, last
 release, maintenance, known advisories, server/client and bundle fit with
 § Stack, and whether it covers the ACs. Prefer the smallest fit; compare 2–3
 candidates only when the choice is not obvious. Only when no acceptable
-library or justified hand-built option meets an AC unchanged is it a product
+coverage option from this order (or a justified hand-built one) meets an AC
+unchanged is it a product
 question (adapt the AC or accept the heavier option) for the user or, in
 external mode, `handoff-refinement` — never silently narrow the AC.
 
