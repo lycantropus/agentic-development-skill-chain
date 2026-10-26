@@ -8,7 +8,7 @@ Three statements about an inventory stay separate:
 
 | Statement | Command | Meaning |
 |---|---|---|
-| Schema valid | `node <skill>/scripts/workspace.mjs check <inventory>` | Structure only. Says nothing about whether any remote exists. |
+| Schema valid | `node <handoff-refinement>/scripts/workspace.mjs check <inventory>` | Structure only. Says nothing about whether any remote exists. |
 | Remote verified | `workspace.mjs verify <inventory>` | `git ls-remote` answered for the coordination remote (and reports every other listed remote). |
 | Team ready | `verify` returns `teamReady: true` | Team mode and verified coordination remote; the marker may be registered on the team path. |
 
@@ -59,9 +59,7 @@ For every code repository, inspect its current code and curated documents, `spec
 
 The exported `nextBaselineStep` is only a deterministic routing aid: its `applicability` report plus `acceptedRevisionVerified`, `sealVerified`, `activeIntake`, `hasCode` and `drift` evidence comes from the inspection above. Explicit evidence of active intake takes priority over baseline reuse. Branch names alone are inspection hints, not proof of active work: they do not override a recorded accepted baseline. A recorded seal/proposal/accepted baseline without an applicability report returns `verify-baseline-applicability`. A report with missing seal/files or divergent unequal documents returns `reconcile-baseline-applicability`, never automatic intake. A divergent but byte-equivalent baseline is eligible for reuse once acceptance is verified. The report examines committed trees, not uncommitted documents; inspect dirty changes separately. Keep `sealRevision`, `examinedRevision`, `ancestor`, per-file presence/equality and `remoteAcceptance` distinct. Remote evidence input is `{verified,revision,evidence}` from the actual remote probe; the helper reports it but does not authenticate human acceptance. Match the report to the recorded seal and examined code revision before routing. A recorded accepted baseline with incomplete acceptance verification returns `verify-accepted-baseline`: verify its evidence and safely acquire/select that revision before reuse, never start duplicate intake. Recorded local seals/proposals await team acceptance (or coordinate their active intake); this is not a readiness claim. It does not fabricate evidence or launch a skill.
 
-Prototype evidence has three independent statements: source present (files or repository found), version matches the handoff (manifest/tag/commit agrees with the package), executability actually checked (built or started in this session). Screenshots and recordings document appearance only and never count as a runnable prototype. Report each statement, not a merged "prototype available".
-
-Close every run with this status block, one line each, each answered `yes`, `no` or `not attempted` with its evidence:
+Close every coordination setup (location located, marker drafted or registered, clone or creation) with this status block, one line each, each answered `yes`, `no` or `not attempted` with its evidence:
 
 ```
 Locally checked:   <checkouts inspected, inventory schema result>

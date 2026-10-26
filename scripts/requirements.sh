@@ -19,7 +19,7 @@ NVM_VERSION=v0.40.5
 SONAR_SCANNER_VERSION=8.2.0.6438
 
 # Skill folders folded into others; same list as the "retired" loop in install-*.sh.
-RETIRED_SKILLS="4a_checkpoint 4b_setup"
+RETIRED_SKILLS="4a_checkpoint 4b_setup 2d_delivery-workspace"
 
 NL='
 '

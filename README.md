@@ -192,10 +192,10 @@ responsibilities:
 - **Refinement location — shared coordination:** shared package, decision, dependency and integration records, plus shared engineering analysis as agreed by the team. A separate refinement repo is optional; the prototype repo or a production repo works equally, with the refinement project as a sibling of the product project (`specs/PROJ-<X>-<theme>-refinement/`), never inside it.
 - **Production repos — Engineering:** scoped, pinned refinement inputs and readiness records alongside architecture, implementation plans, tests and PRs, with execution state owned by each repo.
 
-Start with optional `delivery-workspace` (2d) to find or onboard the coordination
-location and identify each code repository's baseline status.
-Then use `handoff-refinement` (2e) to inspect the immutable product package against
-code, record engineering constraints, and prepare questions for the product team.
+Start with optional `handoff-refinement` (2e): it finds or records the coordination
+location, identifies each code repository's baseline status, then inspects the
+immutable product package against code, records engineering constraints, and
+prepares questions for the product team.
 Each refinement is one run under `specs/PROJ-<id>-<theme>/runs/<date>-<nn>/`
 with the received files kept unchanged and every new result marked as proposal,
 question, checked or approved. Explicit product answers unblock the affected
@@ -253,7 +253,6 @@ the model rank the runner pins for review lanes is in
 ## Optional Skills
 
 ```text
-2d_delivery-workspace
 2e_handoff-refinement
 bugfixing
 refactor-dreamer
