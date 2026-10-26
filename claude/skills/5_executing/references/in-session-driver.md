@@ -45,9 +45,10 @@ integration readiness. A PR remains the local exit, never a whole-feature claim.
       fi
       ```
    2. **Controller:** follow `references/p6-controller.md` with `<X>` and
-      `<theme>` filled in. Fixers are workers, tiered as in Step 5. The opposite
-      re-verification is `bash scripts/chain review qa <X> <theme> --personas --persist --round N …`
-      as in `6_qa`.
+      `<theme>` filled in. Fixers are workers, tiered as in Step 5. The persona
+      panel runs once (controller step 1); the opposite re-verification of
+      fixes is one reviewer, `bash scripts/chain review qa <X> <theme> --persist --round N …`
+      without `--personas`.
    3. **Seal** only with no open Critical/High; a non-zero exit means keep
       fixing or stop:
 
