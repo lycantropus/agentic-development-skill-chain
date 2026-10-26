@@ -122,9 +122,10 @@ Verify every candidate against its registry (e.g. `npm view <pkg>`, PyPI,
 crates.io), never from memory: exact package name and source, license, last
 release, maintenance, known advisories, server/client and bundle fit with
 § Stack, and whether it covers the ACs. Prefer the smallest fit; compare 2–3
-candidates only when the choice is not obvious. A library that cannot meet an
-AC is a product question (adapt the AC or accept a heavier library) for the
-user or, in external mode, `handoff-refinement` — never silently narrow the AC.
+candidates only when the choice is not obvious. Only when no acceptable
+library or justified hand-built option meets an AC unchanged is it a product
+question (adapt the AC or accept the heavier option) for the user or, in
+external mode, `handoff-refinement` — never silently narrow the AC.
 
 ## Output: `specs/PROJ-<X>-<theme>/3-4_plan/PROJ-<X>-architecture.md`
 
@@ -177,7 +178,8 @@ If the handoff conflicts with § Stack, § Stack wins — raise it as an open qu
 ## Dependencies
 [One line per generic capability from the Library Scan: capability → package
 (or existing dependency/code) with version range and license, affected PRDs,
-one-line reason. Hand-built capabilities state why no library fits.]
+one-line reason. Hand-built capabilities state their reason (no fit, license,
+size, security).]
 ```
 
 Example decision:
