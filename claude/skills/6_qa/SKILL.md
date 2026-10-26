@@ -134,16 +134,15 @@ The opposite-provider persona review is a diff-level review source, not a separa
 
 ### Required Persona Cross-Review (Claude QA)
 
-QA's persona review is the opposite-provider panel below; there is no in-session panel. When this QA skill runs in Claude, it is not complete until six independent Codex persona workers have reviewed the QA evidence. After documenting QA results and before making a release recommendation, run:
+QA's persona review is the opposite-provider panel below; there is no in-session panel. **Framework run (state.json exists):** the read-only finder skips this section; the P6 controller runs the panel on the stored finder report before triage. When this QA skill runs interactively in Claude, it is not complete until six independent Codex persona workers have reviewed the QA evidence. After documenting QA results and before making a release recommendation, run:
 
 ```bash
 BASE="specs/PROJ-<X>-<theme>"
 BASE_SHA="$(bash scripts/chain state get <X> <theme> .base_sha)"
 # The QA report is the QA summary sections only — never the whole progress.md.
 QA_REPORT="$(mktemp)"
-# Framework run: write the summary you will print as your final output into "$QA_REPORT"
-# (the runner stores that output as 5_progress/qa-finder-<ts>.md only after you finish).
-# Interactive run: export the QA Results section of progress.md:
+# Interactive run: export the QA Results section of progress.md.
+# (P6 controller: use the stored finder report, chain state get <X> <theme> .qa.finder_report)
 # awk '/^## /{p=($0=="## QA Results")} p' "$BASE/5_progress/PROJ-<X>-progress.md" >"$QA_REPORT"
 bash scripts/chain review qa <X> <theme> \
   --artifacts "$QA_REPORT" \
@@ -317,7 +316,7 @@ Critical/High simplicity findings gate production-readiness the same way functio
 
 ### 7. Document Results
 
-**Framework run (state.json exists): do not edit PRDs or progress.md (read-only finder).** Print the QA summary (per-AC results, Simplicity Gate, Spec vs Standards, Sonar input, Mutation input, AGENTS.md candidates, and the `retrospective` findings from `findings.json` under `## PROJ Retrospective`) as your final output; the runner stores it as `5_progress/qa-finder-<ts>.md`.
+**Framework run (state.json exists): do not edit PRDs or progress.md (read-only finder).** Print the QA summary (per-AC results, Simplicity Gate, Spec vs Standards, Sonar input, Mutation input, and AGENTS.md candidates) as your final output, followed by the finding JSON lines; the runner or in-session driver stores the text as `5_progress/qa-finder-<ts>.md` and ingests the lines. The persona `retrospective` findings reach the ledger through the controller's persona panel.
 
 **Interactive linear run (no external-handoff marker):** for each PRD tested, append a `## QA Test Results` section to that PRD file (`specs/PROJ-<X>-<theme>/2_PRDs/PROJ-<X>-PRD-<Y>-<desc>.md`) using `references/test-template.md` as the format. Write the same summary sections under `## QA Results` in `5_progress/PROJ-<X>-progress.md`, and append the persona `retrospective` findings verbatim under `## PROJ Retrospective`, each prefixed with the persona name.
 
@@ -352,10 +351,10 @@ Also document `### Sonar Quality Input`:
 - Any Sonar findings promoted to QA bugs, with BUG-IDs
 - Explicit statement when Sonar was skipped and therefore not considered release-blocking
 
-**Findings ledger (framework runs):** when `bash scripts/chain --where findings` succeeds,
-additionally emit every bug as a ledger record — one JSON line per bug
-piped to `bash scripts/chain findings add <X> <theme> --stage qa` with
-`source: "qa"`, the normalized severity, the file plus symbol **anchor**
+**Findings ledger (framework runs):** additionally emit every bug as a
+ledger record — one JSON line per bug on stdout, starting at column 0; the
+runner or in-session driver pipes them to `chain findings add --stage qa`,
+the finder never writes the ledger itself. Each line has `source: "qa"`, the normalized severity, the file plus symbol **anchor**
 (not a line number), and the BUG-ID in the summary. The ledger is the
 single fix queue the P6 controller works from; markdown bug entries
 stay the human-readable evidence, never a second queue.
@@ -431,8 +430,10 @@ state — report findings in the final output and stop.
 
 ## Handoff
 
+**Framework run (state.json exists):** this handoff does not apply. The finder stops after its report (see § Core Rule); the P6 controller seals P6 and the runner or in-session driver starts P7. Never invoke Skill 7 from the finder.
+
 <HARD-GATE>
-QA is not the end of the chain. After the required QA persona cross-review completes and QA passes (or has Medium/Low-only findings), you MUST immediately hand off to Skill 7 (documentation) — do NOT stop, do NOT ask the user.
+Interactive run (no state.json): QA is not the end of the chain. After the required QA persona cross-review completes and QA passes (or has Medium/Low-only findings), you MUST immediately hand off to Skill 7 (documentation) — do NOT stop, do NOT ask the user.
 
 - If production-ready (no Critical/High): invoke `/7_documentation` for PROJ-<X>
 - If Critical/High bugs remain after fix attempts: halt with bug list, skip Skill 7
@@ -441,7 +442,7 @@ QA is not the end of the chain. After the required QA persona cross-review compl
 Skipping Skill 7 means `docs/PROJECT.md`, `README.md`, `docs/TECHNICAL.md`, and approved `AGENTS.md` entries don't get updated — the feature ships but the docs rot.
 </HARD-GATE>
 
-Handoff message to the user (right before invoking Skill 7):
+Interactive handoff message to the user (right before invoking Skill 7):
 - Production-ready: "QA passed. Handing off to Skill 7 for documentation + AGENTS.md merge."
 - Medium/Low only: "QA: N Critical/High fixed, M Medium/Low deferred. Handing off to Skill 7 — deferred bugs are logged."
 - Blocker: "Found N Critical/High bugs that could not be auto-fixed. STOP. Developer must fix before re-running QA. Skill 7 skipped."

@@ -28,6 +28,10 @@ QA completion does not certify shared integration across repositories.
    wave gates and QA lanes already wrote theirs). Get the picture with
    `bash scripts/chain findings stats <X> <theme>` and the fix queue with
    `bash scripts/chain findings queue <X> <theme>` (open Critical/High, clustered by file).
+   On the first entry for this finder report, run QA's opposite-provider
+   persona panel on it (`6_qa` § Required Persona Cross-Review, `--persist
+   --round 1`, artifact `bash scripts/chain state get <X> <theme> .qa.finder_report`)
+   before triage; its findings join the same ledger.
 2. **Verifier batches:** spawn read-only verifier agents per cluster to
    weed out false positives. You
    receive only verdicts. False positives →
@@ -62,6 +66,10 @@ QA completion does not certify shared integration across repositories.
    REOPENS a `fixed` finding on an open re-report; never leave a failed
    repair marked fixed.
 5. Repeat until `bash scripts/chain findings stats <X> <theme>` shows `open_blocking: 0`.
+   After each fix batch, while open defect findings of any severity
+   remain, rerun the persona panel on a refreshed report with `--round 2`,
+   then `--round 3`; stop early when a round adds none. Do not seal
+   before the last required round has run.
    A finding whose `fix_attempts` reaches 3 and is still open is a STOP
    CONDITION (§8) — do not dispatch a fourth attempt.
 
