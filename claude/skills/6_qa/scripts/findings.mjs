@@ -224,6 +224,7 @@ if (cmd === "migrate-refinement") {
   withLock(() => {
     if (!existsSync(join(base, "external-handoff.json"))) fail("refinement migration requires external-handoff.json");
     const destination = join(base, REFINEMENT_DIR, "findings.json");
+    if (lstatSync(dirname(destination), { throwIfNoEntry: false })?.isSymbolicLink()) fail("refusing findings symlink — nothing written");
     const files = [destination, join(base, "2_PRDs/findings.json"), join(base, "3_PRDs/findings.json")].filter(existsSync);
     if (files.length > 1) {
       // Conflicting ledgers merge losslessly: every record kept verbatim; identical

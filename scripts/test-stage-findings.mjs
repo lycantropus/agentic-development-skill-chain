@@ -111,6 +111,13 @@ try {
     assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "a symlinked ledger directory is refused");
     assert.equal(fs.existsSync(path.join(outside, "findings.json")), true);
     fs.unlinkSync(path.join(base, "3_PRDs")); fs.mkdirSync(path.join(base, "3_PRDs"));
+    const outsideRefinement = path.join(work, "outside-refinement"); fs.mkdirSync(outsideRefinement);
+    const realRefinement = path.join(base, "refinement.real"); fs.renameSync(path.join(base, "refinement"), realRefinement);
+    fs.symlinkSync(outsideRefinement, path.join(base, "refinement"));
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [extra] }));
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "a symlinked refinement directory is refused");
+    assert.equal(fs.existsSync(path.join(outsideRefinement, "findings.json")), false);
+    fs.unlinkSync(oldRequirements); fs.unlinkSync(path.join(base, "refinement")); fs.renameSync(realRefinement, path.join(base, "refinement"));
     const reordered = Object.fromEntries(Object.entries(beforeMerge[0]).reverse());
     fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [reordered, extra] }));
     ok(["migrate-refinement", "1", "test"]);
