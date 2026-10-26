@@ -51,7 +51,7 @@
           "fix_attempts": { "type": "integer" },
           "debt_marker": {
             "type": "string",
-            "description": "ponytail: marker text when deferred as debt"
+            "description": "debt: marker text when deferred as debt"
           },
           "created_at": { "type": "string" },
           "updated_at": { "type": "string" }

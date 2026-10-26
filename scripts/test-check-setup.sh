@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-setup.sh after a pull: up to date passes; a raised minimum in requirements.sh, a
 # changed / new skill in the checkout, a retired folder still installed, or no install
-# at all fails with the reason; foreign skills are ignored; missing Ponytail only warns;
+# at all fails with the reason; foreign skills are ignored; a leftover Ponytail only warns;
 # nothing on the machine is changed. "Pulls" are edits to a copied checkout. PATH is a
 # farm of real tools plus fake claude/codex with fixed versions. Also unit-tests version_ge.
 set -euo pipefail
@@ -58,7 +58,7 @@ has_line() { grep -qF -- "$1" "$TMP/out" || fail "expected '$1' in: $(cat "$TMP/
 total="$(ls "$CO/claude/skills" | wc -l | tr -d ' ')"
 
 # Up to date, with a foreign skill next to the chain: passes, and changes nothing.
-install_all; ponytail on; mkdir -p "$H/.claude/skills/synced"
+install_all; ponytail off; mkdir -p "$H/.claude/skills/synced"
 # -A, not -a: the ".." entry is $TMP itself, which run() writes to (its size changes on APFS).
 snapshot() { (cd "$TMP" && ls -lAR home pt); }
 before="$(snapshot)"
@@ -100,10 +100,12 @@ rm -rf "$H"; mkdir -p "$H"; run
 [ "$rc" = 1 ] || fail "no install should exit 1, got $rc"
 has_line "  ✗ claude: not installed in $H/.claude/skills"; has_line "  ✗ codex: not installed in $H/.codex/skills"
 
-# Ponytail missing: warned with the fix, but not a problem.
-install_all; ponytail off; run
-[ "$rc" = 0 ] || fail "missing Ponytail must only warn, got $rc: $(cat "$TMP/out")"
-has_line "  ! claude: not installed (./scripts/install.sh offers it)"
-has_line "  ! codex: not installed (./scripts/install.sh offers it)"
+# Retired Ponytail still installed: warned with the removal commands, but not a problem.
+install_all; ponytail on; run
+[ "$rc" = 0 ] || fail "a leftover Ponytail must only warn, got $rc: $(cat "$TMP/out")"
+has_line "  ! claude: the retired Ponytail plugin is still installed (while enabled it injects into every subagent); remove it:"
+has_line "      claude plugin uninstall ponytail@ponytail"; has_line "      claude plugin marketplace remove ponytail"
+has_line "  ! codex: the retired Ponytail plugin is still installed (while enabled it injects into every subagent); remove it:"
+has_line "      codex plugin remove ponytail@ponytail"; has_line "      codex plugin marketplace remove ponytail"
 
 echo "test-check-setup: ok"

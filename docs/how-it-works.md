@@ -16,12 +16,12 @@ Every dispatcher action belongs to exactly one kind. A script can implement acti
 | Kind | Contract | `chain` verbs → script |
 |---|---|---|
 | **Record** | The only way to write one file. Validates every write. | `chain state` → state.sh · `chain findings` (with `chain findings harvest`) → findings.mjs · `chain quality` → quality.mjs |
-| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check inputs` → resolve-inputs.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check ponytail` → ponytail-check.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
+| **Gate** | Refuses to continue: exit 0 or non-zero, report on stdout. | `chain gate wave` → wave-gate.sh · `chain quality seal` → quality.mjs · `chain check inputs` → resolve-inputs.mjs · `chain check prds` → validate-prds.mjs · `chain check architecture` → validate-architecture.mjs · `chain check plan` → validate-wave-plan.mjs · `chain check preflight` → preflight.sh · `chain check migrations` → migration-drift-check.sh · `chain check caps` and `chain check intake` → curation.sh · `chain check conflicts` and `chain check ci` → delivery.sh |
 | **Renderer** | Turns data into a document. Never writes `state.json`, `findings.json` or `quality-*.json`. | `chain render context` → compile-context.mjs · `chain render slice` → story-slice.mjs · `chain render registry` → gen-component-registry.mjs · `chain render pr` and `chain render report` → render.mjs |
 | **Environment** | Changes the repo or the machine: worktree lifecycle, helper sync. | `chain worktree` → worktree.sh · `chain sync` → sync-framework.mjs |
 | **Review** | Starts a reviewer from the opposite provider and normalizes what it returns. | `chain review` → cross-review.sh · `chain review claude` → review-with-claude.sh · `chain review codex` → review-with-codex.sh |
 
-Stack-specific add-ons are separate scripts on purpose, so projects without that stack are unaffected: `chain check migrations` (Supabase projects), `chain render registry` (projects with a component library) and `chain check ponytail` (the Ponytail plugin). `chain check preflight` and `chain gate wave` call them when they apply.
+Stack-specific add-ons are separate scripts on purpose, so projects without that stack are unaffected: `chain check migrations` (Supabase projects) and `chain render registry` (projects with a component library). `chain check preflight` and `chain gate wave` call them when they apply.
 
 Not behind `chain`: `env-local.sh` and `compat.sh` (libraries the gates `source`), `merge-project-settings.sh` (Claude only, run once per project by hand), and the phase runner `runner/run-phase.sh`, which drives unattended runs.
 
@@ -98,7 +98,7 @@ flowchart TD
   CP1["CP1:approved"] --> A["1 · chain check plan<br/>plan consistency · exit 0/1"]
   A --> B["2 · chain worktree prepare<br/>worktree, branch proj/PROJ-X, tag proj-PROJ-X-base<br/>state: .worktree .base_sha .branch"]
   B --> C["3 · chain sync<br/>scripts/*, templates/*, .skillchain-helpers.json"]
-  C --> D["4 · chain check preflight<br/>tools, auth, ponytail, migrations<br/>state: .preflight .degraded .context.ponytail"]
+  C --> D["4 · chain check preflight<br/>tools, auth, migrations<br/>state: .preflight .degraded"]
   D --> E["5 · checkpoint commit, then verify the verifier<br/>chain gate wave --auth-budget-negative-control,<br/>or one safe controlled failure"]
   E --> F["6 · ground-file.md<br/>assumptions checked against the code"]
   F --> G["7 · chain render context compile<br/>worker files for every wave, once"]
@@ -145,7 +145,7 @@ A gate is either a **script** (deterministic, same answer every time), an **LLM 
 | Plan consistency (CP1, P0) | Script | `chain check plan` |
 | Plan, concept, requirements, architecture review | LLM review | `chain review plan` (and the other modes) |
 | Checkpoint 1 approval | Human | the checkpoint subskill; nothing is approved on the user's behalf |
-| Tool and auth preflight, Ponytail parity, migration drift | Script | `chain check preflight` |
+| Tool and auth preflight, migration drift | Script | `chain check preflight` |
 | Acceptance-criteria checks inside Outer Ralph | Script | `chain gate wave --ac-only N` |
 | Wave gate: ACs, regressions, build, browser smoke | Script (CodeRabbit runs inside it as one input) | `chain gate wave N` |
 | Integration review at the end of P5 | LLM review | a reviewer worker; its report is bound with `chain quality … review` |

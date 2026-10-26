@@ -93,7 +93,7 @@ it never touches real branches) and read the JSON verdict:
 
 ### 2. Complete the ledger before rendering
 
-1. `bash scripts/chain findings harvest <X> <theme> --stage delivery` — collect `ponytail:` markers
+1. `bash scripts/chain findings harvest <X> <theme> --stage delivery` — collect `debt:` markers
 2. `bash scripts/chain findings auto-defer <X> <theme>` — open Medium/Low → debt (§8)
 3. `bash scripts/chain findings stats <X> <theme>` — **open_blocking MUST be 0.**
    If not, P8 must not deliver: route back to the P6 fix loop; after
@@ -212,7 +212,7 @@ orchestrator) to the PR comments, via
 2. `fix now` → dispatch a fix task named `micro-fixer` per comment
    immediately, concurrently for disjoint files (comment verbatim + file
    paths each), verify, commit. Do not push per comment.
-3. `debt` → `ponytail:` marker + ledger record
+3. `debt` → `debt:` marker + ledger record
    (`bash scripts/chain findings add <X> <theme> --stage delivery` with status `deferred`),
    reply on the comment with the finding id.
 4. `reject` → reply on the PR with the rationale — never silently ignore.

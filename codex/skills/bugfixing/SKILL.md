@@ -232,7 +232,10 @@ Give the implementer or `micro-fixer` only:
 - the red regression-test command and verbatim failure;
 - allowed files or subsystem boundary;
 - acceptance checks;
-- explicit instruction to avoid unrelated refactors and dependency additions.
+- explicit instruction to avoid unrelated refactors and dependency additions;
+- the two micro-fixer rules: trace the flow end to end before the smallest
+  diff, and grep every caller of the touched function, fixing once where they
+  all route through, not only the path the report names.
 
 The implementer fixes one defect, runs the targeted test, and returns the changed
 files plus command output. The orchestrator remains responsible for independent

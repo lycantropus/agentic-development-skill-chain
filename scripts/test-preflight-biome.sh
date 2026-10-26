@@ -25,9 +25,6 @@ run_preflight() {
     PATH="$FAKE_BIN:$PATH" \
     PREFLIGHT_SKIP_LIVE_PROBE=1 \
     PREFLIGHT_CODEX_INACTIVE=1 \
-    PONYTAIL_ENFORCE=0 \
-    PONYTAIL_CONFIG="$TMP/ponytail-config.json" \
-    PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
     bash "$PREFLIGHT" 1 biome >/dev/null)
 }
 
@@ -79,9 +76,6 @@ sonar_output="$(cd "$sonar" && \
   PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
   PREFLIGHT_SKIP_LIVE_PROBE=1 \
   PREFLIGHT_CODEX_INACTIVE=1 \
-  PONYTAIL_ENFORCE=0 \
-  PONYTAIL_CONFIG="$TMP/ponytail-config.json" \
-  PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
   bash "$PREFLIGHT" 1 sonar)"
 grep -q 'npm-wrapped scanner engine' <<<"$sonar_output" \
   || fail "npm-wrapped sonar_cmd was not accepted without standalone sonar-scanner"
@@ -97,8 +91,7 @@ for command_name in sonar sonar-scanner; do
 done
 run_sonar_policy() {
   (unset SONAR_TOKEN; cd "$sonar"; PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
-    PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
-    PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
+    PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 \
     bash "$PREFLIGHT" 1 sonar >"$TMP/sonar-policy-output" 2>&1)
 }
 run_sonar_policy || { cat "$TMP/sonar-policy-output" >&2; fail "unconfigured optional Sonar must not require scanner auth"; }
@@ -136,8 +129,7 @@ rm "$sonar/specs/PROJ-1-sonar/state.json"
 installed="$TMP/installed/5_executing"
 mkdir -p "$installed/scripts" "$sonar/scripts"
 cp "$ROOT/codex/skills/5_executing/scripts/env-local.sh" "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$sonar/scripts/"
-cp "$ROOT/codex/skills/5_executing/scripts/ponytail-check.sh" \
-  "$ROOT/codex/skills/5_executing/scripts/compat.sh" \
+cp "$ROOT/codex/skills/5_executing/scripts/compat.sh" \
   "$ROOT/codex/skills/5_executing/scripts/resolve-inputs.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/integration-status.mjs" \
   "$ROOT/codex/skills/5_executing/scripts/compile-context.mjs" \
@@ -151,8 +143,7 @@ text = text.replaceAll('$HOME/.claude/skills/5_executing', process.argv[4]).repl
 fs.writeFileSync(process.argv[3], text);
 NODE
 fallback_output="$(cd "$sonar" && PATH="$FAKE_BIN:$(dirname "$BASH"):/usr/bin:/bin" \
-  PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 \
-  PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" \
+  PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 \
   bash scripts/preflight.sh 1 sonar)"
 grep -q '✓ worker context check' <<<"$fallback_output" || fail "installed compiler fallback failed"
 
@@ -182,7 +173,7 @@ printf 'MemAvailable: 100 kB\n' >"$TMP/meminfo"
 printf '#!/usr/bin/env bash\necho called >"$RESOURCE_PROBE_MARKER"\nexit 0\n' >"$FAKE_BIN/claude"
 export RESOURCE_PROBE_MARKER="$TMP/provider-probe"
 rc=0
-(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" PONYTAIL_ENFORCE=0 bash "$PREFLIGHT" 1 biome >"$TMP/pressure.log" 2>&1) || rc=$?
+(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" bash "$PREFLIGHT" 1 biome >"$TMP/pressure.log" 2>&1) || rc=$?
 [ "$rc" -eq 77 ] || fail "pressure must refuse preflight with 77, got $rc: $(cat "$TMP/pressure.log")"
 [ ! -e "$RESOURCE_PROBE_MARKER" ] || fail "pressure launched preflight provider probe"
 
@@ -198,7 +189,7 @@ rc=0
 printf '{"resources":{"test_workers":0,"wait_seconds":0}}\n' >"$pressure/specs/PROJ-1-biome/3-4_plan/wave-gate-config.json"
 printf '{"resources":{"min_available_mb":0,"max_memory_psi_full_avg10":100,"wait_seconds":0}}\n' >"$TMP/outer-resources.json"
 rc=0
-(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" PREFLIGHT_PROBE_TIMEOUT=1 PONYTAIL_ENFORCE=0 bash -c 'source "$1"; resource_run "$2" outer-preflight bash "$3" 1 biome' _ "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$TMP/outer-resources.json" "$PREFLIGHT" >"$TMP/outer.log" 2>&1) || rc=$?
+(cd "$pressure" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/resources" PREFLIGHT_PROBE_TIMEOUT=1 bash -c 'source "$1"; resource_run "$2" outer-preflight bash "$3" 1 biome' _ "$ROOT/codex/skills/5_executing/scripts/compat.sh" "$TMP/outer-resources.json" "$PREFLIGHT" >"$TMP/outer.log" 2>&1) || rc=$?
 [ "$rc" -eq 64 ] || fail "outer lease bypassed project policy, got $rc: $(cat "$TMP/outer.log")"
 [ ! -e "$RESOURCE_PROBE_MARKER" ] || fail "outer lease launched provider despite invalid project policy"
 jq -e '.preflight.ok == false and .preflight.resource_exit == 64' "$pressure/specs/PROJ-1-biome/state.json" >/dev/null || fail "invalid nested policy retained green evidence"
@@ -209,7 +200,7 @@ mkdir -p "$portable"
 printf 'MemAvailable: 16777216 kB\n' >"$TMP/portable-meminfo"
 printf '{"resources":{"min_available_mb":0,"max_memory_psi_full_avg10":100,"wait_seconds":0}}\n' >"$TMP/portable-config.json"
 rc=0
-(cd "$portable" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/portable-meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/portable-resources" PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 PONYTAIL_ENFORCE=0 PONYTAIL_CONFIG="$TMP/ponytail-config.json" PONYTAIL_CLAUDE_REGISTRY="$TMP/no-claude-registry.json" REAL_BASH="$BASH" PREFLIGHT_SCRIPT="$PREFLIGHT" REENTRY_COUNT="$TMP/reentry-count" "$BASH" -c '
+(cd "$portable" && PATH="$FAKE_BIN:$PATH" SKILLCHAIN_MEMINFO_FILE="$TMP/portable-meminfo" SKILLCHAIN_CGROUP_DIR="$TMP/no-cgroup" SKILLCHAIN_RESOURCE_LOCK_DIR="$TMP/portable-resources" PREFLIGHT_SKIP_LIVE_PROBE=1 PREFLIGHT_CODEX_INACTIVE=1 REAL_BASH="$BASH" PREFLIGHT_SCRIPT="$PREFLIGHT" REENTRY_COUNT="$TMP/reentry-count" "$BASH" -c '
   command() { if [[ "${1:-}" == -v && "${2:-}" == flock ]]; then return 1; else builtin command "$@"; fi; }
   bash() {
     if [[ "${1:-}" == "$PREFLIGHT_SCRIPT" ]]; then

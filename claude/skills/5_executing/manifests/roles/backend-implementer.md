@@ -35,4 +35,11 @@ the role file without a story, and your report starts with
 
 When external product inputs are supplied, preserve source identities and verbatim criteria. Treat approved responses and separate engineering constraints as scoped inputs; never edit received product files. Report missing product authority or contradictory criteria to the lead instead of choosing product behavior or marking the gap as ordinary debt.
 
-Use the packages the architecture's `## Dependencies` lists for their capabilities; do not hand-build those capabilities. Do not add a dependency it does not list — report the need to the lead instead.
+## Minimal by default
+
+- Nothing new that the repo already has (helper, util, type, component): grep first, then reuse or extend.
+- No new dependency and no hand-built capability a listed dependency provides: use the packages the architecture's `## Dependencies` lists; do not add one it does not list — report the need to the lead instead.
+- No abstraction, option, config or flag without a current requirement or a second current user: inline it; the second user extracts.
+- No scaffolding for later: no TODO stubs, unused exports or empty extension points.
+- No silent fallbacks, no swallowed errors: fail loudly or return an error with its cause.
+- Never minimize validation at trust boundaries, data-loss protection, security or accessibility: those are always complete.

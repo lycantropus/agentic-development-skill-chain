@@ -296,15 +296,13 @@ enforces it.
 It checks the prerequisites ([Claude Code](https://code.claude.com/docs/en/setup),
 [Codex](https://github.com/openai/codex), bash >= 4.4, `git`, `jq`, Node.js LTS >= 22,
 and `perl` where `timeout` is absent), lists everything missing at once and offers to install it (showing the
-exact commands first), then installs both chains and offers to install Ponytail where it is missing,
-plus the optional Sonar CLIs.
+exact commands first), then installs both chains and offers the optional Sonar CLIs.
 Start newly installed `claude` and `codex` once to sign in. On a single-provider
 machine run `./scripts/install-claude.sh` or `./scripts/install-codex.sh` alone.
 
 The installers copy the bundled core chain and optional skills into the
-default local skill directories as one unit (no per-skill install). Framework runs additionally need the
-Ponytail plugin on both providers — install commands and the mode/scoping
-setup are in [docs/installation.md](docs/installation.md), together with the macOS (bash >= 4.4) and Windows (WSL2) notes.
+default local skill directories as one unit (no per-skill install). The macOS (bash >= 4.4) and
+Windows (WSL2) notes are in [docs/installation.md](docs/installation.md).
 
 After pulling updates, run `./scripts/check-setup.sh`: it reports tools below
 the checkout's required versions and installed skills that no longer match it,
@@ -313,7 +311,7 @@ optional local git hook)
 ([details](docs/installation.md#after-pulling-updates)).
 
 To remove it again, run `./scripts/uninstall.sh`: it removes the chain's skill
-folders and Ponytail, asking before each, and leaves Claude Code, Codex and your
+folders (and a leftover Ponytail plugin, now retired), asking before each, and leaves Claude Code, Codex and your
 other skills installed ([details](docs/installation.md#uninstall)).
 
 ## Validate
@@ -336,7 +334,7 @@ This repo was shaped by ideas from:
 
 - [Get Shit Done](https://github.com/majiayu000/claude-skill-registry/tree/main/skills/data/get-shit-done)
 - [Superpowers](https://github.com/obra/superpowers)
-- [Ponytail](https://github.com/DietrichGebert/ponytail)
+- [Ponytail](https://github.com/DietrichGebert/ponytail) (used as a plugin until 2026-10-26; its ideas live on in the role manifests)
 - [Alex Sprogis](https://www.alexsprogis.de/)
 - [Matt Pocock](https://github.com/mattpocock)
 

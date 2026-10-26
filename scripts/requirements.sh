@@ -84,10 +84,12 @@ check_prereqs() { # sets $missing/$missing_cmds (what to fix) and $found (what i
   fi
 }
 
-# Ponytail install commands per provider (docs/installation.md § Ponytail), one per line.
-PONYTAIL_INSTALL_CLAUDE="claude plugin marketplace add DietrichGebert/ponytail${NL}claude plugin install ponytail@ponytail"
-PONYTAIL_INSTALL_CODEX="codex plugin marketplace add DietrichGebert/ponytail${NL}codex plugin add ponytail@ponytail"
-ponytail_on() { # ponytail_on claude|codex: the Ponytail plugin is installed there (read-only; same files and overrides as chain check ponytail)
+# The Ponytail plugin was retired on 2026-10-26 (its rules now live in the role manifests). It
+# still injects into every subagent where installed, so check-setup.sh warns and uninstall.sh
+# offers its removal for one release; drop both and this helper afterwards.
+PONYTAIL_REMOVE_CLAUDE="claude plugin uninstall ponytail@ponytail${NL}claude plugin marketplace remove ponytail"
+PONYTAIL_REMOVE_CODEX="codex plugin remove ponytail@ponytail${NL}codex plugin marketplace remove ponytail"
+ponytail_on() { # ponytail_on claude|codex: the Ponytail plugin is installed there (read-only)
   case "$1" in
     claude) grep -q '"ponytail@ponytail"' "${PONYTAIL_CLAUDE_REGISTRY:-$HOME/.claude/plugins/installed_plugins.json}" 2>/dev/null ;;
     codex) grep -q 'plugins\."ponytail@ponytail"' "${PONYTAIL_CODEX_CONFIG:-$HOME/.codex/config.toml}" 2>/dev/null ||

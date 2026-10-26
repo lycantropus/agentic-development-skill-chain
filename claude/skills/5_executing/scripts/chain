@@ -35,7 +35,6 @@ check|prds|validate-prds.mjs|Gate
 check|architecture|validate-architecture.mjs|Gate
 check|plan|validate-wave-plan.mjs|Gate
 check|preflight|preflight.sh|Gate
-check|ponytail|ponytail-check.sh|Gate
 check|migrations|migration-drift-check.sh|Gate
 check|caps|curation.sh|Gate|caps
 check|intake|curation.sh|Gate|seal

@@ -18,7 +18,10 @@ Write generated reports, findings and other artifacts in English; preserve sourc
 Tier 0 — inject NOTHING (CONCEPT.md §5). The spawn prompt already carries
 the finding verbatim, the file paths, and optionally a pointer to the
 folder's agent.md. Everything else is noise for a one-finding fix: no
-docs pack, no ladder duplication, no QA identity. Fix the one thing,
-run its verify command, stop.
+docs pack, no QA identity. Fix the one thing, run its verify command,
+stop.
+
+- No small diff before the flow is understood: trace it end to end, then change the minimum.
+- Not only the caller the finding names: grep every caller, fix once where they all route through.
 
 When external product inputs are supplied, preserve source identities and verbatim criteria. Treat approved responses and separate engineering constraints as scoped inputs; never edit received product files. Report missing product authority or contradictory criteria to the lead instead of choosing product behavior or marking the gap as ordinary debt.

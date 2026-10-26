@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deterministic behavior tests for findings ingestion, dedupe, reopen and the ponytail: debt harvest.
+# Deterministic behavior tests for findings ingestion, dedupe, reopen and the debt: marker harvest.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -77,33 +77,36 @@ run_suite() {
   jq -e '[.findings[] | select(.file=="src/catalog.tsx")] | length==2 and ([.[]|select(.summary=="Validate regular image file")][0].severity=="critical")' \
     "$work/specs/PROJ-1-test/5_progress/findings.json" >/dev/null || fail "$label: same-line genuine duplicate did not merge/escalate"
 
-  # harvest: ponytail: markers become deferred debt findings; idempotent; quiet when there is nothing to do
+  # harvest: debt: markers (and the retired ponytail: spelling) become deferred debt findings; idempotent; quiet when there is nothing to do
   local hv="$TMP/$label-harvest"
   mkdir -p "$hv/specs/PROJ-1-test" "$hv/src/deep" "$hv/node_modules/x" "$hv/specs/PROJ-1-test/notes"
-  printf 'a\n// ponytail: global lock, per-account locks if throughput matters\nb\n' >"$hv/src/a.ts"
+  printf 'a\n// debt: global lock, per-account locks if throughput matters\nb\n' >"$hv/src/a.ts"
   printf '# ponytail:no space note\n' >"$hv/src/deep/b.py"
-  printf '// ponytail: ignored, vendored\n' >"$hv/node_modules/x/c.js"
-  printf 'ponytail: ignored, a spec note\n' >"$hv/specs/PROJ-1-test/notes/n.md"
+  printf '// debt: ignored, vendored\n' >"$hv/node_modules/x/c.js"
+  printf 'debt: ignored, a spec note\n' >"$hv/specs/PROJ-1-test/notes/n.md"
   (cd "$hv" && node "$ledger" harvest 1 test) >"$hv/out" || fail "$label: harvest failed"
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 2 ]] || fail "$label: harvest should find exactly the two src markers"
   jq -e '[.findings[] | select(.file == "src/a.ts")] | length == 1 and .[0].line == 2 and .[0].status == "deferred" and .[0].severity == "low" and .[0].source == "debt"
-         and .[0].summary == "ponytail: global lock, per-account locks if throughput matters"
+         and .[0].summary == "debt: global lock, per-account locks if throughput matters"
          and .[0].debt_marker == "global lock, per-account locks if throughput matters"' \
     "$hv/specs/PROJ-1-test/5_progress/findings.json" >/dev/null || fail "$label: harvested finding has the wrong shape"
-  jq -e '[.findings[] | select(.file == "src/deep/b.py")][0].summary == "ponytail: no space note"' "$hv/specs/PROJ-1-test/5_progress/findings.json" >/dev/null \
-    || fail "$label: marker without a space after the colon"
+  jq -e '[.findings[] | select(.file == "src/deep/b.py")][0].summary == "debt: no space note"' "$hv/specs/PROJ-1-test/5_progress/findings.json" >/dev/null \
+    || fail "$label: retired ponytail: spelling not harvested, or marker without a space after the colon"
   (cd "$hv" && node "$ledger" harvest 1 test) >/dev/null
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 2 ]] || fail "$label: harvest is not idempotent"
+  echo '{"source":"debt","severity":"low","status":"deferred","category":"debt","summary":"ponytail: global lock, per-account locks if throughput matters","file":"src/a.ts","line":2}' \
+    | (cd "$hv" && node "$ledger" add 1 test) >/dev/null
+  [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 2 ]] || fail "$label: a record under the retired ponytail: prefix must merge with its debt: re-harvest"
   (cd "$hv" && node "$ledger" harvest 1 test nowhere) | grep -q 'does not exist' || fail "$label: a missing search root should be reported, not fatal"
   (cd "$hv" && node "$ledger" harvest 1 test src/a.ts) | grep -q 'does not exist' || fail "$label: a file as search root should be reported like a missing directory"
-  mkdir "$hv/empty"; (cd "$hv" && node "$ledger" harvest 1 test empty) | grep -q 'no ponytail: markers' || fail "$label: no markers should be reported, not fatal"
+  mkdir "$hv/empty"; (cd "$hv" && node "$ledger" harvest 1 test empty) | grep -q 'no debt: markers' || fail "$label: no markers should be reported, not fatal"
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 2 ]] || fail "$label: an empty harvest changed the ledger"
   (cd "$hv" && node "$ledger" harvest 1 test .) >/dev/null
   [[ $(jq '[.findings[] | select(.file | startswith("node_modules") or startswith("specs"))] | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq 0 ]] \
     || fail "$label: harvest of the repo root must still skip node_modules and specs"
   mkdir -p "$hv/specs/PROJ-1-test/3-4_plan" "$hv/app/src"
   printf '{"app_root":"app"}\n' >"$hv/specs/PROJ-1-test/3-4_plan/wave-gate-config.json"
-  printf '// ponytail: nested app debt\n' >"$hv/app/src/nested.ts"
+  printf '// debt: nested app debt\n' >"$hv/app/src/nested.ts"
   (cd "$hv" && node "$ledger" harvest 1 test --stage delivery) >/dev/null
   jq -e '.findings | length == 1 and .[0].file == "app/src/nested.ts"' "$hv/specs/PROJ-1-test/8_delivery/findings.json" >/dev/null || fail "$label: default harvest ignored configured app_root"
   for invalid_root in '../escape' '..\escape' '/tmp' ' '; do
@@ -112,7 +115,7 @@ run_suite() {
   done
   (cd "$hv" && node "$ledger" harvest 1 test empty) >/dev/null || fail "$label: explicit harvest root must override app_root"
   before=$(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json")
-  mkdir "$hv/huge"; yes 'x ponytail: filler marker text to make the grep output large' | head -c 60000000 >"$hv/huge/big.txt" || true
+  mkdir "$hv/huge"; yes 'x debt: filler marker text to make the grep output large' | head -c 60000000 >"$hv/huge/big.txt" || true
   set +e; (cd "$hv" && node "$ledger" harvest 1 test huge) >/dev/null 2>&1; rc=$?; set -e
   [[ "$rc" -eq 1 ]] || fail "$label: an oversized harvest must fail instead of truncating (got $rc)"
   [[ $(jq '.findings | length' "$hv/specs/PROJ-1-test/5_progress/findings.json") -eq "$before" ]] || fail "$label: a failed harvest changed the ledger"

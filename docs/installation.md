@@ -31,12 +31,8 @@ answer but `y` (or a non-interactive stdin) declines; then, or when an install
 command fails, nothing is copied. Start newly installed `claude` and `codex`
 once to sign in.
 
-With everything present it runs both installers below. Then, for each provider
-still without [Ponytail](#ponytail-required-for-framework-runs-stage-2), it shows
-that provider's marketplace and plugin commands and asks `Install Ponytail now?`
-before running them, and finally runs `chain check ponytail`. Declining, or a
-failed check, only warns: Ponytail is needed for framework runs, not for
-installing skills. Last, if `sonar` or `sonar-scanner` is missing, it offers the
+With everything present it runs both installers below. Then, if `sonar` or
+`sonar-scanner` is missing, it offers the
 optional [Sonar CLIs](#sonar-clis-optional-per-project) the same way. The
 per-provider installers stay
 available for single-provider machines and for `update-chain`.
@@ -102,32 +98,24 @@ The framework helpers run on Linux and macOS. They need bash >= 4.4, `git`, `jq`
 - All GNU-only calls live in `compat.sh`; `scripts/check-portability.sh` (part of `validate.sh`) enforces it and
   `scripts/test-portability.sh` runs the fast suites on a Linux box with macOS-like tool shims.
 
-## Ponytail (required for framework runs, Stage 2)
+## Ponytail (retired)
 
-The framework's minimalism ladder is the third-party
-[Ponytail](https://github.com/DietrichGebert/ponytail) plugin — installed
-on all active providers in mode `full`. Versions may differ and are reported
-for diagnostics only. The P0 preflight (`chain check ponytail`) blocks runs
-on absence, wrong mode, or restricted subagent coverage. `./scripts/install.sh`
-offers the install commands below for each provider that lacks it.
+The third-party Ponytail plugin was the framework's minimalism ladder until
+2026-10-26. Its rules now live in the chain's own role manifests
+(`5_executing/manifests/roles/*.md`, `## Minimal by default`), so nothing
+installs or gates it any more. Where it is still installed it keeps injecting
+into every subagent on that provider, so `./scripts/check-setup.sh` warns and
+`./scripts/uninstall.sh` offers its removal (see [Uninstall](#uninstall)), or
+remove it by hand:
 
 ```bash
 # Claude Code
-claude plugin marketplace add DietrichGebert/ponytail
-claude plugin install ponytail@ponytail
+claude plugin uninstall ponytail@ponytail
+claude plugin marketplace remove ponytail
 # Codex
-codex plugin marketplace add DietrichGebert/ponytail
-codex plugin add ponytail@ponytail
+codex plugin remove ponytail@ponytail
+codex plugin marketplace remove ponytail
 ```
-
-The shared mode lives in `~/.config/ponytail/config.json`
-(`{"defaultMode":"full"}` — `chain check ponytail` persists it if absent).
-Leave `PONYTAIL_SUBAGENT_MATCHER` unset. Ponytail then reaches every normal
-subagent, including generic implementation fallbacks; P0 rejects a scoped
-matcher because it silently misses those fallbacks.
-
-`PONYTAIL_ENFORCE=0` is the loud escape hatch — the run continues without
-the ladder, recorded in state.json and flagged in the reports.
 
 ## Sonar CLIs (optional, per project)
 
@@ -186,11 +174,11 @@ It changes nothing and reports:
   checkout: skills changed or added since the last install, retired folders
   still installed, or no install at all. Other skills in those directories are
   ignored.
-- **Ponytail** per provider, as a warning only (framework runs need it).
+- A leftover [Ponytail](#ponytail-retired) plugin per provider, as a warning only.
 
 It exits 1 when anything but Ponytail needs fixing; `./scripts/install.sh`
 fixes all of it (it treats a tool below its minimum like a missing one and
-offers the upgrade, reinstalls the skills, and offers Ponytail).
+offers the upgrade and reinstalls the skills).
 
 ### Optional: run it after every pull
 
@@ -238,7 +226,7 @@ It lists what it found and asks separately before removing each part:
   `4a_checkpoint`/`4b_setup`) in `~/.claude/skills/` and `~/.codex/skills/`
   (or `CLAUDE_HOME`/`CODEX_HOME`). It matches by name, so your other skills
   and the directories themselves stay.
-- **Ponytail**, where installed: `claude plugin uninstall ponytail@ponytail`,
+- The retired **Ponytail** plugin, where still installed: `claude plugin uninstall ponytail@ponytail`,
   `claude plugin marketplace remove ponytail`, `codex plugin remove
   ponytail@ponytail` and `codex plugin marketplace remove ponytail`. A failed
   command is reported and the rest still run (exit 1). If a provider's CLI is
