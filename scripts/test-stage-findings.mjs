@@ -90,11 +90,20 @@ try {
     ok(["add", "1", "test", "--stage", "requirements"], JSON.stringify({ ...JSON.parse(record), anchor: "second-round" }));
     assert.ok(aggregate().some(f => f.id === "F-PROJ-1-008"), "IDs continue across stages and runs");
     assert.equal(fs.existsSync(path.join(base, "runs/second/refinement/findings.json")), false);
-    // A second ledger must never be overwritten or silently accepted.
-    fs.writeFileSync(oldRequirements, preserved);
-    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0);
-    assert.deepEqual(fs.readFileSync(oldRequirements), preserved);
-    fs.unlinkSync(oldRequirements);
+    // A second ledger blocks ordinary use, and migrate-refinement merges it losslessly.
+    const beforeMerge = JSON.parse(fs.readFileSync(refinement)).findings;
+    const extra = { ...beforeMerge[0], id: "F-PROJ-1-099", summary: "old-ledger only" };
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [beforeMerge[0], extra] }));
+    assert.notEqual(run(["list", "1", "test"]).status, 0, "conflicting ledgers fail closed");
+    const conflicting = { ...beforeMerge[0], summary: "edited elsewhere" };
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [conflicting] }));
+    assert.notEqual(run(["migrate-refinement", "1", "test"]).status, 0, "a differing duplicate ID needs its owner");
+    assert.equal(fs.existsSync(oldRequirements), true);
+    fs.writeFileSync(oldRequirements, JSON.stringify({ proj: "PROJ-1", findings: [beforeMerge[0], extra] }));
+    ok(["migrate-refinement", "1", "test"]);
+    assert.equal(fs.existsSync(oldRequirements), false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(refinement)).findings, [...beforeMerge, extra], "every record kept verbatim");
+    ok(["set-status", "1", "test", extra.id, "fixed", "revision"]);
     const fresh = path.join(work, "specs/PROJ-2-external"); fs.mkdirSync(fresh);
     fs.writeFileSync(path.join(fresh, "external-handoff.json"), '{"schemaVersion":1}');
     ok(["add", "2", "external", "--stage", "requirements"], record);

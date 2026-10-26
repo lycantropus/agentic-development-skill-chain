@@ -37,7 +37,7 @@
 // collection streams cannot lose each other's writes.
 //
 // Exit codes: 0 ok · 1 invalid input / unknown severity / lock timeout (nothing written) · 2 findings.json missing · 64 usage
-import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, renameSync, mkdirSync, rmdirSync, statSync, lstatSync, unlinkSync } from "node:fs";
 import { join, dirname, isAbsolute } from "node:path";
 import { stageDirectory, readFindingLedgers, REFINEMENT_DIR } from "./findings-store.mjs";
 import { createHash } from "node:crypto";
@@ -222,10 +222,33 @@ function harvestLines(root) {
 if (cmd === "migrate-refinement") {
   withLock(() => {
     if (!existsSync(join(base, "external-handoff.json"))) fail("refinement migration requires external-handoff.json");
+    const destination = join(base, REFINEMENT_DIR, "findings.json");
+    const files = [destination, join(base, "2_PRDs/findings.json"), join(base, "3_PRDs/findings.json")].filter(existsSync);
+    if (files.length > 1) {
+      // Conflicting ledgers merge losslessly: every record kept verbatim; identical
+      // repeats (an interrupted earlier merge) collapse, a differing duplicate ID stops.
+      if (files.some(f => lstatSync(f).isSymbolicLink())) fail("refusing findings symlink — nothing written");
+      let ledgers;
+      try { ledgers = files.map(f => JSON.parse(readFileSync(f, "utf8"))); } catch (error) { fail(`unreadable ledger: ${error.message} — nothing written`); }
+      if (new Set(ledgers.map(l => l.proj)).size !== 1) fail("ledgers name different projects — nothing written");
+      const byId = new Map();
+      for (const f of ledgers.flatMap(l => l.findings ?? [])) {
+        if (byId.has(f.id) && JSON.stringify(byId.get(f.id)) !== JSON.stringify(f)) fail(`finding ${f.id} differs between ledgers; resolve it with its owner — nothing written`);
+        byId.set(f.id, f);
+      }
+      const merged = { proj: ledgers[0].proj, updated_at: now, findings: [...byId.values()] };
+      validateLedger(merged);
+      mkdirSync(dirname(destination), { recursive: true });
+      const tmp = join(dirname(destination), `.findings.${process.pid}.tmp`);
+      writeFileSync(tmp, JSON.stringify(merged, null, 2) + "\n");
+      renameSync(tmp, destination);
+      for (const f of files) if (f !== destination) unlinkSync(f);
+      console.log(`findings.mjs: merged ${files.join(", ")} -> ${destination}`);
+      return;
+    }
     const ledger = load();
     validateLedger(ledger);
     const source = join(stageDirectory(base, "requirements"), "findings.json");
-    const destination = join(base, REFINEMENT_DIR, "findings.json");
     if (source !== destination && existsSync(source)) {
       mkdirSync(dirname(destination), { recursive: true });
       renameSync(source, destination);

@@ -79,9 +79,11 @@ project-level `refinement/findings.json`, shared across runs. Before reviewing a
 existing external project, run `chain findings migrate-refinement <X> <theme>`.
 It moves an existing `2_PRDs/findings.json` (or legacy `3_PRDs/findings.json`)
 byte-for-byte under the project lock; rerunning is safe. Other files remain in
-place. If both old and new ledgers exist, it refuses to overwrite either; reconcile
-the conflict before continuing. Until migration, helpers retain the old ledger as
-its owner. Never rename/delete it manually or create a per-run ledger.
+place. If old and new ledgers both exist (all reads then fail closed), the same
+command merges them into `refinement/findings.json`, keeping every record verbatim;
+a finding ID whose records differ stops the merge for its owner to resolve. Until
+migration, helpers retain the old ledger as its owner. Never rename/delete it
+manually or create a per-run ledger.
 
 `chain findings list` aggregates these files and an existing legacy root ledger
 without writing a central copy. IDs remain unique per PROJ; status and attempt
