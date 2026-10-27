@@ -22,6 +22,13 @@ PROJ map) and `bootstrap` (the stack decided into one table, the real
 scaffold stood up, agent files written); an existing codebase goes through
 `intake`, which reaches the same curated baseline by extraction.
 
+The baseline has nine files: root `AGENTS.md` and `docs/{PRODUCT,ARCHITECTURE,GUIDELINES,DESIGN-SYSTEM,components,security-baseline,test-conventions,review-checklist}.md`.
+The two UI files are conditional. GUIDELINES holds target-state rules and at most
+10 project-specific Traps within 120 lines; review-checklist holds project antipatterns
+and Known Debt within 80 lines and is required to seal. Reviewers and QA read it;
+implementers read it by path only during self-review after writing. See the
+[rule placement contract](CONCEPT.md#trap-test-and-rule-placement).
+
 ## The Chain
 
 ```mermaid

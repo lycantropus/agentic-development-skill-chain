@@ -125,53 +125,6 @@ Binding for every test an implementer, the Outer Ralph or a gate relies on.
 | Must mock everything | Code too coupled. Use dependency injection. |
 | Test setup huge | Extract helpers. Still complex? Simplify design. |
 
-## Testing Anti-Patterns
-
-### 1. Testing Mock Behavior
-
-Asserting on mock elements (e.g., `getByTestId('sidebar-mock')`).
-
-**Gate:** "Am I testing real component behavior or just mock existence?"
-If mock existence: delete the assertion or unmock the component.
-
-### 2. Test-Only Methods in Production
-
-Adding `destroy()` or cleanup methods to production classes only called in tests.
-
-**Gate:** "Is this method only used by tests?"
-If yes: put it in test utilities instead.
-
-### 3. Mocking Without Understanding Dependencies
-
-Mocking a high-level method that has side effects the test depends on.
-
-**Gate:** Before mocking, ask:
-1. What side effects does the real method have?
-2. Does this test depend on any of them?
-3. Run the test with the real implementation FIRST, then add minimal mocking at the right level.
-
-### 4. Incomplete Mocks
-
-Only mocking fields you know the immediate test uses. Downstream code may silently depend on omitted fields.
-
-**Rule:** Mock the COMPLETE data structure as it exists in reality.
-
-### 5. Tests as Afterthought
-
-Declaring implementation complete without tests.
-
-**Fix:** Follow TDD. Tests are part of implementation, not optional follow-up.
-
-## Warning Signs of Bad Mocks
-
-- Mock setup longer than test logic
-- Mocking everything to make test pass
-- Mocks missing methods real components have
-- Test breaks when mock changes
-- Can't explain why mock is needed
-
-If mocks are too complex, consider integration tests with real components instead.
-
 ## Common Rationalizations
 
 | Excuse | Reality |

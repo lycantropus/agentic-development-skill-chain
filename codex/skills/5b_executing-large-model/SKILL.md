@@ -263,8 +263,11 @@ UI (if any): the handoff sections the slice points to
   production implementation or required tests.
 
 Every behavior change needs a test that failed before and passes after; run it
-and read the output (rules: 5_executing/references/writing-tests.md). Before
-reporting, re-read your diff against the story once, fix what you find, run targeted tests once, then report in ≤300 tokens:
+and read the output (rules: 5_executing/references/writing-tests.md § Evidence Rules).
+After writing, read docs/review-checklist.md by path for Inner Ralph self-review
+only; never inject it into an implementer bundle. Do not re-flag Known Debt; flag
+changes that spread it. Before reporting, re-read your diff against the story once,
+fix what you find, run targeted tests once, then report in ≤300 tokens:
 files changed, tests added and their commands, anything unresolved.
 Sequential wave: commit as feat(PROJ-<X>-PRD-<Y>): implement US-<N> <task>.
 Parallel wave: do not stage or commit; the lead integrates and commits.

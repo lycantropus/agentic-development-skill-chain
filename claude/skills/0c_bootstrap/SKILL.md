@@ -185,13 +185,20 @@ that is not listed there; never add one without an architecture decision.
 ## Curated context
 - `docs/PRODUCT.md` — what the product is, and is not
 - `docs/ARCHITECTURE.md` — stack + load-bearing architecture
-- `docs/GUIDELINES.md` — conventions that ARE the rule
+- `docs/GUIDELINES.md` — target-state rules + project-specific Traps
+- `docs/review-checklist.md` — reviewer/QA checks and Known Debt
 - `docs/DESIGN-SYSTEM.md` + `docs/components.md` — UI rules + registry
 - `specs/product-roadmap.md` — PROJ map and order
 
 ## Rules
 - <rules the user states now, or nothing — P7 curation grows this file>
 ```
+
+Seed `docs/GUIDELINES.md` with target-state rules grouped by topic and an empty
+`## Traps` section (≤10 top-level list entries; [trap test](../../../CONCEPT.md#trap-test-and-rule-placement)).
+Seed `docs/review-checklist.md` (≤80 lines) with `## Antipatterns` and
+`## Known Debt` headers, even when both are empty. Antipatterns are project-specific
+checks with detection signal and severity; Known Debt means do not re-flag, do not spread.
 
 **Root `CLAUDE.md`** — a pointer, never a second rulebook:
 

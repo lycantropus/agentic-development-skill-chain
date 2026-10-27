@@ -6,6 +6,8 @@
 #       docs/PRODUCT.md        <= 30 non-blank lines   ("half page")
 #       docs/ARCHITECTURE.md   <= 200 lines
 #       docs/DESIGN-SYSTEM.md  <= 80 lines    (injected into every frontend bundle)
+#       docs/review-checklist.md <= 80 lines (reviewers / QA, read by path)
+#       docs/GUIDELINES.md § Traps <= 10 top-level list entries
 #       docs/GUIDELINES.md     <= 120 lines   (injected into every tier-1 bundle)
 #       docs/security-baseline.md <= 60 lines (backend / generic bundles)
 #       docs/test-conventions.md  <= 60 lines (every tier-1 bundle)
@@ -101,6 +103,34 @@ caps() (
   [ -f docs/security-baseline.md ] && check docs/security-baseline.md "$(total docs/security-baseline.md)"  60 "lines"
   [ -f docs/test-conventions.md ]  && check docs/test-conventions.md  "$(total docs/test-conventions.md)"   60 "lines"
 
+  if [ -f docs/review-checklist.md ]; then
+    check docs/review-checklist.md "$(total docs/review-checklist.md)" 80 "lines"
+  else
+    missing docs/review-checklist.md
+  fi
+  if [ -f docs/GUIDELINES.md ]; then
+    # Top-level Markdown bullets or numbered items; continuations/nested bullets
+    # are part of the same entry. A top-level marker may be indented 0–3
+    # spaces; markers at/after its content column are nested, not new Traps.
+    # Stop at the next level-1/2 heading.
+    traps="$(awk '
+      { sub(/\r$/, "") }
+      /^## Traps[[:space:]]*$/ { active=1; have_top=0; next }
+      /^##?[[:space:]]/ { active=0 }
+      active {
+        item=$0; sub(/^ */, "", item)
+        indent=length($0)-length(item)
+        marker=match(item, /^([-*+]|[0-9]+[.)])[ 	]+/)
+        if (marker && indent <= 3 &&
+            (!have_top || indent < content_indent)) {
+          count++; have_top=1; content_indent=indent+RLENGTH
+        } else if (!marker && item ~ /[^[:space:]]/ && indent < content_indent) have_top=0
+      }
+      END { print count+0 }
+    ' docs/GUIDELINES.md)"
+    check 'docs/GUIDELINES.md § Traps' "$traps" 10 "entries"
+  fi
+
   if [ -d src ]; then
     while IFS= read -r f; do
       check "$f" "$(total "$f")" 100 "lines"
@@ -121,10 +151,12 @@ seal() (
 
   FAIL=0
 
+  # Nine baseline files: seven below plus the two UI-only files checked next.
   BASELINE=(
     docs/PRODUCT.md
     docs/ARCHITECTURE.md
     docs/GUIDELINES.md
+    docs/review-checklist.md
     docs/security-baseline.md
     docs/test-conventions.md
     AGENTS.md
@@ -137,6 +169,25 @@ seal() (
       FAIL=1
     fi
   done
+
+  if [ -f docs/review-checklist.md ]; then
+    for heading in '## Antipatterns' '## Known Debt'; do
+      if ! awk -v heading="$heading" '
+        { sub(/\r$/, ""); line=$0; sub(/^ ? ? ?/, "", line) }
+        match(line, /^(```+|~~~+)/) {
+          marker=substr(line, 1, RLENGTH); tail=substr(line, RLENGTH+1)
+          if (!fence) { fence=substr(marker, 1, 1); width=length(marker) }
+          else if (substr(marker, 1, 1)==fence && length(marker)>=width && tail ~ /^[[:space:]]*$/) fence=""
+          next
+        }
+        !fence { sub(/[[:space:]]*$/, "", line); if (line==heading) found=1 }
+        END { exit !found }
+      ' docs/review-checklist.md; then
+        echo "MISSING docs/review-checklist.md $heading — required checklist section"
+        FAIL=1
+      fi
+    done
+  fi
 
   # DESIGN-SYSTEM.md and components.md are UI-only baseline files: a backend-only
   # repo never has a component directory and must not be blocked from sealing

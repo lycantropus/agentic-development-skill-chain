@@ -132,7 +132,9 @@ Rules:
 
 ## Inner Ralph Self-Review
 
-After all tasks for a user story are implemented, its worker runs one bounded self-review covering task/spec compliance, error handling, type safety, test quality, boundaries, and architecture. The worker fixes confirmed issues once, reruns targeted tests, and reports unresolved issues without starting another self-review cycle.
+After all tasks for a user story are implemented, its worker reads `docs/review-checklist.md` by path (never injected into its bundle), then runs one bounded self-review covering task/spec compliance, error handling, type safety, test quality, boundaries, and architecture. The worker fixes confirmed issues once, reruns targeted tests, and reports unresolved issues without starting another self-review cycle.
+
+Existing Known Debt is not re-flagged; changes that spread it are flagged.
 
 The implementer does not verify acceptance criteria. That is reserved for the lead's wave-scoped Outer Ralph pass.
 

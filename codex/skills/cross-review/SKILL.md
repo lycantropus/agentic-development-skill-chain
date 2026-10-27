@@ -39,7 +39,7 @@ explanations may use the user's language.
 | `architecture` | `3-4_plan/PROJ-<X>-architecture.md` | decisions, feasibility, traceability, risk, Summary fidelity |
 | `plan` | wave plans and gate config | executability, coverage, sequencing, scope |
 | `qa` | QA summary/evidence plus implementation diff | evidence integrity, adversarial coverage, finding quality, release decision; `--personas` runs six isolated discipline reviewers |
-| `docs` | curated documentation | factual truth, staleness, cap-gaming, durable-rule quality |
+| `docs` | curated documentation | factual truth, staleness, cap-gaming, durable-rule quality, every new Trap against [the trap test](../../../CONCEPT.md#trap-test-and-rule-placement) |
 
 Supply source artifacts that establish truth through `--ground-truth`; the
 script embeds both artifacts and ground truth with `cat -n` line numbers. A

@@ -10,10 +10,11 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail() { echo "test-curation: $*" >&2; exit 1; }
 
 lines() { seq 1 "$1"; }
-baseline() { # fresh repo with every file at exactly its cap
+baseline() { # nine baseline files: seven required + two conditional UI files; capped files at their cap
   rm -rf "$R"; mkdir -p "$R/docs" "$R/src/feature" "$R/specs/intake"; cd "$R"
   { lines 20; printf '\n\n\n'; lines 10; } >docs/PRODUCT.md   # 30 non-blank + blanks
   lines 200 >docs/ARCHITECTURE.md; lines 120 >docs/GUIDELINES.md
+  { printf "## Antipatterns\n## Known Debt\n"; lines 78; } >docs/review-checklist.md
   lines 60 >docs/security-baseline.md; lines 60 >docs/test-conventions.md
   lines 40 >AGENTS.md; lines 100 >src/feature/agent.md
   printf 'D-BOOTSTRAP-01 decided\n' >specs/intake/decisions.md
@@ -31,7 +32,7 @@ transcript() {
   run "caps clean at the cap" check caps .
   run "caps default root" check caps
   for spec in "docs/PRODUCT.md 31" "docs/ARCHITECTURE.md 201" "docs/GUIDELINES.md 121" "docs/security-baseline.md 61" \
-              "docs/test-conventions.md 61" "AGENTS.md 41" "src/feature/agent.md 101"; do
+              "docs/review-checklist.md 81" "docs/test-conventions.md 61" "AGENTS.md 41" "src/feature/agent.md 101"; do
     set -- $spec; baseline; lines "$2" >"$1"
     run "caps breach $1" check caps .
   done
@@ -45,9 +46,45 @@ transcript() {
   baseline; rm docs/PRODUCT.md; run "caps missing product warns" check caps .
   baseline; rm docs/PRODUCT.md; run "caps missing product require-baseline" check caps --require-baseline .
 
+  baseline; rm docs/review-checklist.md; run "caps missing checklist warns" check caps .
+  run "caps missing checklist require-baseline" check caps --require-baseline .
+  baseline; printf '## Traps\n' >docs/GUIDELINES.md
+  for i in $(seq 1 10); do printf '%s. Don’t X → instead Y — why here\n   continuation\n    - nested detail\n' "$i" >>docs/GUIDELINES.md; done
+  printf '## Other\n- outside Traps\n' >>docs/GUIDELINES.md
+  run "caps ten multiline numbered Traps" check caps .
+  baseline; printf '## Traps\n' >docs/GUIDELINES.md
+  for i in $(seq 1 11); do printf -- '- Don’t X → instead Y — why here\n' >>docs/GUIDELINES.md; done
+  run "caps eleven Traps breach" check caps .
+  run "intake eleven Traps breach" check intake .
+  baseline; printf '## Traps\n## Other\n- not a trap\n' >docs/GUIDELINES.md
+  run "caps empty Traps" check caps .
+
+  for indent in '' ' ' '  ' '   '; do
+    baseline; printf '## Traps\n' >docs/GUIDELINES.md
+    for i in $(seq 1 10); do printf '%s- Trap %s\n%s  - nested detail\n' "$indent" "$i" "$indent" >>docs/GUIDELINES.md; done
+    run "caps ten Traps at indent ${#indent}" check caps .
+    printf '%s- Trap 11\n' "$indent" >>docs/GUIDELINES.md
+    run "caps eleven Traps at indent ${#indent}" check caps .
+    run "intake eleven Traps at indent ${#indent}" check intake .
+  done
+  baseline; printf '## Traps\n  1. Trap one\n     - nested detail\n   2. Trap two\n      1. nested detail\n## Other\n- outside\n' >docs/GUIDELINES.md
+  run "caps numbered Traps with mixed top-level indentation" check caps .
+  baseline; printf '## Traps\n- Trap one\n\nAnother list:\n\n  - Trap two\n    - nested detail\n' >docs/GUIDELINES.md
+  run "caps paragraph-separated Traps lists" check caps .
+  for header in '## Antipatterns' '## Known Debt'; do
+    baseline; sed -i "\|^$header$|d" docs/review-checklist.md
+    run "intake missing checklist header $header" check intake .
+  done
+  baseline; printf '```markdown\n## Antipatterns\n## Known Debt\n```\n' >docs/review-checklist.md
+  run "intake fenced checklist headers are not sections" check intake .
+  baseline; printf '~~~markdown\n## Antipatterns\n## Known Debt\n~~~\n## Antipatterns\n## Known Debt\n' >docs/review-checklist.md
+  run "intake actual checklist headers after fence" check intake .
+  baseline; printf '## Antipatterns\n## Known Debt\n' >docs/review-checklist.md
+  run "intake thin checklist" check intake .
+
   baseline; run "intake sealable" check intake .
   baseline; run "intake default root" check intake
-  for f in docs/PRODUCT.md docs/ARCHITECTURE.md docs/GUIDELINES.md docs/security-baseline.md docs/test-conventions.md AGENTS.md; do
+  for f in docs/PRODUCT.md docs/ARCHITECTURE.md docs/GUIDELINES.md docs/review-checklist.md docs/security-baseline.md docs/test-conventions.md AGENTS.md; do
     baseline; rm "$f"; run "intake missing $f" check intake .
   done
   for marker in '[extracted: src/a.ts]' '[assumed]' '[gap: who owns this]'; do
@@ -66,6 +103,21 @@ for provider in claude codex; do
   CHAIN="$ROOT/$provider/skills/5_executing/scripts/chain"
   bash "$CHAIN" check caps --help | grep -q 'curation.sh caps' || fail "$provider: caps --help prints no usage"
   CHAIN="$ROOT/$provider/skills/5_executing/scripts/chain"
+  R="$TMP/repo"; baseline
+  printf '## Traps\n' >docs/GUIDELINES.md
+  for i in $(seq 1 11); do printf '  - Trap %s\n    - nested detail\n' "$i" >>docs/GUIDELINES.md; done
+  if bash "$CHAIN" check caps . >"$TMP/regression.out" 2>&1; then
+    fail "$provider: eleven indented Traps incorrectly pass caps"
+  fi
+  grep -q 'Traps 11/10 entries' "$TMP/regression.out" || fail "$provider: wrong indented Trap count"
+  baseline; printf '## Antipatterns\n' >docs/review-checklist.md
+  if bash "$CHAIN" check intake . >"$TMP/regression.out" 2>&1; then
+    fail "$provider: checklist without Known Debt incorrectly seals"
+  fi
+  baseline; printf '## Known Debt\n' >docs/review-checklist.md
+  if bash "$CHAIN" check intake . >"$TMP/regression.out" 2>&1; then
+    fail "$provider: checklist without Antipatterns incorrectly seals"
+  fi
   transcript >"$TMP/$provider.txt"
   if [ "${1:-}" = "--record" ]; then cp "$TMP/$provider.txt" "$EXPECTED"; echo "test-curation: recorded $EXPECTED"; exit 0; fi
   diff -u "$EXPECTED" "$TMP/$provider.txt" || fail "$provider transcript differs from $EXPECTED"

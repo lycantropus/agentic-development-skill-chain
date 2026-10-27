@@ -36,6 +36,7 @@ JS
 P="$CASE/specs/PROJ-1-demo"
 mkdir -p "$P/3-4_plan" "$CASE/docs"
 echo "# Product" >"$CASE/docs/PRODUCT.md"
+printf "## Antipatterns\nCHECKLIST_CONTENT_SENTINEL\n## Known Debt\n" >"$CASE/docs/review-checklist.md"
 cat >"$P/3-4_plan/PROJ-1-architecture.md" <<'ARCH'
 # PROJ-1 Architecture — demo
 
@@ -189,7 +190,7 @@ sha256sum -c --quiet "$CASE/foreign.sha" || die "compile touched a foreign agent
 T_PRODUCT='Product (docs/PRODUCT.md)'; T_ARCH='Architecture overview (docs/ARCHITECTURE.md)'; T_PROJ='PROJ architecture ('
 T_GUIDE='Guidelines (docs/GUIDELINES.md)'; T_DS='Design system (docs/DESIGN-SYSTEM.md)'; T_COMP='Component registry (docs/components.md)'
 T_API='API contracts — own wave only'; T_SEC='Security baseline (docs/security-baseline.md)'; T_TEST='Test conventions (docs/test-conventions.md)'
-T_GROUND='Validated assumptions ('; T_CRIT='Review criteria'; T_DIFF='Diff scope'; T_STORY='Your Story'
+T_CHECK='Review checklist (docs/review-checklist.md)'; T_GROUND='Validated assumptions ('; T_CRIT='Review criteria'; T_DIFF='Diff scope'; T_STORY='Your Story'
 sections() { # file, then +title (must have a "## title..." line) / -title (must not)
   local f="$1" spec t; shift
   for spec in "$@"; do
@@ -198,7 +199,7 @@ sections() { # file, then +title (must have a "## title..." line) / -title (must
     else [ "${spec:0:1}" = "-" ] || die "$f lacks a '## $t' section"; fi
   done
 }
-CORE=("+$T_PRODUCT" "+$T_ARCH" "+$T_PROJ" "+$T_GUIDE" "+$T_API" "+$T_TEST" "+$T_GROUND" "-$T_CRIT" "-$T_DIFF")
+CORE=("-$T_CHECK" "+$T_PRODUCT" "+$T_ARCH" "+$T_PROJ" "+$T_GUIDE" "+$T_API" "+$T_TEST" "+$T_GROUND" "-$T_CRIT" "-$T_DIFF")
 for f in "$CTX/roles/wave-1/frontend-implementer.md" "$CTX/workers/wave-1/PROJ-1-PRD-1-US-2.frontend.md"; do
   sections "$f" "${CORE[@]}" "+$T_DS" "+$T_COMP" "-$T_SEC"
 done
@@ -208,7 +209,7 @@ done
 for f in "$CTX/roles/wave-1/implementer.md" "$CTX/workers/wave-1/PROJ-1-PRD-1-US-3.md"; do
   sections "$f" "${CORE[@]}" "+$T_DS" "+$T_COMP" "+$T_SEC"
 done
-sections "$CTX/roles/wave-1/reviewer.md" "+$T_PRODUCT" "+$T_CRIT" "+$T_DIFF" "-$T_ARCH" "-$T_PROJ" "-$T_GUIDE" "-$T_DS" "-$T_COMP" "-$T_API" "-$T_SEC" "-$T_TEST" "-$T_GROUND" "-$T_STORY"
+sections "$CTX/roles/wave-1/reviewer.md" "+$T_CHECK" "+$T_PRODUCT" "+$T_CRIT" "+$T_DIFF" "-$T_ARCH" "-$T_PROJ" "-$T_GUIDE" "-$T_DS" "-$T_COMP" "-$T_API" "-$T_SEC" "-$T_TEST" "-$T_GROUND" "-$T_STORY"
 for f in "$CTX"/roles/wave-1/*.md; do sections "$f" "-$T_STORY"; done   # role files carry no story
 for f in "$CTX"/workers/wave-1/*.md; do sections "$f" "+$T_STORY"; done  # every story file does
 ls "$CTX"/workers/wave-1 | grep -q reviewer && die "reviewer got a worker file"
@@ -259,6 +260,15 @@ rm -rf "$CTX" .claude/agents/skillchain-*.md
 run compile 1 demo >/dev/null
 snap | cmp - "$CASE/full.snap" || die "a compile from scratch does not reproduce every byte"
 grep -rq 'NEVER-INJECT-MARKER' "$CTX" .claude && die "never-inject violated: PRD or progress.md content in a worker or agent file"
+
+# All waves, every implementer role and story: no checklist path or body is injected.
+for f in "$CTX"/roles/wave-*/*implementer.md "$CTX"/workers/wave-*/*.md; do
+  grep -qE 'review-checklist|CHECKLIST_CONTENT_SENTINEL' "$f" && die "$f leaked checklist context"
+done
+for f in "$CTX"/roles/wave-*/reviewer.md; do
+  grep -qF 'Read `docs/review-checklist.md`' "$f" || die "$f lacks checklist path"
+done
+grep -rqF 'CHECKLIST_CONTENT_SENTINEL' "$CTX" && die "checklist must be read by path, not inlined"
 
 # budget breach and parser error: exit != 0, nothing written or deleted
 cp -r "$SKILL/manifests/roles" "$CASE/tight"
@@ -417,6 +427,15 @@ cp -r "$SKILL/manifests/roles" "$CASE/badname"
 sed -i 's|^name: reviewer$|name: ../reviewer|' "$CASE/badname/reviewer.md"
 [ "$(rc node "$COMPILE" compile 1 demo --roles-dir "$CASE/badname")" -eq 1 ] && grep -qF "manifest name '../reviewer'" "$CASE/err" \
   || die "invalid manifest name must exit 1"
+
+# Local manifests cannot bypass reviewer-only routing.
+cp -r "$SKILL/manifests/roles" "$CASE/leaky"
+for role in implementer frontend-implementer backend-implementer; do
+  cp "$SKILL/manifests/roles/$role.md" "$CASE/leaky/$role.md"
+  sed -i '/^inject:$/a\  - review-checklist' "$CASE/leaky/$role.md"
+  [ "$(rc node "$COMPILE" compile 1 demo --roles-dir "$CASE/leaky")" -eq 2 ] && grep -qF 'review-checklist is reserved for reviewers' "$CASE/err" || die "$role accepted checklist injection"
+  cp "$SKILL/manifests/roles/$role.md" "$CASE/leaky/$role.md"
+done
 
 # missing plan wave, plan without a story, missing plan folder: exit 2
 [ "$(rc run compile 1 demo --wave 9)" -eq 2 ] || die "unknown wave must exit 2"

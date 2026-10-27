@@ -284,12 +284,18 @@ Inventory: `docs/components.md` · Rationale: `specs/PROJ-<X>-<theme>/1c_design/
 
 ## Do / Don't
 - Do: compose from registered components (`docs/components.md`)
-- Don't: hex colors, arbitrary sizes, a styled `<div>` that duplicates a component
-- Don't: introduce a component that is not registered — escalate instead
+- Do: use the named token classes for colors and sizes
+- Do: extend the registry through the design-system procedure
 
 ## Extending
 Variant before new component. Procedure: `1c_frontend-design` → Extending The Design System.
 ```
+
+Every Don’t rule must pass the [trap test](../../../CONCEPT.md#trap-test-and-rule-placement).
+Keep target-state Dos here; project-specific Don’ts that pass the test belong in
+`docs/GUIDELINES.md` § Traps with alternative and reason, without repeating generic
+role rules. Artifact-style Don’ts belong in `docs/review-checklist.md` § Antipatterns
+with detection signal and severity. Showcase `Don’t:` examples stay as visual traps.
 
 Write tokens as **classes, not hex palettes** — the implementer needs what to type. The hex values live in the design language document and in the CSS variables.
 

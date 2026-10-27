@@ -32,18 +32,21 @@ developer tells what is INTENDED — product scope and non-goals, security
 requirements, which of two inconsistent conventions is the rule going
 forward. This is a collaborative session, not a batch job.
 
-## Output (the baseline — all eight files)
+## Output (the baseline — all nine files)
 
 | File | Content | Cap |
 |---|---|---|
 | `docs/PRODUCT.md` | what the product is, for whom, non-goals | ½ page (≤30 non-blank lines) |
 | `docs/ARCHITECTURE.md` | the load-bearing architecture truths as current state, in the sections `Stack` · `System shape` · `Data ownership` · `Invariants` (`0c_bootstrap` § 3); details → `docs/architecture/` | ≤200 lines |
-| `docs/GUIDELINES.md` | conventions that ARE the rule (incl. Known Debt notes for losing patterns) | ≤120 lines |
+| `docs/GUIDELINES.md` | target-state rules by topic + `## Traps` (≤10 top-level list entries, each `Don’t X → instead Y — why it happens here`; use the [trap test](../../../CONCEPT.md#trap-test-and-rule-placement)) | ≤120 lines |
+| `docs/review-checklist.md` | `## Antipatterns`: project-specific checks with detection signal and severity; `## Known Debt`: do not re-flag, do not spread | ≤80 lines |
 | `docs/DESIGN-SYSTEM.md` | design **rules** extracted from code — tokens, scales, patterns, do/don't — or a pointer to **frontend-design** (1c) if none exist; never invented. No component inventory (that's `components.md`) | ≤80 lines |
 | `docs/components.md` | component registry — **generated** by `scripts/chain render registry` from the doc block above each component export | — |
 | `docs/security-baseline.md` | auth model, secret handling, input validation floor | ≤60 lines |
 | `docs/test-conventions.md` | test runner, layout, naming, what must be tested | ≤60 lines |
 | `AGENTS.md` (root) | initial durable agent rules | ≤40 non-blank lines |
+
+`docs/review-checklist.md` is required to seal; a thin file with both headers beats an absent one. Generic role rules stay in the chain manifests, never duplicated in project Traps.
 
 `docs/DESIGN-SYSTEM.md` and `docs/components.md` are only required to seal
 when the repo has a component directory (`src/components` or
@@ -102,8 +105,10 @@ they locate, the prepare subagent judges):
   DESIGN-SYSTEM draft. If no real tokens exist, write a pointer to the
   **frontend-design** skill (1c) instead of inventing a design system.
 
-Draft ALL eight files into `specs/intake/` with a provenance marker on
-EVERY statement:
+Draft the nine baseline files into `specs/intake/` as applicable: the seven
+core files, including `review-checklist.md`, are always required; the two UI
+files follow the component-directory condition in the output table above.
+Put a provenance marker on EVERY statement:
 
 - `[extracted: <file:line evidence>]` — derived from code/README/git
   history, with the evidence reference
@@ -132,8 +137,9 @@ the orchestrator edits no draft.
 - Every answer becomes a GUIDELINES rule (or a PRODUCT/ARCHITECTURE
   statement, wherever it belongs).
 - For inconsistencies: the developer picks the rule going forward; the
-  LOSING pattern becomes a **Known Debt** note in GUIDELINES — recorded,
-  not silently rewritten.
+  LOSING pattern becomes a **Known Debt** note in the `review-checklist` draft
+  in `specs/intake/`; the seal step promotes it to `docs/review-checklist.md` —
+  recorded, not silently rewritten.
 - `[assumed]` items the developer confirms lose their marker; corrected
   ones are rewritten from the answer.
 
@@ -144,8 +150,10 @@ the orchestrator edits no draft.
    syntax, the sealed baseline never carries them.
 2. `bash scripts/chain check intake` (no `scripts/chain` yet: use
    `~/.claude/skills/5_executing/scripts/chain`, which finds the helpers in the
-   installed skills). It verifies: all eight files exist,
-   zero residual markers, `specs/intake/decisions.md` carries
+   installed skills). It verifies the nine baseline files subject to the
+   output table’s UI condition: seven core files always exist (including
+   `review-checklist.md`), plus both UI files when component directories exist;
+   zero residual markers; `specs/intake/decisions.md` carries
    `D-BOOTSTRAP` reconcile decisions (undiscussed drafts never seal),
    file caps hold. Red → fix, re-run; NEVER seal past a red check.
 3. Commit: `docs: intake baseline — initial curated docs`

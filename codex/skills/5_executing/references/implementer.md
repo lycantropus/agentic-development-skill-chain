@@ -59,7 +59,9 @@ Task tool:
        Parallel wave: do not stage or commit — report; the lead integrates and commits.
 
     After all tasks:
-    7. Run one bounded Inner Ralph self-review covering both:
+    7. After writing, read `docs/review-checklist.md` by path for this bounded
+       Inner Ralph self-review only (never inject it into the implementer bundle).
+       Do not re-flag Known Debt; flag changes that spread it. Review both:
        - Spec compliance — does the implementation match the task requirements?
        - Code quality — error handling, type safety, test quality, architecture.
     8. Fix confirmed findings once, then re-run targeted tests. Report unresolved

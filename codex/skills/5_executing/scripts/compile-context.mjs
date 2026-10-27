@@ -107,7 +107,7 @@ function coerce(v) {
 
 const SOURCE_IDS = [
   "product", "architecture-overview", "proj-architecture", "guidelines",
-  "ground-file", "test-conventions", "design-system", "components",
+  "ground-file", "test-conventions", "design-system", "components", "review-checklist",
   "api-contracts-own-wave", "security-baseline", "review-criteria", "diff-scope",
 ];
 // Repo manifest copies synced before the rename (sync-framework never
@@ -138,6 +138,8 @@ function loadManifests() {
 function checkManifests(manifests) {
   for (const m of manifests) {
     if (!["implementer", "frontend-implementer", "backend-implementer"].includes(m.name)) continue;
+    if (m.inject.includes("review-checklist"))
+      fail(`${m.file}: review-checklist is reserved for reviewers; implementers read it by path only after writing`, 2);
     if (/## Deine Story/.test(m.preamble))
       fail(`${m.file}: preamble names the retired German story heading — refresh the manifest via sync-framework or use \`## Your Story\``, 2);
     if (/tasks\s+arrive\s+in\s+the\s+spawn\s+prompt/.test(m.preamble))
@@ -237,6 +239,7 @@ function sourceContent(id, manifest, wave, prds) {
     case "ground-file":          return { title: `Validated assumptions (${BASE}/ground-file.md)`, text: readOr(join(BASE, "ground-file.md"), "generated in P0 step 6b") };
     case "test-conventions":     return { title: "Test conventions (docs/test-conventions.md)", text: readOr("docs/test-conventions.md", "no intake baseline yet") };
     case "design-system":        return { title: "Design system (docs/DESIGN-SYSTEM.md)", text: readOr("docs/DESIGN-SYSTEM.md", "no intake baseline yet") };
+    case "review-checklist":     return { title: "Review checklist (docs/review-checklist.md)", text: "Read `docs/review-checklist.md` for project-specific antipatterns and Known Debt. Do not re-flag existing debt; flag changes that spread it. If absent, report the missing baseline and use the available review criteria." };
     case "components":           return { title: "Component registry (docs/components.md)", text: "Read `docs/components.md` before creating or changing a component; it is deliberately referenced by path so its inventory does not consume this file's budget." };
     case "security-baseline":    return { title: "Security baseline (docs/security-baseline.md)", text: readOr("docs/security-baseline.md", "no intake baseline yet") };
     case "api-contracts-own-wave": return { title: "API contracts — own wave only", text: apiContractsOwnWave(wave) };
